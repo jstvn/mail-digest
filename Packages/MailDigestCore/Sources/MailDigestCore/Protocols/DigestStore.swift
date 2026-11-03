@@ -52,8 +52,11 @@ public protocol DigestStore: Sendable {
     func items(job jobID: UUID) async throws -> [JobItem]
     /// Sets an item's state; `.processing` increments attempts, and `error` is stored as lastError.
     func setItemState(_ itemID: UUID, _ state: JobItemState, error: String?) async throws
-    /// Stores the outcome text and time taken for a finished item.
-    func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double) async throws
+    /// Stores the outcome text, time taken and finish time for a finished item.
+    func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws
+    /// Moves a job's `failed` items back to `queued` with attempts reset to 0 (lastError is kept),
+    /// and returns the updated items. Used by "Retry failed".
+    func requeueFailed(job jobID: UUID) async throws -> [JobItem]
     /// Moves every `processing` item back to `queued` and returns how many changed.
     func requeueInterrupted() async throws -> Int
 }

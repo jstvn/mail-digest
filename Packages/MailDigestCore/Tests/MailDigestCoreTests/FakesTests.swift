@@ -117,7 +117,7 @@ private func header(_ id: String) -> MessageHeader {
         #expect(try await store.requeueInterrupted() == 1)
         #expect(try await store.nextQueued(job: job, limit: 5).map(\.messageID) == ["a", "c"])
 
-        try await store.recordItemOutcome(items[0].id, outcome: "ok", seconds: 2)
+        try await store.recordItemOutcome(items[0].id, outcome: "ok", seconds: 2, finishedAt: Date(timeIntervalSince1970: 0))
         #expect(await store.allItems().first?.outcome == "ok")
     }
 

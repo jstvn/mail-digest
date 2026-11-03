@@ -98,10 +98,21 @@ public actor InMemoryDigestStore: DigestStore {
         if state == .processing { itemList[i].attempts += 1 }
     }
 
-    public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double) async throws {
+    public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws {
         guard let i = itemList.firstIndex(where: { $0.id == itemID }) else { return }
         itemList[i].outcome = outcome
         itemList[i].seconds = seconds
+        itemList[i].finishedAt = finishedAt
+    }
+
+    public func requeueFailed(job jobID: UUID) async throws -> [JobItem] {
+        var changed: [JobItem] = []
+        for i in itemList.indices where itemList[i].jobID == jobID && itemList[i].state == .failed {
+            itemList[i].state = .queued
+            itemList[i].attempts = 0
+            changed.append(itemList[i])
+        }
+        return changed.sorted { $0.position < $1.position }
     }
 
     public func requeueInterrupted() async throws -> Int {

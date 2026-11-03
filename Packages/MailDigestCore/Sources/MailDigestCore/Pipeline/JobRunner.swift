@@ -120,6 +120,8 @@ public actor JobRunner {
     // MARK: Starting
 
     /// Lists, filters and queues the plan's mail, then starts processing in the background and returns.
+    /// The queued set equals `preview(plan).toProcess`. The plan's `to` is fixed when the user confirms the
+    /// preview; start never re-reads "now" for a confirmed plan, so mail arriving later goes to the next Daily job.
     /// Throws `alreadyRunning` if a job is active; use `startDaily()` to run a Daily job over a Backlog job.
     public func start(_ plan: JobPlan) async throws {
         try claim()
@@ -161,6 +163,78 @@ public actor JobRunner {
             resumeAfter = nil
             throw error
         }
+    }
+
+    // MARK: Preview
+
+    /// Lists headers for the plan and reports what `start(plan)` would queue. Queues nothing and creates no job.
+    public func preview(_ plan: JobPlan) async throws -> JobPreview {
+        let (headers, unavailable) = try await listHeaders(plan)
+        let builder = JobPreviewBuilder(filter: settings.filter)
+        return builder.build(plan: plan, headers: headers, isProcessedOrQueued: unavailable,
+                             averageSecondsPerEmail: try await rollingAverage(),
+                             limit: dailyLimit(plan))
+    }
+
+    /// Mean seconds of the last 20 finished emails across all jobs, or nil without history.
+    private func rollingAverage() async throws -> Double? {
+        var finished: [JobItem] = []
+        for job in try await store.jobs() {
+            finished += try await store.items(job: job.id).filter { $0.state == .done && $0.seconds != nil }
+        }
+        finished.sort { ($0.finishedAt ?? .distantPast) < ($1.finishedAt ?? .distantPast) }
+        let recent = finished.suffix(20).compactMap(\.seconds)
+        return recent.isEmpty ? nil : recent.reduce(0, +) / Double(recent.count)
+    }
+
+    private func dailyLimit(_ plan: JobPlan) -> Int? { plan.kind == .daily ? settings.maxEmailsPerRun : nil }
+
+    /// Lists every mailbox and finds which listed ids are already processed or queued.
+    private func listHeaders(_ plan: JobPlan) async throws -> ([MailboxRef: [MessageHeader]], Set<String>) {
+        var headers: [MailboxRef: [MessageHeader]] = [:]
+        var unavailable = Set<String>()
+        for mailbox in plan.mailboxes where headers[mailbox] == nil {
+            let listed = try await source.listHeaders(in: mailbox, from: plan.from, to: plan.to)
+            headers[mailbox] = listed
+            for h in listed where !plan.excludedMessageIDs.contains(h.id) {
+                let processed = try await store.isProcessed(h.id)
+                if processed { unavailable.insert(h.id) } else if try await store.isQueued(h.id) { unavailable.insert(h.id) }
+            }
+        }
+        return (headers, unavailable)
+    }
+
+    /// The one listing-and-dedupe path shared by `preview` and `start`.
+    private func select(_ plan: JobPlan) async throws -> JobPreviewBuilder.Selection {
+        let (headers, unavailable) = try await listHeaders(plan)
+        return JobPreviewBuilder.select(plan: plan, headers: headers, unavailable: unavailable,
+                                        limit: dailyLimit(plan))
+    }
+
+    // MARK: Retry
+
+    /// Requeues the job's failed emails (attempts reset), removes their "failed: ..." entries from the job's
+    /// digest, then resumes the job. Returns how many were requeued. Throws `alreadyRunning` if a job is active.
+    @discardableResult
+    public func retryFailed(jobID: UUID) async throws -> Int {
+        guard !busy else { throw JobRunnerError.alreadyRunning }
+        guard var job = try await store.jobs().first(where: { $0.id == jobID }) else { throw JobRunnerError.jobNotFound }
+        let requeued = try await store.requeueFailed(job: jobID)
+        guard !requeued.isEmpty else { return 0 }
+        let ids = Set(requeued.map(\.messageID))
+        if var digest = try await store.digest(id: jobID) {
+            let before = digest.skipped.count
+            digest.skipped.removeAll { ids.contains($0.id) && $0.reason.hasPrefix("failed:") }
+            digest.emailCount = max(0, digest.emailCount - (before - digest.skipped.count))
+            try await store.save(digest)
+        }
+        job.state = .paused
+        job.autoPaused = false
+        job.totals.failed = max(0, job.totals.failed - requeued.count)
+        job.totals.queued += requeued.count
+        try await store.updateJob(job)
+        try await resume(jobID: jobID)
+        return requeued.count
     }
 
     // MARK: Controls
@@ -279,22 +353,7 @@ public actor JobRunner {
                                                     suggestions: [], info: [], skipped: []))
             emit(force: true)
 
-            var seen = Set<String>()
-            var headers: [MessageHeader] = []
-            for mailbox in plan.mailboxes {
-                for h in try await source.listHeaders(in: mailbox, from: plan.from, to: plan.to) {
-                    guard !plan.excludedMessageIDs.contains(h.id), seen.insert(h.id).inserted else { continue }
-                    if try await store.isProcessed(h.id) { continue }
-                    if try await store.isQueued(h.id) { continue }
-                    headers.append(h)
-                }
-            }
-            // Newest first across mailboxes; the index keeps equal timestamps in listing order.
-            headers = headers.enumerated()
-                .sorted { $0.element.receivedAt != $1.element.receivedAt
-                    ? $0.element.receivedAt > $1.element.receivedAt : $0.offset < $1.offset }
-                .map(\.element)
-            if plan.kind == .daily, let cap = settings.maxEmailsPerRun { headers = Array(headers.prefix(cap)) }
+            let headers = try await select(plan).toProcess
 
             var index = 0
             while index < headers.count {
@@ -524,7 +583,8 @@ public actor JobRunner {
     /// Records a finished item (done, skipped or failed) and updates counters, job totals and progress.
     private func complete(_ run: RunState, _ item: JobItem, state: JobItemState, outcome: String,
                           seconds: Double?, error: String?, countsTowardSpeed: Bool = true) async throws {
-        try await store.recordItemOutcome(item.id, outcome: outcome, seconds: seconds ?? 0)
+        try await store.recordItemOutcome(item.id, outcome: outcome, seconds: seconds ?? 0,
+                                          finishedAt: clock.now())
         try await store.setItemState(item.id, state, error: error)
         run.job.totals.queued = max(0, run.job.totals.queued - 1)
         switch state {

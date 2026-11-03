@@ -86,10 +86,12 @@ public struct JobItem: Codable, Sendable, Equatable, Identifiable {
     public var seconds: Double?
     public var attempts: Int
     public var lastError: String?
+    /// When the item reached a final state; the activity log's "time".
+    public var finishedAt: Date?
 
     public init(id: UUID, jobID: UUID, messageID: String, mailbox: MailboxRef, sender: String,
                 subject: String, receivedAt: Date, position: Int, state: JobItemState,
-                outcome: String?, seconds: Double?, attempts: Int, lastError: String?) {
+                outcome: String?, seconds: Double?, attempts: Int, lastError: String?, finishedAt: Date? = nil) {
         self.id = id
         self.jobID = jobID
         self.messageID = messageID
@@ -103,6 +105,7 @@ public struct JobItem: Codable, Sendable, Equatable, Identifiable {
         self.seconds = seconds
         self.attempts = attempts
         self.lastError = lastError
+        self.finishedAt = finishedAt
     }
 }
 
