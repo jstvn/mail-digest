@@ -30,6 +30,8 @@ public actor InMemoryDigestStore: DigestStore {
 
     public func latestDigest() async throws -> Digest? { digests.max { $0.createdAt < $1.createdAt } }
 
+    public func digest(id: UUID) async throws -> Digest? { digests.first { $0.id == id } }
+
     public func recentSuggestions(since: Date) async throws -> [Suggestion] {
         digests.filter { $0.createdAt >= since }.flatMap(\.suggestions)
     }

@@ -16,6 +16,8 @@ public protocol DigestStore: Sendable {
     func save(_ digest: Digest) async throws
     /// The most recent digest, if any.
     func latestDigest() async throws -> Digest?
+    /// The digest with this id (a job's digest shares the job's id), so a resumed job keeps appending to it.
+    func digest(id: UUID) async throws -> Digest?
     /// Suggestions created since the given date, for validator dedupe (rule 6).
     func recentSuggestions(since: Date) async throws -> [Suggestion]
     /// Replaces a suggestion by id inside whichever digest holds it.
@@ -25,7 +27,8 @@ public protocol DigestStore: Sendable {
 
     /// Stores an approve or dismiss decision.
     func recordDecision(_ decision: Decision) async throws
-    /// All decisions for one sender, for learned rules.
+    /// All decisions for one sender, for learned rules. Decisions are keyed by the lowercased
+    /// address (see `MailFilter.address(from:)`), not by "Name <addr>".
     func decisions(for sender: String) async throws -> [Decision]
 
     // MARK: Jobs
