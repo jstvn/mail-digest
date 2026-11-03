@@ -1,0 +1,10 @@
+{
+  "id": "<bill-energy-05@origin-example.com.au>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Origin Energy <billing@origin-example.com.au>",
+  "subject": "Your Origin bill is ready",
+  "receivedAt": "2026-11-03T05:15:00Z",
+  "body": "Hi Justin,\nYour latest electricity bill is $182.40.\nThe amount is due on 20 November 2026.\nYou can pay online or set up direct debit.",
+  "rawHeaders": "From: Origin Energy <billing@origin-example.com.au>\nTo: justin@example.com\nDate: 2026-11-03T05:15:00Z\nMessage-ID: <bill-energy-05@origin-example.com.au>\nSubject: Your Origin bill is ready\n"
+}

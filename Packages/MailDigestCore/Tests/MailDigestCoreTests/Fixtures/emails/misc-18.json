@@ -1,0 +1,10 @@
+{
+  "id": "<misc-18@drlee-example.com.au>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Dr Lee Dental <reception@drlee-example.com.au>",
+  "subject": "Appointment reminder",
+  "receivedAt": "2026-11-03T18:40:00Z",
+  "body": "Hi Justin,\nThis is a reminder of your check-up.\nYour appointment is on 12 November 2026 at 2:30pm.",
+  "rawHeaders": "From: Dr Lee Dental <reception@drlee-example.com.au>\nTo: justin@example.com\nDate: 2026-11-03T18:40:00Z\nMessage-ID: <misc-18@drlee-example.com.au>\nSubject: Appointment reminder\n"
+}

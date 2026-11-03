@@ -1,0 +1,18 @@
+{
+  "summary": "Priya shared Q4 planning notes and wants feedback before the 11 November review.",
+  "category": "work",
+  "importance": 3,
+  "key_facts": [
+    "Review 11 Nov 10am"
+  ],
+  "tasks": [
+    {
+      "title": "Send Q4 planning feedback",
+      "due": "2026-11-11T10:00",
+      "due_has_time": true,
+      "priority": "medium",
+      "evidence": "Please send me your feedback before the review on Wednesday 11 November at 10am.",
+      "confidence": 0.78
+    }
+  ]
+}

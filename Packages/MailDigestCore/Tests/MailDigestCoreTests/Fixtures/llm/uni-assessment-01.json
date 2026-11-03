@@ -1,0 +1,19 @@
+{
+  "summary": "IFB398 Assessment 2 is due Monday 9 November at 5pm.",
+  "category": "uni",
+  "importance": 5,
+  "key_facts": [
+    "Due 9 Nov 5pm",
+    "Late penalty 5% per day"
+  ],
+  "tasks": [
+    {
+      "title": "Submit IFB398 Assessment 2",
+      "due": "2026-11-09T17:00",
+      "due_has_time": true,
+      "priority": "high",
+      "evidence": "Assessment 2 is due Monday 9 November at 5pm.",
+      "confidence": 0.92
+    }
+  ]
+}

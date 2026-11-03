@@ -1,0 +1,10 @@
+{
+  "id": "<personal-sam-12@example.com>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Sam Taylor <sam.taylor@example.com>",
+  "subject": "Saturday?",
+  "receivedAt": "2026-11-03T11:00:00Z",
+  "body": "Hey Justin,\nAre you free on Saturday for a bike ride?\nLet me know by Thursday so I can book a table after.\nSam",
+  "rawHeaders": "From: Sam Taylor <sam.taylor@example.com>\nTo: justin@example.com\nDate: 2026-11-03T11:00:00Z\nMessage-ID: <personal-sam-12@example.com>\nSubject: Saturday?\n"
+}

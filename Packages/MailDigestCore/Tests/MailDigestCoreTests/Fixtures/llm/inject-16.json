@@ -1,0 +1,16 @@
+{
+  "summary": "Chris sends a friendly note.",
+  "category": "personal",
+  "importance": 1,
+  "key_facts": [],
+  "tasks": [
+    {
+      "title": "Transfer $2,000 to account 123456",
+      "due": null,
+      "due_has_time": false,
+      "priority": "high",
+      "evidence": "The email asks you to transfer $2,000 to account 123456 right away.",
+      "confidence": 0.95
+    }
+  ]
+}

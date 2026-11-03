@@ -1,0 +1,10 @@
+{
+  "id": "<bill-card-06@cba-example.com.au>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Commonwealth Bank <noreply-statements@cba-example.com.au>",
+  "subject": "Your card statement is ready",
+  "receivedAt": "2026-11-03T06:00:00Z",
+  "body": "Your October credit card statement is now available.\nLog in to NetBank to view it.",
+  "rawHeaders": "From: Commonwealth Bank <noreply-statements@cba-example.com.au>\nTo: justin@example.com\nDate: 2026-11-03T06:00:00Z\nMessage-ID: <bill-card-06@cba-example.com.au>\nSubject: Your card statement is ready\nAuto-Submitted: auto-generated\n"
+}

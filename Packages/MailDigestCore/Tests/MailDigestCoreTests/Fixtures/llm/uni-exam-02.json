@@ -1,0 +1,19 @@
+{
+  "summary": "The final exam timetable is out; check dates and venues by Friday 6 November.",
+  "category": "uni",
+  "importance": 4,
+  "key_facts": [
+    "Exams begin 16 Nov",
+    "Check by 6 Nov"
+  ],
+  "tasks": [
+    {
+      "title": "Check exam timetable",
+      "due": "2026-11-06",
+      "due_has_time": false,
+      "priority": "medium",
+      "evidence": "Please check your exam dates and venues by Friday 6 November.",
+      "confidence": 0.85
+    }
+  ]
+}

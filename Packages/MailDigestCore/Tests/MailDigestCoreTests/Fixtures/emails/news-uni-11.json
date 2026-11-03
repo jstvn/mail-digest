@@ -1,0 +1,10 @@
+{
+  "id": "<news-uni-11@qut.edu.au>",
+  "account": "Outlook",
+  "mailbox": "Inbox",
+  "sender": "QUT News <news@qut.edu.au>",
+  "subject": "Campus news this month",
+  "receivedAt": "2026-11-03T10:10:00Z",
+  "body": "Campus news.\nThe library extends opening hours during exams.\nA new cafe opens in Building P.",
+  "rawHeaders": "From: QUT News <news@qut.edu.au>\nTo: justin@example.com\nDate: 2026-11-03T10:10:00Z\nMessage-ID: <news-uni-11@qut.edu.au>\nSubject: Campus news this month\nList-Unsubscribe: <mailto:unsubscribe@qut.edu.au>, <https://qut.edu.au/unsub?id=42>\nPrecedence: list\n"
+}

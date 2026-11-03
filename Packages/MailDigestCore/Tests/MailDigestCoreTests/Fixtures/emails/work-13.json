@@ -1,0 +1,10 @@
+{
+  "id": "<work-13@acme-example.com>",
+  "account": "Outlook",
+  "mailbox": "Inbox",
+  "sender": "Priya Nair <priya.nair@acme-example.com>",
+  "subject": "Q4 planning notes",
+  "receivedAt": "2026-11-03T12:20:00Z",
+  "body": "Hi Justin,\nAttached are the Q4 planning notes.\nPlease send me your feedback before the review on Wednesday 11 November at 10am.\nPriya",
+  "rawHeaders": "From: Priya Nair <priya.nair@acme-example.com>\nTo: justin@example.com\nDate: 2026-11-03T12:20:00Z\nMessage-ID: <work-13@acme-example.com>\nSubject: Q4 planning notes\n"
+}

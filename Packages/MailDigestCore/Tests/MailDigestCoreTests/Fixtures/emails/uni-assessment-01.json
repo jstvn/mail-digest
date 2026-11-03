@@ -1,0 +1,10 @@
+{
+  "id": "<uni-assessment-01@qut.edu.au>",
+  "account": "Outlook",
+  "mailbox": "Inbox",
+  "sender": "QUT Canvas <canvas@qut.edu.au>",
+  "subject": "Assessment 2 due Monday",
+  "receivedAt": "2026-11-03T01:10:00Z",
+  "body": "Hi Justin,\nYour submission for IFB398 Assessment 2 is not yet received.\nAssessment 2 is due Monday 9 November at 5pm.\nLate submissions lose 5% per day.\nRegards,\nQUT Canvas",
+  "rawHeaders": "From: QUT Canvas <canvas@qut.edu.au>\nTo: justin@example.com\nDate: 2026-11-03T01:10:00Z\nMessage-ID: <uni-assessment-01@qut.edu.au>\nSubject: Assessment 2 due Monday\nReceived: from mail.qut.edu.au (mail.qut.edu.au [203.0.113.5])\n\tby mx.example.com with ESMTPS;\n\tMon, 03 Nov 2026 01:10:00 +0000\n"
+}

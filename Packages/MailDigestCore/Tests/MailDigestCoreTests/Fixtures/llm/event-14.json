@@ -1,0 +1,19 @@
+{
+  "summary": "Jamie invites you to a housewarming party on Saturday 14 November at 6pm.",
+  "category": "events",
+  "importance": 3,
+  "key_facts": [
+    "14 Nov 6pm",
+    "12 Garden Street"
+  ],
+  "tasks": [
+    {
+      "title": "RSVP to Jamie's housewarming",
+      "due": "2026-11-14T18:00",
+      "due_has_time": true,
+      "priority": "low",
+      "evidence": "RSVP if you can make it.",
+      "confidence": 0.55
+    }
+  ]
+}

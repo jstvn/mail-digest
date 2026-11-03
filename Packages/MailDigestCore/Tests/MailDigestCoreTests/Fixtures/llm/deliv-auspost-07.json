@@ -1,0 +1,18 @@
+{
+  "summary": "A parcel is arriving Thursday between 10am and 2pm.",
+  "category": "deliveries",
+  "importance": 3,
+  "key_facts": [
+    "Thursday 10am to 2pm"
+  ],
+  "tasks": [
+    {
+      "title": "Be home for parcel",
+      "due": "2026-11-05",
+      "due_has_time": false,
+      "priority": "medium",
+      "evidence": "Your parcel will arrive on Thursday between 10am and 2pm.",
+      "confidence": 0.6
+    }
+  ]
+}

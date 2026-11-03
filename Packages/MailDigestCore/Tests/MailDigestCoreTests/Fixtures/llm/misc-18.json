@@ -1,0 +1,18 @@
+{
+  "summary": "Dental check-up reminder for 12 November at 2:30pm.",
+  "category": "other",
+  "importance": 3,
+  "key_facts": [
+    "12 Nov 2:30pm"
+  ],
+  "tasks": [
+    {
+      "title": "Attend dental check-up",
+      "due": "2026-11-12T14:30",
+      "due_has_time": true,
+      "priority": "medium",
+      "evidence": "Your appointment is on 12 November 2026 at 2:30pm.",
+      "confidence": 0.9
+    }
+  ]
+}
