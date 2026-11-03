@@ -1,0 +1,16 @@
+[
+  {"account": "iCloud", "name": "Inbox", "kind": "inbox", "messageCount": 1240, "unreadCount": 12},
+  {"account": "iCloud", "name": "Archive", "kind": "archive", "messageCount": 5120, "unreadCount": 0},
+  {"account": "iCloud", "name": "Sent Messages", "kind": "sent", "messageCount": 800, "unreadCount": 0},
+  {"account": "iCloud", "name": "Drafts", "kind": "drafts", "messageCount": 3, "unreadCount": 0},
+  {"account": "iCloud", "name": "Junk", "kind": "junk", "messageCount": 40, "unreadCount": 40},
+  {"account": "iCloud", "name": "Deleted Messages", "kind": "trash", "messageCount": 77, "unreadCount": 0},
+  {"account": "iCloud", "name": "Projects/Uni", "kind": "custom", "messageCount": 230, "unreadCount": 2},
+  {"account": "Outlook", "name": "Inbox", "kind": "inbox", "messageCount": 310, "unreadCount": 5},
+  {"account": "Outlook", "name": "Archive", "kind": "archive", "messageCount": 900, "unreadCount": 0},
+  {"account": "Outlook", "name": "Sent Items", "kind": "sent", "messageCount": 150, "unreadCount": 0},
+  {"account": "Outlook", "name": "Drafts", "kind": "drafts", "messageCount": 1, "unreadCount": 0},
+  {"account": "Outlook", "name": "Junk Email", "kind": "junk", "messageCount": 12, "unreadCount": 12},
+  {"account": "Outlook", "name": "Bin", "kind": "trash", "messageCount": 20, "unreadCount": 0},
+  {"account": "Outlook", "name": "Conversation History", "kind": "somethingNew", "messageCount": 0, "unreadCount": 0}
+]
