@@ -13,3 +13,10 @@ Each item says what the spec leaves open and the interim choice the build uses, 
 5. **`Decision` isn't `Equatable` in the spec**, but "all models are Equatable". *Interim:* made it `Equatable` (same for `MailActionResult`).
 6. **Osascript timeout:** Mail ingestion says 60 s per call; the Risks table says 120 s. Which one? (Affects T11 only.)
 7. **`EvalCLI`** is in the repo layout and Testing section but has no task ID. *Interim:* T01 created a stub executable that prints "not implemented yet".
+8. **`FetchMail.js` output shape.** "Missing ids are skipped and reported", but the spec doesn't say how they're reported. *Interim:* `{"messages": [...], "missing": ["id", ...]}`; the decoder also accepts a bare array.
+9. **VIP vs blocked sender.** If a sender is on both lists, which wins? *Interim:* VIP wins ("VIP senders always land here"), and VIP also overrides the info-only signals. Block lists match exact addresses only (no domain wildcards).
+10. **`Auto-Submitted: no`** means a human sent the email (RFC 3834). *Interim:* only values other than `no` count as info-only.
+11. **"Bare tracking URLs" in the cleaner.** *Interim:* only lines that are nothing but a URL get removed; URLs inside sentences stay, so evidence can still match verbatim.
+12. **`{today_iso}` in the prompt.** *Interim:* the date only (`2026-11-04`). Adding the weekday ("Wednesday") would probably help the model resolve "this Friday"; should I add it?
+13. **Rule 3 "date or time words".** *Interim:* weekday and month names (plus 3-letter forms, with "may" counted only next to a number), relative words (today, tomorrow, week, weekend, morning, …), time patterns (5pm, 17:00) and date patterns (9/11, 2026-11-09, ordinals). The list is in `SuggestionValidator.swift`.
+14. **Title length.** The prompt asks for under 60 characters, but validation allows 3 to 80. *Interim:* both kept as written; the validator accepts up to 80.
