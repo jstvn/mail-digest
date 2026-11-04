@@ -1,0 +1,10 @@
+{
+  "id": "<bill-rent-04@raywhite-example.com.au>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Ray White Property <rent@raywhite-example.com.au>",
+  "subject": "Rent reminder",
+  "receivedAt": "2026-11-03T04:00:00Z",
+  "body": "Hi Justin,\nYour rent of $420 is due this Friday.\nPlease pay by bank transfer using your tenant reference.\nThanks,\nRay White",
+  "rawHeaders": "From: Ray White Property <rent@raywhite-example.com.au>\nTo: justin@example.com\nDate: 2026-11-03T04:00:00Z\nMessage-ID: <bill-rent-04@raywhite-example.com.au>\nSubject: Rent reminder\n"
+}

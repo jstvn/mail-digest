@@ -1,0 +1,10 @@
+{
+  "id": "<quote-17@example.com>",
+  "account": "Outlook",
+  "mailbox": "Inbox",
+  "sender": "Sam Taylor <sam.taylor@example.com>",
+  "subject": "Re: Project catch-up",
+  "receivedAt": "2026-11-03T16:45:00Z",
+  "body": "Sounds good, let's meet Tuesday at 3pm.\n\nOn Mon, 2 Nov 2026, Sam wrote:\n> Can we catch up about the project?\n> I'm free Tuesday afternoon.\n\n-- \nSam Taylor\nSent from my phone",
+  "rawHeaders": "From: Sam Taylor <sam.taylor@example.com>\nTo: justin@example.com\nDate: 2026-11-03T16:45:00Z\nMessage-ID: <quote-17@example.com>\nSubject: Re: Project catch-up\n"
+}

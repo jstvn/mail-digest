@@ -1,0 +1,7 @@
+[
+  {"id": "<a1@example.com>", "account": "Outlook", "mailbox": "Inbox", "sender": "Priya Nair <priya@acme-example.com>", "subject": "Q4 planning", "receivedAt": "2026-11-03T08:15:00.000Z"},
+  {"id": "<a2@example.com>", "account": "iCloud", "mailbox": "Inbox", "sender": "Uni Admin <admin@uni.example.edu>", "subject": "Enrolment reminder", "receivedAt": "2026-11-03T07:40:12.345Z"},
+  {"id": "<a3@example.com>", "account": "iCloud", "mailbox": "Archive", "sender": "Energy Co <bills@energy.example.com>", "subject": "Your bill", "receivedAt": "2026-11-02T22:05:00.000Z"},
+  {"id": "<a4@example.com>", "account": "iCloud", "mailbox": "Inbox", "sender": "Sam <sam@example.com>", "subject": "Dinner?", "receivedAt": "2026-11-02T19:30:59.999Z"},
+  {"id": "<a5@example.com>", "account": "iCloud", "mailbox": "Projects/Uni", "sender": "Prof Lee <lee@uni.example.edu>", "subject": "Assessment 2 brief", "receivedAt": "2026-11-01T01:00:00.000Z"}
+]

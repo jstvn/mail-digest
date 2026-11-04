@@ -1,0 +1,10 @@
+{
+  "id": "<news-shop-10@shoply-example.com>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Shoply <noreply@shoply-example.com>",
+  "subject": "Weekend sale: 30% off",
+  "receivedAt": "2026-11-03T09:30:00Z",
+  "body": "Save 30% on everything this weekend.\nShop now before stock runs out.",
+  "rawHeaders": "From: Shoply <noreply@shoply-example.com>\nTo: justin@example.com\nDate: 2026-11-03T09:30:00Z\nMessage-ID: <news-shop-10@shoply-example.com>\nSubject: Weekend sale: 30% off\nPrecedence: bulk\n"
+}

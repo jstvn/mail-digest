@@ -1,0 +1,18 @@
+{
+  "summary": "Sam agrees to meet Tuesday at 3pm about the project.",
+  "category": "work",
+  "importance": 3,
+  "key_facts": [
+    "Tuesday 3pm"
+  ],
+  "tasks": [
+    {
+      "title": "Meet Sam Tuesday 3pm",
+      "due": "2026-11-10T15:00",
+      "due_has_time": true,
+      "priority": "medium",
+      "evidence": "Sounds good, let's meet Tuesday at 3pm.",
+      "confidence": 0.8
+    }
+  ]
+}

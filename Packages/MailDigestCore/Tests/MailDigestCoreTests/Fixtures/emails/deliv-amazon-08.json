@@ -1,0 +1,10 @@
+{
+  "id": "<deliv-amazon-08@amazon-example.com>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Amazon <shipment-tracking@amazon-example.com>",
+  "subject": "Your order has shipped",
+  "receivedAt": "2026-11-03T08:05:00Z",
+  "body": "Your order of USB-C cable has shipped.\nEstimated delivery is 8 November.",
+  "rawHeaders": "From: Amazon <shipment-tracking@amazon-example.com>\nTo: justin@example.com\nDate: 2026-11-03T08:05:00Z\nMessage-ID: <deliv-amazon-08@amazon-example.com>\nSubject: Your order has shipped\n"
+}

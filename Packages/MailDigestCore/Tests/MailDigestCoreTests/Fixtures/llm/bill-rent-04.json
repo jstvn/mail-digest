@@ -1,0 +1,19 @@
+{
+  "summary": "Weekly rent of $420 is due this Friday.",
+  "category": "finance",
+  "importance": 4,
+  "key_facts": [
+    "$420",
+    "Due Friday"
+  ],
+  "tasks": [
+    {
+      "title": "Pay rent $420",
+      "due": "2026-11-06",
+      "due_has_time": false,
+      "priority": "high",
+      "evidence": "Your rent of $420 is due this Friday.",
+      "confidence": 0.88
+    }
+  ]
+}

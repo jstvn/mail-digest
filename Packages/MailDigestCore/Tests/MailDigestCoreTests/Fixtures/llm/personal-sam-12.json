@@ -1,0 +1,19 @@
+{
+  "summary": "Sam asks if you are free Saturday for a bike ride and wants an answer by Thursday.",
+  "category": "personal",
+  "importance": 3,
+  "key_facts": [
+    "Saturday ride",
+    "Reply by Thursday"
+  ],
+  "tasks": [
+    {
+      "title": "Reply to Sam about Saturday",
+      "due": "2026-11-05",
+      "due_has_time": false,
+      "priority": "medium",
+      "evidence": "Let me know by Thursday so I can book a table after.",
+      "confidence": 0.8
+    }
+  ]
+}

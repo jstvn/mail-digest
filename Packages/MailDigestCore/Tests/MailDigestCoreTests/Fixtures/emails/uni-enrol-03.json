@@ -1,0 +1,10 @@
+{
+  "id": "<uni-enrol-03@qut.edu.au>",
+  "account": "Outlook",
+  "mailbox": "Inbox",
+  "sender": "QUT Student Services <enrol@qut.edu.au>",
+  "subject": "Enrolment confirmation Semester 1",
+  "receivedAt": "2026-11-03T03:45:00Z",
+  "body": "Hello Justin,\nYour enrolment for Semester 1 2027 has been confirmed.\nNo further action is required.",
+  "rawHeaders": "From: QUT Student Services <enrol@qut.edu.au>\nTo: justin@example.com\nDate: 2026-11-03T03:45:00Z\nMessage-ID: <uni-enrol-03@qut.edu.au>\nSubject: Enrolment confirmation Semester 1\n"
+}

@@ -1,0 +1,19 @@
+{
+  "summary": "Origin electricity bill of $182.40 is due on 20 November.",
+  "category": "finance",
+  "importance": 4,
+  "key_facts": [
+    "$182.40",
+    "Due 20 Nov"
+  ],
+  "tasks": [
+    {
+      "title": "Pay Origin bill $182.40",
+      "due": "2026-11-20",
+      "due_has_time": false,
+      "priority": "medium",
+      "evidence": "The amount is due on 20 November 2026.",
+      "confidence": 0.9
+    }
+  ]
+}

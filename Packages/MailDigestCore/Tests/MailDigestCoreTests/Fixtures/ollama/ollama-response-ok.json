@@ -1,0 +1,9 @@
+{
+  "model": "qwen3:4b",
+  "created_at": "2026-11-04T06:30:00Z",
+  "message": {
+    "role": "assistant",
+    "content": "{\n  \"summary\": \"IFB398 Assessment 2 is due Monday 9 November at 5pm.\",\n  \"category\": \"uni\",\n  \"importance\": 5,\n  \"key_facts\": [\n    \"Due 9 Nov 5pm\",\n    \"Late penalty 5% per day\"\n  ],\n  \"tasks\": [\n    {\n      \"title\": \"Submit IFB398 Assessment 2\",\n      \"due\": \"2026-11-09T17:00\",\n      \"due_has_time\": true,\n      \"priority\": \"high\",\n      \"evidence\": \"Assessment 2 is due Monday 9 November at 5pm.\",\n      \"confidence\": 0.92\n    }\n  ]\n}"
+  },
+  "done": true
+}

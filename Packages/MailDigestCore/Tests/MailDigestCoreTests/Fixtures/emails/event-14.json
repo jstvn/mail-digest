@@ -1,0 +1,10 @@
+{
+  "id": "<event-14@example.org>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Jamie Lee <jamie.lee@example.org>",
+  "subject": "Housewarming party invite",
+  "receivedAt": "2026-11-03T13:10:00Z",
+  "body": "You are invited to my housewarming party.\nIt starts at 6pm on Saturday 14 November at 12 Garden Street.\nRSVP if you can make it.",
+  "rawHeaders": "From: Jamie Lee <jamie.lee@example.org>\nTo: justin@example.com\nDate: 2026-11-03T13:10:00Z\nMessage-ID: <event-14@example.org>\nSubject: Housewarming party invite\n"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "<news-tech-09@techweekly-example.com>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Tech Weekly <newsletter@techweekly-example.com>",
+  "subject": "This week in tech",
+  "receivedAt": "2026-11-03T09:00:00Z",
+  "body": "Top stories this week.\nNew laptop chips announced.\nSwift 6 adoption grows.",
+  "rawHeaders": "From: Tech Weekly <newsletter@techweekly-example.com>\nTo: justin@example.com\nDate: 2026-11-03T09:00:00Z\nMessage-ID: <news-tech-09@techweekly-example.com>\nSubject: This week in tech\nList-Unsubscribe: <mailto:unsubscribe@techweekly-example.com>, <https://techweekly-example.com/unsub?id=42>\n"
+}

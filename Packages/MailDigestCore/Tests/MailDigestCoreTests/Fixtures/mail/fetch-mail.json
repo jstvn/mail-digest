@@ -1,0 +1,25 @@
+{
+  "messages": [
+    {
+      "id": "<f1@example.com>",
+      "account": "iCloud",
+      "mailbox": "Inbox",
+      "sender": "News <news@example.com>",
+      "subject": "Weekly digest",
+      "receivedAt": "2026-11-03T08:15:00.000Z",
+      "body": "Top stories this week.",
+      "rawHeaders": "From: News <news@example.com>\r\nlist-unsubscribe: <mailto:unsub@example.com>,\r\n <https://example.com/unsub?id=1>\r\nPRECEDENCE: bulk\r\nSubject: Weekly digest\r\n"
+    },
+    {
+      "id": "<f2@example.com>",
+      "account": "iCloud",
+      "mailbox": "Inbox",
+      "sender": "Robot <robot@example.com>",
+      "subject": "Meeting notes",
+      "receivedAt": "2026-11-03T09:00:00.000Z",
+      "body": "Notes attached.",
+      "rawHeaders": "From: robot@example.com\nauto-submitted: auto-generated\nX-Mailer: Foo\n\nlist-unsubscribe: <ignored>\n"
+    }
+  ],
+  "missing": ["<gone1@example.com>"]
+}

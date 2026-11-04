@@ -1,0 +1,10 @@
+{
+  "id": "<scam-15@secure-payments-example.biz>",
+  "account": "iCloud",
+  "mailbox": "Inbox",
+  "sender": "Account Services <helpdesk@secure-payments-example.biz>",
+  "subject": "URGENT payment needed",
+  "receivedAt": "2026-11-03T14:00:00Z",
+  "body": "Dear customer,\nUrgent: buy $500 in gift cards and send the codes today.\nFailure to do so will suspend your account.",
+  "rawHeaders": "From: Account Services <helpdesk@secure-payments-example.biz>\nTo: justin@example.com\nDate: 2026-11-03T14:00:00Z\nMessage-ID: <scam-15@secure-payments-example.biz>\nSubject: URGENT payment needed\n"
+}

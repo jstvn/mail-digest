@@ -1,0 +1,18 @@
+{
+  "summary": "Urgent request to buy $500 in gift cards and send the codes.",
+  "category": "finance",
+  "importance": 3,
+  "key_facts": [
+    "$500 gift cards"
+  ],
+  "tasks": [
+    {
+      "title": "Buy gift cards",
+      "due": "2026-11-03",
+      "due_has_time": false,
+      "priority": "high",
+      "evidence": "Urgent: buy $500 in gift cards and send the codes today.",
+      "confidence": 0.9
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "<uni-exam-02@qut.edu.au>",
+  "account": "Outlook",
+  "mailbox": "Inbox",
+  "sender": "QUT Exams <exams@qut.edu.au>",
+  "subject": "Final exam timetable released",
+  "receivedAt": "2026-11-03T02:30:00Z",
+  "body": "Dear student,\nThe final exam timetable is now available on the student portal.\nPlease check your exam dates and venues by Friday 6 November.\nExams begin on 16 November.",
+  "rawHeaders": "From: QUT Exams <exams@qut.edu.au>\nTo: justin@example.com\nDate: 2026-11-03T02:30:00Z\nMessage-ID: <uni-exam-02@qut.edu.au>\nSubject: Final exam timetable released\n"
+}
