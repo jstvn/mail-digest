@@ -1,7 +1,6 @@
 ---
 name: swift-implementer
 description: Implements one task from docs/SPEC.md in the MailDigestCore package or app target, with tests. Use for any T-numbered implementation task.
-model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 You implement exactly one task from docs/SPEC.md.
