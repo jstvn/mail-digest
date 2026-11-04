@@ -46,7 +46,7 @@ If `swift` isn't installed in the container, install a Swift 6 toolchain first (
 
 ## Delegating implementation
 
-The main session orchestrates: it plans, reviews each diff against the spec, makes spec and architecture decisions, runs the final test suite, and commits. Implementation of a single T-numbered task goes to the `swift-implementer` sub-agent (`.claude/agents/swift-implementer.md`, model `sonnet`). Mechanical work such as fixture JSON or boilerplate can use `haiku`.
+The main session orchestrates: it plans, reviews each diff against the spec, makes spec and architecture decisions, runs the final test suite, and commits. Implementation of a single T-numbered task goes to the `swift-implementer` sub-agent (`.claude/agents/swift-implementer.md`). The agent file doesn't pin a model: choose one per session, from any provider, that can write and test Swift 6 code. Mechanical work such as fixture JSON or boilerplate can go to a smaller, cheaper model.
 
 - One task ID per sub-agent. The prompt names the task ID, the spec sections it needs, the files it may create or change, and the acceptance criteria.
 - The sub-agent runs `swift build` and `swift test` before reporting back.

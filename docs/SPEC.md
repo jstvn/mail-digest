@@ -67,7 +67,7 @@ ReviewPanel (app, SwiftUI) reads Digest from DigestStore
 mail-digest/
   CLAUDE.md                      # agent rules, build/test commands, delegation
   .claude/agents/
-    swift-implementer.md         # sub-agent for T-numbered tasks (model: sonnet)
+    swift-implementer.md         # sub-agent for T-numbered tasks (model chosen per session)
   docs/
     SPEC.md                      # this document
     MAC_TODO.md                  # agent notes for Mac-only verification
