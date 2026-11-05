@@ -45,7 +45,7 @@ struct AppleMailSource: MailSource {
                 return (rows, names)
             }
         } catch let error as MailStoreError {
-            Self.log.info("listMailboxes path=jxa reason=\(error.reasonCode, privacy: .public)")
+            Self.log.notice("listMailboxes path=jxa reason=\(error.reasonCode, privacy: .public)")
             return try await jxa.listMailboxes()
         }
 
@@ -56,10 +56,10 @@ struct AppleMailSource: MailSource {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            Self.log.info("listMailboxes resolver=heuristic reason=\(Self.reason(error), privacy: .public)")
+            Self.log.notice("listMailboxes resolver=heuristic reason=\(Self.reason(error), privacy: .public)")
         }
         let infos = MailboxResolver(rows: rows, jxaMailboxes: jxaInfos, storeDirectoryNames: names).mailboxInfos()
-        Self.log.info("listMailboxes path=sqlite count=\(infos.count, privacy: .public)")
+        Self.log.notice("listMailboxes path=sqlite count=\(infos.count, privacy: .public)")
         return infos
     }
 
@@ -81,13 +81,13 @@ struct AppleMailSource: MailSource {
                                              sourceReference: MailMessageReference(messageID: id, storeRowID: row.rowID)))
             }
             let unique = MailListingDeduplicator.deduplicate(headers).map { Self.stamp($0, mailbox) }
-            Self.log.info("listHeaders path=sqlite rows=\(rows.count, privacy: .public) unique=\(unique.count, privacy: .public) missingIdentity=\(missingIdentity, privacy: .public)")
+            Self.log.notice("listHeaders path=sqlite rows=\(rows.count, privacy: .public) unique=\(unique.count, privacy: .public) missingIdentity=\(missingIdentity, privacy: .public)")
             return unique
         } catch let error as MailStoreError {
-            Self.log.info("listHeaders path=jxa reason=\(error.reasonCode, privacy: .public)")
+            Self.log.notice("listHeaders path=jxa reason=\(error.reasonCode, privacy: .public)")
         }
         let listing = try await jxa.listHeaderListing(in: mailbox, from: from, to: to)
-        Self.log.info("listHeaders path=jxa unique=\(listing.headers.count, privacy: .public) missingIdentity=\(listing.missingIdentityCount, privacy: .public)")
+        Self.log.notice("listHeaders path=jxa unique=\(listing.headers.count, privacy: .public) missingIdentity=\(listing.missingIdentityCount, privacy: .public)")
         return listing.headers.map { Self.stamp($0, mailbox) }
     }
 
@@ -102,12 +102,12 @@ struct AppleMailSource: MailSource {
             }
             for m in outcome.messages { found[m.id] = m }
             remaining = outcome.remaining
-            Self.log.info("fetch path=sqlite served=\(outcome.messages.count, privacy: .public) emlx=\(outcome.emlxCount, privacy: .public) partial=\(outcome.partialCount, privacy: .public) fallback=\(outcome.remaining.count, privacy: .public)")
+            Self.log.notice("fetch path=sqlite served=\(outcome.messages.count, privacy: .public) emlx=\(outcome.emlxCount, privacy: .public) partial=\(outcome.partialCount, privacy: .public) fallback=\(outcome.remaining.count, privacy: .public)")
             for (reason, n) in outcome.reasons.sorted(by: { $0.key < $1.key }) {
-                Self.log.info("fetch fallbackReason=\(reason, privacy: .public) count=\(n, privacy: .public)")
+                Self.log.notice("fetch fallbackReason=\(reason, privacy: .public) count=\(n, privacy: .public)")
             }
         } catch let error as MailStoreError {
-            Self.log.info("fetch path=jxa reason=\(error.reasonCode, privacy: .public)")
+            Self.log.notice("fetch path=jxa reason=\(error.reasonCode, privacy: .public)")
         }
 
         if !remaining.isEmpty {
@@ -118,7 +118,7 @@ struct AppleMailSource: MailSource {
                 m.mailbox = mailbox.name
                 found[m.id] = m
             }
-            Self.log.info("fetch path=jxa served=\(result.messages.count, privacy: .public) missing=\(result.missingIDs.count, privacy: .public)")
+            Self.log.notice("fetch path=jxa served=\(result.messages.count, privacy: .public) missing=\(result.missingIDs.count, privacy: .public)")
         }
 
         var seen = Set<String>()
