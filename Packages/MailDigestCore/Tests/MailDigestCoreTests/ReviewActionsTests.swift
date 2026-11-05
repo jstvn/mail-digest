@@ -99,18 +99,67 @@ private let emails: [String: EmailContext] = [
         }
     }
 
-    @Test func categoryOverrideAndDefaults() throws {
+    @Test func categoryEditSetsSuggestionAndResolutionOrder() throws {
         let a = sug("Pay fees", email: "e1"), b = sug("Other", email: "zz")
         var state = ReviewState(digest: digest([a, b], info: [info("e1", .finance)]))
+        // Fallbacks: no own category -> InfoItem category -> .other.
         #expect(ReviewActions.category(for: a, in: state) == .finance)
         #expect(ReviewActions.category(for: b, in: state) == .other)
         state = try ReviewActions.apply(SuggestionEdit(category: .uni), to: a.id, in: state)
-        #expect(ReviewActions.category(for: a, in: state) == .uni)
+        #expect(state.digest.suggestions[0].category == .uni)
+        #expect(ReviewActions.category(for: state.digest.suggestions[0], in: state) == .uni)
         #expect(state.digest.suggestions[0].title == "Pay fees")
+        // The suggestion's own category wins over the InfoItem even when they differ.
+        #expect(ReviewActions.category(for: state.digest.suggestions[0], in: state) != .finance)
+    }
+
+    @Test func editPersistsAndSurvivesReload() async throws {
+        let a = sug("Pay fees", email: "e1")
+        let state = ReviewState(digest: digest([a], info: [info("e1", .finance)]))
+        let store = InMemoryDigestStore()
+        try await store.save(state.digest)
+        let edited = try await ReviewActions.edit(
+            SuggestionEdit(title: "Pay uni fees", due: .some(t0), priority: .high, category: .uni),
+            id: a.id, state: state, store: store)
+        #expect(edited.digest.suggestions[0].category == .uni)
+
+        let reloaded = ReviewState(digest: try #require(await store.latestDigest()))
+        let s = reloaded.digest.suggestions[0]
+        #expect(s.title == "Pay uni fees")
+        #expect(s.due == t0)
+        #expect(s.priority == .high)
+        #expect(s.category == .uni)
+        #expect(ReviewActions.category(for: s, in: reloaded) == .uni)
+    }
+
+    @Test func invalidEditIsNotPersisted() async throws {
+        let a = sug("Pay fees")
+        let state = ReviewState(digest: digest([a]))
+        let store = InMemoryDigestStore()
+        try await store.save(state.digest)
+        await #expect(throws: ReviewError.invalidTitle) {
+            try await ReviewActions.edit(SuggestionEdit(title: "x", category: .uni), id: a.id, state: state, store: store)
+        }
+        #expect(try await store.latestDigest()?.suggestions[0].category == nil)
     }
 }
 
 @Suite struct ReviewFlowTests {
+    @Test func approveUsesEditedCategory() async throws {
+        let a = sug("Pay fees", email: "e1")
+        var state = ReviewState(digest: digest([a], info: [info("e1", .finance)]))
+        let store = InMemoryDigestStore()
+        try await store.save(state.digest)
+        state = try await ReviewActions.edit(SuggestionEdit(category: .uni), id: a.id, state: state, store: store)
+        let writer = RecordingReminderWriter()
+        let out = await ReviewActions.approve(ReviewActions.split(state).approve, state: state, emails: emails,
+                                              writer: writer, store: store, listName: "Mail Digest",
+                                              storedListID: nil, clock: FixedClock(t0))
+        #expect(out.results.map(\.status) == [.approved])
+        #expect(await writer.written.map(\.category) == [.uni])
+        #expect(try await store.latestDigest()?.suggestions[0].category == .uni)
+    }
+
     @Test func approveWritesOnlyPassedItemsWithCategory() async throws {
         let a = sug("Pay fees", email: "e1"), b = sug("Report", email: "e2"), c = sug("Untouched", email: "e2")
         let state = ReviewState(digest: digest([a, b, c], info: [info("e1", .finance), info("e2", .work)]))

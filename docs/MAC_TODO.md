@@ -105,7 +105,32 @@ Verified on this Mac from Terminal (a harness that compiles the real adapter sou
   - Retention keeps processed ids, decisions, pinned digests with their job context, and paused jobs.
   - Real app: the signed app created `~/Library/Application Support/MailDigest/digest.sqlite` in WAL mode with migration `v1`.
 - **Not verified in the real app:** quitting mid-job and resuming after relaunch (covered only by the package restart test), and retention cleanup scheduling (nothing calls `apply` yet; the daily cleanup belongs to T15).
-- **Open:** Q19's removal of `ReviewState.categoryOverrides` belongs with the review UI (T13/T14). The in-memory store accepts `enqueue` for an unknown job, but GRDB rejects it (foreign key).
+- **Open:** Q19's removal of `ReviewState.categoryOverrides` is done in T13. The in-memory store accepts `enqueue` for an unknown job, but GRDB rejects it (foreign key).
+
+## T13 status
+
+**T13 code done (2026-11-06); nothing below has been checked by hand yet.** Build: `xcodebuild ... build` succeeds. Core and Persistence tests pass.
+
+**Manual checks (Mac, signed app):**
+
+1. **Layout** against the wireframe in the spec: header ("Today · Wed 4 Nov · 23 emails", headline, Run Now, gear), progress strip, SUGGESTED REMINDERS, INFO groups, Skipped. Window opens at about 720 x 640 and resizes cleanly. Open the Xcode previews (Panel states, Suggestion rows, Progress strip, Menu bar, Settings) and compare.
+2. **Keyboard:** Up/Down move between suggestion rows; Space ticks the focused row; Command-Return runs Add Selected (only when Reminders is available, see deferred); Delete dismisses the focused row and moves focus on. Check that typing, Space and Delete inside a title field do not trigger row actions.
+3. **Responsiveness during a job:** start Run Now with a large inbox; the panel and menu stay responsive; finished suggestions and info cards appear while the job runs (refresh happens when `done` changes).
+4. **Each state:** Running; Paused (Pause then Resume; Stop then Resume); Ollama down or model missing (quit Ollama, Run Now: banner with the fix and Retry); Full Disk Access unavailable (banner with button); Mail Automation denied (banner with button); Reminders unavailable (Add Selected disabled plus banner, expected until T14); No new mail ("Inbox zero for today" and last run time); Partial failure (failed email under Skipped with its reason).
+5. **Editing:** change title (a 2-character or link title reverts and shows an error), due date / "Due" checkbox / "Time" checkbox, priority and category. Quit and relaunch: edits (including category) are still there.
+6. **Menu bar:** the pending-suggestion count shows next to the icon; the window-style menu opens, the strip fits, Open Review Panel, Run Now, Mail Access, Settings (Command-,) and Quit (Command-Q) work. Settings opening from an agent (no Dock icon) app can need the activate workaround; confirm it comes to the front.
+7. **Settings persistence:** change each value, quit, relaunch. Change the Ollama URL/model and confirm the next run uses them. Daily mailboxes: untick "All inboxes", pick a subset, run.
+8. **VoiceOver:** checkboxes ("Select <title>"), pickers (Priority, Category), the warning badge (hint has the reason), the open-email buttons, the progress bar (label and value), the banners and the gear button are all read sensibly.
+
+**Deferred (not part of T13):**
+
+- Reminders writer (T14). The panel's approve path is wired to `ReviewActions.approve`; T14 only calls `ReviewViewModel.setReminderWriter(_:)`. Until then Add Selected is disabled and the Reminders banner shows.
+- Settings that are stored but not used yet: run time (scheduler, T15), Reminders list name (T14), retention (cleanup, T15), Trusted Newsletter senders (the validator and extraction do not read them yet). Launch at login, auto-file, power and quiet-hours rules, and past jobs are not in Settings (T15, T18, T19).
+- Pin and Save to Notes on info cards, learned rules (T16). Processed tab and mail actions (T18).
+- Job setup sheet, full progress view (Recent, Per-mailbox, activity log), backlog batches of 50, power and thermal auto-pause, menu bar progress ring and pause badge, past jobs (T19).
+- Q16 Trusted Newsletter senders (8 suggestions instead of 3) are not read by `SuggestionValidator` or the runner yet; the setting is only stored. This gap predates T13.
+- The paused strip cannot show an auto-pause reason: `JobProgress` has no reason field yet. `ReviewPresentation.pausedText` already accepts one.
+- A job left paused by a previous session has no strip after relaunch (the runner only publishes progress once it runs); it is resumable from the job list in T19.
 
 ## Open items
 

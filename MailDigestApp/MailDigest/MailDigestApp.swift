@@ -1,6 +1,8 @@
+import MailDigestCore
 import SwiftUI
 
-/// Menu bar agent entry point. The review panel, settings and onboarding arrive in later tasks.
+/// Menu bar agent entry point: the menu bar window, the review panel, Settings and Mail Access.
+/// The scheduler, onboarding and the Reminders writer arrive in later tasks.
 @main
 struct MailDigestApp: App {
     @State private var access = MailAccessModel()
@@ -9,40 +11,37 @@ struct MailDigestApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            Text("Mail Digest")
-            if let status = access.status {
-                Text(status.mode.title)
-            }
-            Button("Run Now") { Task { await run.runNow() } }
-                .disabled(run.isRunning || access.status?.mode == .unavailable)
-            if run.isRunning, let text = run.progressText {
-                Text(text)
-            } else if let summary = run.lastRunSummary {
-                Text(summary)
-            }
-            if let banner = run.banner {
-                Text(banner)
-            }
-            if run.failedJobID != nil {
-                Button("Retry") { Task { await run.retryFailedJob() } }
-                    .disabled(run.isRunning)
-            }
-            Divider()
-            Button("Mail Access…") { showMailAccess() }
-            Divider()
-            Button("Quit Mail Digest") {
-                NSApplication.shared.terminate(nil)
-            }
-            .keyboardShortcut("q")
+            MenuBarView(run: run, access: access)
         } label: {
-            Label("Mail Digest", systemImage: "envelope.badge")
+            menuBarLabel
                 .task { await launch() }
         }
+        .menuBarExtraStyle(.window)
+
+        Window("Mail Digest", id: "review") {
+            ReviewPanelView(run: run, access: access)
+        }
+        .defaultSize(width: 720, height: 640)
 
         Window("Mail Access", id: "mail-access") {
             MailAccessView(model: access, run: run)
         }
         .windowResizability(.contentSize)
+
+        Settings {
+            SettingsView(run: run)
+        }
+    }
+
+    /// The icon, plus the number of pending suggestions when there are any.
+    private var menuBarLabel: some View {
+        let count = run.review.pendingCount
+        return HStack(spacing: 2) {
+            Image(systemName: "envelope.badge")
+            if count > 0 { Text("\(count)").monospacedDigit() }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(count > 0 ? "Mail Digest, \(count) pending suggestions" : "Mail Digest")
     }
 
     private func showMailAccess() {

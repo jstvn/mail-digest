@@ -24,14 +24,11 @@ public struct EmailContext: Sendable, Equatable {
 public struct ReviewState: Sendable, Equatable {
     public var digest: Digest
     public var selection: Set<UUID>
-    /// Category picked in the panel; wins over the email's InfoItem category.
-    public var categoryOverrides: [UUID: Category]
 
     /// Selects the defaults: pending suggestions the pipeline marked preselected.
     public init(digest: Digest) {
         self.digest = digest
         self.selection = Set(digest.suggestions.filter { $0.status == .pending && $0.preselected }.map(\.id))
-        self.categoryOverrides = [:]
     }
 }
 
@@ -131,14 +128,25 @@ public enum ReviewActions {
             sug.dueHasTime = sug.due == nil ? false : hasTime
         }
         if let priority = edit.priority { sug.priority = priority }
-        if let category = edit.category { s.categoryOverrides[id] = category }
+        if let category = edit.category { sug.category = category }
         s.digest.suggestions[index] = sug
         return s
     }
 
-    /// Override from the panel, else the email's InfoItem category, else `.other`.
+    /// Applies an edit and persists the whole edited suggestion (Q19), so title, date, priority and
+    /// category survive a restart. The store is only written when the edit is valid.
+    public static func edit(_ edit: SuggestionEdit, id: UUID, state: ReviewState,
+                            store: DigestStore) async throws -> ReviewState {
+        let updated = try apply(edit, to: id, in: state)
+        if let sug = updated.digest.suggestions.first(where: { $0.id == id }) {
+            try await store.update(sug)
+        }
+        return updated
+    }
+
+    /// The suggestion's own category, else the email's InfoItem category (older records), else `.other`.
     public static func category(for suggestion: Suggestion, in state: ReviewState) -> Category {
-        if let c = state.categoryOverrides[suggestion.id] { return c }
+        if let c = suggestion.category { return c }
         return state.digest.info.first { $0.emailID == suggestion.emailID }?.category ?? .other
     }
 

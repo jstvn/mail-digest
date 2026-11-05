@@ -9,6 +9,11 @@ final class MailAccessModel {
     private(set) var isChecking = false
     @ObservationIgnored private let probe = MailPermissionProbe()
 
+    init() {}
+
+    /// Previews: a fixed permission snapshot.
+    init(preview status: MailAccessStatus?) { self.status = status }
+
     /// Re-probes both permissions off the main actor.
     func refresh() async {
         guard !isChecking else { return }
