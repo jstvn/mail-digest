@@ -243,6 +243,47 @@ private func oldMessages(_ count: Int, prefix: String = "old") -> [EmailMessage]
         #expect(await h.notifier.messages == ["\(pending) suggestions ready"])
     }
 
+    @Test func dailyJobKeepsEverySuggestionAndTagsCategory() async throws {
+        // Q16: the 25-suggestion cap is presentation-only; the runner persists all of them.
+        let recent = (0..<30).map { n in
+            EmailMessage(id: "many-\(n)@fixture", account: "iCloud", mailbox: "Inbox",
+                         sender: "Sam \(n) <sam\(n)@example.com>", subject: "Hi \(n)",
+                         receivedAt: today.addingTimeInterval(-3600 - 60 * Double(n)),
+                         body: "Hello. Please reply by Friday.", headers: [:])
+        }
+        let results = Dictionary(uniqueKeysWithValues: recent.map { m in
+            (m.id, ExtractionResult(summary: "s", category: .finance, importance: 2, keyFacts: [], tasks: [
+                ExtractedTask(title: "Reply to \(m.subject)", due: nil, dueHasTime: false, priority: .medium,
+                              evidence: "Please reply by Friday", confidence: 0.9)]))
+        })
+        let h = Harness(source: FixtureMailSource(messages: recent), llm: StubLLMClient(results: results),
+                        settings: settings(mailboxes: [icloud]))
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        let digest = try await h.digest()
+        #expect(digest.suggestions.count == 30 && digest.emailCount == 30)
+        #expect(digest.suggestions.allSatisfy { $0.category == .finance })
+    }
+
+    @Test func emptyJobLeavesNoDigestAndRetryFailedDropsFailedResults() async throws {
+        let h = Harness(source: FixtureMailSource(messages: []), llm: StubLLMClient())
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        #expect(await h.store.allDigests().isEmpty)
+
+        let h2 = Harness(source: FixtureMailSource(messages: oldMessages(2)),
+                         llm: StubLLMClient(failures: ["old-0@fixture": Int.max]))
+        try await h2.runner.start(h2.plan(boxes: [icloud]))
+        await h2.runner.waitUntilIdle()
+        let failed = try await h2.digest()
+        #expect(failed.emailCount == 2 && failed.skipped.map(\.id) == ["old-0@fixture"])
+        await h2.llm.setFailures([:])
+        #expect(try await h2.runner.retryFailed(jobID: failed.id) == 1)
+        await h2.runner.waitUntilIdle()
+        let fixed = try await h2.digest()
+        #expect(fixed.emailCount == 2 && fixed.skipped.isEmpty && fixed.info.count == 2)
+    }
+
     @Test func injectionScamAndNewsletters() async throws {
         let h = try await Harness.fixtures()
         try await h.runner.startDaily()

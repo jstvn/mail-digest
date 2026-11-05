@@ -26,7 +26,7 @@ Things the cloud agent could not verify; check on the Mac.
 
 - **T11 JXA fallback contract.** `FetchMail.js` is the compatibility fallback in the hybrid SQLite/`.emlx` design in `docs/SPEC.md`. Its decoder expects `{"messages": [...], "missing": [...]}` (a bare array also works). `rawHeaders` should be the raw header block (e.g. `message.allHeaders()`); `receivedAt` from `toISOString()` is fine (milliseconds are accepted). Nested custom folder names (e.g. "Projects/Uni") must be verified against what `ListMailboxes.js` reports.
 - **T11 timeout.** Each `osascript` call has a 120-second hard timeout (Q6). The 60-second target is the performance benchmark for listing 3,000 messages, not the process timeout.
-- **T12 `GRDBDigestStore`** must implement every `DigestStore` method. Beyond the spec's list: `digest(id:)`, `recentSuggestions(since:)`, `updateJob`, `items(job:)`, `isQueued`, `recordItemOutcome(_:outcome:seconds:finishedAt:)`, `requeueFailed(job:)`. `InMemoryDigestStore` is the reference behaviour; consider running the same tests against both.
+- **T12 `GRDBDigestStore`** (done, see T12 status) implements every `DigestStore` method. Beyond the spec's list: `digest(id:)`, `recentSuggestions(since:)`, `updateJob`, `items(job:)`, `isQueued`, `recordItemOutcome(_:outcome:seconds:finishedAt:)`, `requeueFailed(job:)`. `InMemoryDigestStore` is the reference behaviour; consider running the same tests against both.
 - **T13/T14 review panel.** Use `ReviewActions` for selection, edits, approve and dismiss; `ReviewActions.reminderNotes` and `messageURL` build the EventKit notes and `message://` link. Category edits live in `ReviewState.categoryOverrides` (QUESTIONS 19).
 - **T14 tags.** EventKit has no public API for Reminders tags, so the category is written as `#category` at the end of the notes. Check how this shows in Reminders on macOS 26 and iOS (does it become a real tag or stay searchable text?).
 - **T15 scheduler.** Call `JobRunner.recoverOnLaunch()` on every launch before anything else, then `startDaily()` from the 15-minute check.
@@ -84,7 +84,28 @@ Verified on this Mac from Terminal (a harness that compiles the real adapter sou
     - **Mid-job outage:** after any model error other than a malformed answer, the runner re-checks health. If Ollama is down, the job stops as `.failed` with `lastError`, the email returns to `queued` and no attempt is used. The menu shows the reason and a Retry item that resumes the same job.
     - **Attempt counting:** now follows Q22. Only genuine item failures count; starts, pauses, cancellations and crash recovery do not.
     - **Not yet tried:** stopping Ollama during a run of the real app.
-  - The interim in-memory store loses results on quit until T12.
+  - T12 replaced the interim in-memory store (see T12 status).
+
+## T12 status
+
+**T12 done (2026-11-06).**
+
+- **Where the store lives:** `GRDBDigestStore` is in a new local package, `Packages/MailDigestPersistence` (GRDB + MailDigestCore), linked into the app like `MailDigestCore`. The spec's layout puts it under `Adapters/`. I moved it so the GRDB store has a `swift test` suite without hand-adding an Xcode test target. Core stays Foundation-only and GRDB stays on the app side. Confirm or ask to move it.
+- **Schema (migration `v1`):** `processed_email`, `digest`, `digest_email_result` (one row per email, unique by digest and email), `decision`, `job` (with `last_error`), `job_item` (full `MailboxRef` JSON plus nullable `mail_store_row_id`) and `setting`. Foreign keys cascade from digest to results and from job to items. WAL mode.
+- **Core changes:**
+  - Q17: `EmailResult`, `appendEmailResult` and `deleteEmailResults`, with digests rebuilt from results. The runner writes one result per email.
+  - Q16: the runner no longer truncates Daily suggestions.
+  - Q19: `Suggestion.category` is persisted.
+  - Retention: `apply(RetentionPlan)`. The plan now keeps a pinned digest's job and the digest of a resumable job together (Q21).
+  - Q28: `requeueFailed` clears outcome, seconds and finish time.
+- **Verified:**
+  - Core 232 tests and Persistence 16 tests.
+  - Persistence restart test: pause plus a simulated crash mid-backlog, reopen the file, `recoverOnLaunch`, `resume` → no reprocessing, the digest matches an uninterrupted run, `mail_store_row_id` reaches `fetchMessages`, and a later Daily run reprocesses nothing.
+  - Atomicity under a mid-transaction error.
+  - Retention keeps processed ids, decisions, pinned digests with their job context, and paused jobs.
+  - Real app: the signed app created `~/Library/Application Support/MailDigest/digest.sqlite` in WAL mode with migration `v1`.
+- **Not verified in the real app:** quitting mid-job and resuming after relaunch (covered only by the package restart test), and retention cleanup scheduling (nothing calls `apply` yet; the daily cleanup belongs to T15).
+- **Open:** Q19's removal of `ReviewState.categoryOverrides` belongs with the review UI (T13/T14). The in-memory store accepts `enqueue` for an unknown job, but GRDB rejects it (foreign key).
 
 ## Open items
 

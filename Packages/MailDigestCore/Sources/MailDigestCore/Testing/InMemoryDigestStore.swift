@@ -2,12 +2,15 @@ import Foundation
 
 /// Dictionary-backed `DigestStore` with the same semantics as the SQLite store.
 public actor InMemoryDigestStore: DigestStore {
-    private var digests: [Digest] = []
+    /// Digest-level row; the content lives in `resultsByDigest` (Q17).
+    private struct DigestRow { var id: UUID; var createdAt: Date; var headline: String }
+    private var digestRows: [DigestRow] = []
+    private var resultsByDigest: [UUID: [EmailResult]] = [:]
     private var processed: [String: ProcessedEmail] = [:]
     private var decisionList: [Decision] = []
     private var jobList: [Job] = []
     private var itemList: [JobItem] = []
-    /// Item id -> index in `itemList`. Items are never removed, so entries stay valid.
+    /// Item id -> index in `itemList`; rebuilt when retention removes items.
     private var itemIndex: [UUID: Int] = [:]
     /// Job id -> indices into `itemList`, in enqueue order (which is position order).
     private var itemsByJob: [UUID: [Int]] = [:]
@@ -16,7 +19,7 @@ public actor InMemoryDigestStore: DigestStore {
 
     // MARK: Runs and processed mail
 
-    public func lastRunDate() async throws -> Date? { digests.map(\.createdAt).max() }
+    public func lastRunDate() async throws -> Date? { digestRows.map(\.createdAt).max() }
 
     public func isProcessed(_ messageID: String) async throws -> Bool { processed[messageID] != nil }
 
@@ -25,27 +28,70 @@ public actor InMemoryDigestStore: DigestStore {
     // MARK: Digests and suggestions
 
     public func save(_ digest: Digest) async throws {
-        if let i = digests.firstIndex(where: { $0.id == digest.id }) {
-            digests[i] = digest
+        let row = DigestRow(id: digest.id, createdAt: digest.createdAt, headline: digest.headline)
+        if let i = digestRows.firstIndex(where: { $0.id == digest.id }) {
+            digestRows[i] = row
         } else {
-            digests.append(digest)
+            digestRows.append(row)
         }
+        resultsByDigest[digest.id] = EmailResult.results(from: digest)
     }
 
-    public func latestDigest() async throws -> Digest? { digests.max { $0.createdAt < $1.createdAt } }
+    public func appendEmailResult(_ result: EmailResult, to digestID: UUID) async throws {
+        guard digestRows.contains(where: { $0.id == digestID }) else { throw DigestStoreError.digestNotFound(digestID) }
+        var list = resultsByDigest[digestID] ?? []
+        if let i = list.firstIndex(where: { $0.emailID == result.emailID }) {
+            list[i] = result
+        } else {
+            list.append(result)
+        }
+        resultsByDigest[digestID] = list
+    }
 
-    public func digest(id: UUID) async throws -> Digest? { digests.first { $0.id == id } }
+    public func deleteEmailResults(_ emailIDs: Set<String>, from digestID: UUID) async throws {
+        resultsByDigest[digestID]?.removeAll { emailIDs.contains($0.emailID) }
+    }
+
+    public func latestDigest() async throws -> Digest? {
+        digestRows.max { $0.createdAt < $1.createdAt }.map(aggregate)
+    }
+
+    public func digest(id: UUID) async throws -> Digest? {
+        digestRows.first { $0.id == id }.map(aggregate)
+    }
+
+    private func aggregate(_ row: DigestRow) -> Digest {
+        Digest(id: row.id, createdAt: row.createdAt, headline: row.headline, results: resultsByDigest[row.id] ?? [])
+    }
 
     public func recentSuggestions(since: Date) async throws -> [Suggestion] {
-        digests.filter { $0.createdAt >= since }.flatMap(\.suggestions)
+        digestRows.filter { $0.createdAt >= since }.flatMap { resultsByDigest[$0.id] ?? [] }.flatMap(\.suggestions)
     }
 
     public func update(_ suggestion: Suggestion) async throws {
-        for d in digests.indices {
-            if let s = digests[d].suggestions.firstIndex(where: { $0.id == suggestion.id }) {
-                digests[d].suggestions[s] = suggestion
-                return
+        for (digestID, results) in resultsByDigest {
+            for r in results.indices {
+                if let s = results[r].suggestions.firstIndex(where: { $0.id == suggestion.id }) {
+                    resultsByDigest[digestID]?[r].suggestions[s] = suggestion
+                    return
+                }
             }
+        }
+    }
+
+    public func apply(_ plan: RetentionPlan) async throws {
+        let digestIDs = Set(plan.digestIDs)
+        digestRows.removeAll { digestIDs.contains($0.id) }
+        for id in digestIDs { resultsByDigest[id] = nil }
+        let jobIDs = Set(plan.jobIDs)
+        jobList.removeAll { jobIDs.contains($0.id) }
+        itemList.removeAll { jobIDs.contains($0.jobID) }
+        // Items moved, so the position lookups must be rebuilt.
+        itemIndex = [:]
+        itemsByJob = [:]
+        for (i, item) in itemList.enumerated() {
+            itemIndex[item.id] = i
+            itemsByJob[item.jobID, default: []].append(i)
         }
     }
 
@@ -125,6 +171,10 @@ public actor InMemoryDigestStore: DigestStore {
         for i in itemList.indices where itemList[i].jobID == jobID && itemList[i].state == .failed {
             itemList[i].state = .queued
             itemList[i].attempts = 0
+            // Q28: a requeued item must not still look finished.
+            itemList[i].outcome = nil
+            itemList[i].seconds = nil
+            itemList[i].finishedAt = nil
             changed.append(itemList[i])
         }
         return changed.sorted { $0.position < $1.position }
@@ -145,6 +195,6 @@ public actor InMemoryDigestStore: DigestStore {
     public func allItems() -> [JobItem] { itemList }
     /// Ids marked processed.
     public func processedIDs() -> Set<String> { Set(processed.keys) }
-    /// Every saved digest, in insertion order.
-    public func allDigests() -> [Digest] { digests }
+    /// Every saved digest, in insertion order, rebuilt from its results.
+    public func allDigests() -> [Digest] { digestRows.map(aggregate) }
 }

@@ -34,21 +34,31 @@ public struct RetentionPlan: Sendable, Equatable {
 public struct RetentionPolicy: Sendable {
     public init() {}
 
-    /// Digests and finished or failed jobs strictly older than the limit. Pinned digests are kept.
+    /// Digests and finished or failed jobs strictly older than the limit. A digest and its job share an id and
+    /// are kept or deleted together (Q21): a pinned digest keeps its job and items, and the digest of a job
+    /// that can still be resumed is kept.
     public func plan(retention: HistoryRetention, now: Date, digests: [Digest], jobs: [Job]) -> RetentionPlan {
         guard let maxAge = retention.maxAge else { return RetentionPlan() }
         let cutoff = now.addingTimeInterval(-maxAge)
+        let keep = keptIDs(digests: digests, jobs: jobs)
         return RetentionPlan(
-            digestIDs: digests.filter { $0.createdAt < cutoff && !Self.hasPinned($0) }.map(\.id),
+            digestIDs: digests.filter { $0.createdAt < cutoff && !keep.contains($0.id) }.map(\.id),
             // Paused or stopped jobs can still be resumed, so only terminal states are cleaned.
-            jobIDs: jobs.filter { $0.createdAt < cutoff && Self.isTerminal($0) }.map(\.id))
+            jobIDs: jobs.filter { $0.createdAt < cutoff && Self.isTerminal($0) && !keep.contains($0.id) }.map(\.id))
     }
 
-    /// "Delete all history now": everything except pinned digests and unfinished (running or resumable) jobs.
+    /// "Delete all history now": everything except pinned digests (with their jobs) and unfinished (running or
+    /// resumable) jobs (with their digests).
     public func deleteAllPlan(digests: [Digest], jobs: [Job]) -> RetentionPlan {
-        RetentionPlan(
-            digestIDs: digests.filter { !Self.hasPinned($0) }.map(\.id),
-            jobIDs: jobs.filter(Self.isTerminal).map(\.id))
+        let keep = keptIDs(digests: digests, jobs: jobs)
+        return RetentionPlan(
+            digestIDs: digests.filter { !keep.contains($0.id) }.map(\.id),
+            jobIDs: jobs.filter { Self.isTerminal($0) && !keep.contains($0.id) }.map(\.id))
+    }
+
+    /// Ids (shared by a digest and its job) that must survive: pinned digests and unfinished jobs.
+    private func keptIDs(digests: [Digest], jobs: [Job]) -> Set<UUID> {
+        Set(digests.filter(Self.hasPinned).map(\.id)).union(jobs.filter { !Self.isTerminal($0) }.map(\.id))
     }
 
     private static func hasPinned(_ digest: Digest) -> Bool { digest.info.contains { $0.pinned } }

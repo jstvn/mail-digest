@@ -71,6 +71,7 @@ public struct DigestPipeline: Sendable {
             let context = ValidationContext(today: today, recentSuggestions: recentSuggestions,
                                             senderHasApprovedDecision: senderHasApprovedDecision)
             suggestions = validator.validate(result.tasks, email: cleaned, context: context)
+                .map { var s = $0; s.category = info.category; return s }
         }
 
         let text = suggestions.isEmpty

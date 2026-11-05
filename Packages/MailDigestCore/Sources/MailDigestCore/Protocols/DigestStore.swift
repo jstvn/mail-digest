@@ -12,9 +12,17 @@ public protocol DigestStore: Sendable {
 
     // MARK: Digests and suggestions
 
-    /// Upserts by id. The pipeline re-saves after every email so partial results survive.
+    /// Upserts the digest row (id, createdAt, headline) and REPLACES its per-email results with those
+    /// derived from `digest`'s content (see `EmailResult.results(from:)`). The runner uses it to create a
+    /// digest and to store the headline; per-email progress goes through `appendEmailResult`.
     func save(_ digest: Digest) async throws
-    /// The most recent digest, if any.
+    /// Atomically upserts one email's result, keyed by (digest, email id): a new email appends after the
+    /// existing results, a known one is replaced in place. Throws `DigestStoreError.digestNotFound` if the
+    /// digest was never saved.
+    func appendEmailResult(_ result: EmailResult, to digestID: UUID) async throws
+    /// Removes the given emails' results from a digest (used by "Retry failed").
+    func deleteEmailResults(_ emailIDs: Set<String>, from digestID: UUID) async throws
+    /// The most recent digest, if any, rebuilt from its results.
     func latestDigest() async throws -> Digest?
     /// The digest with this id (a job's digest shares the job's id), so a resumed job keeps appending to it.
     func digest(id: UUID) async throws -> Digest?
@@ -22,6 +30,12 @@ public protocol DigestStore: Sendable {
     func recentSuggestions(since: Date) async throws -> [Suggestion]
     /// Replaces a suggestion by id inside whichever digest holds it.
     func update(_ suggestion: Suggestion) async throws
+
+    // MARK: Retention
+
+    /// Deletes the planned digests (with their results) and jobs (with their items). Never touches
+    /// processed ids or decisions (Q18, Q21).
+    func apply(_ plan: RetentionPlan) async throws
 
     // MARK: Decisions
 

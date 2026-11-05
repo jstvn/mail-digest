@@ -1,5 +1,6 @@
 import Foundation
 import MailDigestCore
+import MailDigestPersistence
 import Observation
 import OSLog
 
@@ -22,8 +23,10 @@ final class DigestRunModel {
 
     @ObservationIgnored private let source = AppleMailSource()
     @ObservationIgnored private let llm = OllamaClient()
-    /// Interim in-memory store; T12 replaces it with the GRDB store, so results are lost on quit.
-    @ObservationIgnored private let store = InMemoryDigestStore()
+    /// The SQLite store, opened lazily off the main actor. Nil until opened; there is deliberately no
+    /// in-memory fallback, so a failure is shown instead of silently losing results.
+    @ObservationIgnored private var store: GRDBDigestStore?
+    @ObservationIgnored private var didRecoverJobs = false
     @ObservationIgnored private let notifier = LogNotifier()
     @ObservationIgnored private let clock = SystemClock()
     @ObservationIgnored private var runner: JobRunner?
@@ -45,12 +48,41 @@ final class DigestRunModel {
         }
     }
 
+    /// Call once at launch: opens the database and shows the last run's summary.
+    func loadLastRun() async {
+        guard let store = await openStore(), let digest = try? await store.latestDigest() else { return }
+        lastRunSummary = Self.summary(for: digest)
+    }
+
+    /// `~/Library/Application Support/MailDigest/digest.sqlite`.
+    private static var databasePath: String {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base.appendingPathComponent("MailDigest/digest.sqlite").path
+    }
+
+    /// Opens the store once, off the main actor. On failure shows a banner and returns nil.
+    private func openStore() async -> GRDBDigestStore? {
+        if let store { return store }
+        let path = Self.databasePath
+        do {
+            let opened = try await Task.detached(priority: .userInitiated) { try GRDBDigestStore(path: path) }.value
+            store = opened
+            return opened
+        } catch {
+            Self.log.error("could not open database: \(String(describing: error), privacy: .public)")
+            banner = "Could not open the Mail Digest database. Your results can't be saved, so nothing was run."
+            return nil
+        }
+    }
+
     func runNow() async {
         guard !isRunning else { return }
         isRunning = true
         banner = nil
         progressText = "Starting…"
         defer { isRunning = false; progressText = nil }
+
+        guard let store = await openStore() else { return }
 
         // Check Ollama first so a down server doesn't cost a mail listing (Q25).
         do {
@@ -74,7 +106,7 @@ final class DigestRunModel {
             return
         }
 
-        let runner = runner(for: inboxes)
+        let runner = await runner(for: inboxes, store: store)
         do {
             try await runner.startDaily()
             await runner.waitUntilIdle()
@@ -87,7 +119,7 @@ final class DigestRunModel {
 
     /// Resumes the job a provider outage stopped. The runner re-checks Ollama first.
     func retryFailedJob() async {
-        guard !isRunning, let jobID = failedJobID, let runner else { return }
+        guard !isRunning, let jobID = failedJobID, let runner, store != nil else { return }
         isRunning = true
         banner = nil
         progressText = "Starting…"
@@ -104,6 +136,7 @@ final class DigestRunModel {
 
     /// Shows the outage banner if the job stopped as failed; otherwise summarises it.
     private func finishRun() async {
+        guard let store else { return }
         if let job = try? await store.jobs().first, job.state == .failed {
             failedJobID = job.id
             banner = job.lastError ?? "The run stopped. Try again."
@@ -111,13 +144,14 @@ final class DigestRunModel {
             return
         }
         failedJobID = nil
-        await summariseLastRun()
+        await summariseLastRun(store)
     }
 
     // MARK: Helpers
 
-    /// Creates the runner once and only recreates it when the inbox set changes.
-    private func runner(for inboxes: [MailboxRef]) -> JobRunner {
+    /// Creates the runner once and only recreates it when the inbox set changes. The first runner puts jobs
+    /// interrupted by a quit or crash back into a resumable state.
+    private func runner(for inboxes: [MailboxRef], store: GRDBDigestStore) async -> JobRunner {
         let set = Set(inboxes)
         if let runner, set == runnerInboxes { return runner }
         progressTask?.cancel()
@@ -125,6 +159,12 @@ final class DigestRunModel {
                             settings: RunnerSettings(dailyMailboxes: inboxes))
         runner = new
         runnerInboxes = set
+        if !didRecoverJobs {
+            didRecoverJobs = true
+            do { try await new.recoverOnLaunch() } catch {
+                Self.log.error("job recovery failed: \(String(describing: error), privacy: .public)")
+            }
+        }
         progressTask = Task { [weak self] in
             for await update in new.progress {
                 self?.apply(update)
@@ -149,19 +189,20 @@ final class DigestRunModel {
         }
     }
 
-    private func summariseLastRun() async {
+    private static func summary(for digest: Digest) -> String {
+        let time = digest.createdAt.formatted(date: .omitted, time: .shortened)
+        if digest.emailCount == 0 { return "Inbox zero for today · last run \(time)" }
+        return "Last run \(time) · \(digest.suggestions.count) suggestions · \(digest.emailCount) emails"
+    }
+
+    private func summariseLastRun(_ store: GRDBDigestStore) async {
         do {
             guard let digest = try await store.latestDigest() else {
                 lastRunSummary = "Inbox zero for today"
                 Self.log.notice("run finished: no digest")
                 return
             }
-            let time = digest.createdAt.formatted(date: .omitted, time: .shortened)
-            if digest.emailCount == 0 {
-                lastRunSummary = "Inbox zero for today · last run \(time)"
-            } else {
-                lastRunSummary = "Last run \(time) · \(digest.suggestions.count) suggestions · \(digest.emailCount) emails"
-            }
+            lastRunSummary = Self.summary(for: digest)
 
             // Counts only: no subjects, senders, bodies or IDs go to the log.
             let items = try await store.items(job: digest.id)

@@ -52,6 +52,7 @@ struct MailDigestApp: App {
 
     /// Probes once at launch and shows Mail Access on first run. Never prompts for Automation.
     private func launch() async {
+        await run.loadLastRun()
         await access.refresh()
         let key = "didShowMailAccess"
         if !UserDefaults.standard.bool(forKey: key) {

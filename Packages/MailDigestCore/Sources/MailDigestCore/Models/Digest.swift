@@ -46,10 +46,14 @@ public struct Suggestion: Codable, Sendable, Equatable, Identifiable {
     public var flags: [String]         // e.g. "money-new-sender"
     public var status: SuggestionStatus
     public var reminderID: String?     // EKReminder.calendarItemIdentifier after approval
+    /// Category tag (Q19). Set from the email's `InfoItem` when created; edits persist via `DigestStore.update`.
+    /// Absent in older records: resolve as `category`, then the matching `InfoItem`, then `.other`.
+    public var category: Category?
 
     public init(id: UUID, emailID: String, title: String, due: Date?, dueHasTime: Bool,
                 priority: Priority, evidence: String, confidence: Double, preselected: Bool,
-                flags: [String], status: SuggestionStatus, reminderID: String?) {
+                flags: [String], status: SuggestionStatus, reminderID: String?, category: Category? = nil) {
+        self.category = category
         self.id = id
         self.emailID = emailID
         self.title = title
@@ -114,4 +118,48 @@ public struct Decision: Codable, Sendable, Equatable {
         self.action = action
         self.decidedAt = decidedAt
     }
+}
+
+/// Everything one source email contributed to a digest. Persisted atomically per email (Q17), so a digest
+/// is rebuilt from its results instead of being rewritten as one growing document.
+public struct EmailResult: Codable, Sendable, Equatable {
+    public var emailID: String
+    public var info: InfoItem?
+    public var suggestions: [Suggestion]
+    public var skipped: SkippedEmail?
+
+    public init(emailID: String, info: InfoItem? = nil, suggestions: [Suggestion] = [], skipped: SkippedEmail? = nil) {
+        self.emailID = emailID
+        self.info = info
+        self.suggestions = suggestions
+        self.skipped = skipped
+    }
+
+    /// Splits a whole digest into per-email results, ordered by first appearance (info, suggestions, skipped).
+    public static func results(from digest: Digest) -> [EmailResult] {
+        var order: [String] = []
+        var byEmail: [String: EmailResult] = [:]
+        func slot(_ id: String) {
+            if byEmail[id] == nil { order.append(id); byEmail[id] = EmailResult(emailID: id) }
+        }
+        for item in digest.info { slot(item.emailID); byEmail[item.emailID]?.info = item }
+        for s in digest.suggestions { slot(s.emailID); byEmail[s.emailID]?.suggestions.append(s) }
+        for k in digest.skipped { slot(k.id); byEmail[k.id]?.skipped = k }
+        return order.compactMap { byEmail[$0] }
+    }
+}
+
+extension Digest {
+    /// Rebuilds the aggregate: info, suggestions and skipped in result order; `emailCount` is the result count.
+    public init(id: UUID, createdAt: Date, headline: String, results: [EmailResult]) {
+        self.init(id: id, createdAt: createdAt, headline: headline, emailCount: results.count,
+                  suggestions: results.flatMap(\.suggestions), info: results.compactMap(\.info),
+                  skipped: results.compactMap(\.skipped))
+    }
+}
+
+/// Failures every `DigestStore` reports the same way.
+public enum DigestStoreError: Error, Sendable, Equatable {
+    /// A result was appended to a digest that was never saved.
+    case digestNotFound(UUID)
 }

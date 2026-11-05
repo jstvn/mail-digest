@@ -16,6 +16,8 @@ public struct RunnerSettings: Sendable {
     public var waitAfterCheck: Duration
     /// Minimum injected-clock time between throttled progress updates.
     public var progressInterval: TimeInterval
+    /// Presentation threshold for the Daily digest (Q16). The runner never truncates by it; the UI uses it
+    /// with `SuggestionValidator.capDigest` to decide what to show first.
     public var dailyDigestCap: Int
 
     public init(timeZone: TimeZone = TimeZone(identifier: "Australia/Brisbane") ?? .current,
@@ -96,10 +98,14 @@ public actor JobRunner {
         var queueHead: [JobItem] = []
         /// Set when the loop has decided to pause, so `resume()` can no longer cancel the pause.
         var committed = false
+        /// Whether the digest row exists in the store. Created lazily with the first result so an empty
+        /// job leaves no digest (Q24).
+        var digestStored: Bool
 
-        init(job: Job, digest: Digest) {
+        init(job: Job, digest: Digest, digestStored: Bool) {
             self.job = job
             self.digest = digest
+            self.digestStored = digestStored
         }
     }
 
@@ -232,13 +238,9 @@ public actor JobRunner {
         guard var job = try await store.jobs().first(where: { $0.id == jobID }) else { throw JobRunnerError.jobNotFound }
         let requeued = try await store.requeueFailed(job: jobID)
         guard !requeued.isEmpty else { return 0 }
-        let ids = Set(requeued.map(\.messageID))
-        if var digest = try await store.digest(id: jobID) {
-            let before = digest.skipped.count
-            digest.skipped.removeAll { ids.contains($0.id) && $0.reason.hasPrefix("failed:") }
-            digest.emailCount = max(0, digest.emailCount - (before - digest.skipped.count))
-            try await store.save(digest)
-        }
+        // A failed item's only result is its "failed: ..." skip entry, so dropping the result removes it
+        // and keeps the digest's email count consistent.
+        try await store.deleteEmailResults(Set(requeued.map(\.messageID)), from: jobID)
         job.state = .paused
         job.autoPaused = false
         job.totals.failed = max(0, job.totals.failed - requeued.count)
@@ -364,7 +366,7 @@ public actor JobRunner {
         do {
             try await store.createJob(job)
             run = RunState(job: job, digest: Digest(id: job.id, createdAt: now, headline: "", emailCount: 0,
-                                                    suggestions: [], info: [], skipped: []))
+                                                    suggestions: [], info: [], skipped: []), digestStored: false)
             emit(force: true)
 
             let headers = try await select(plan).toProcess
@@ -397,15 +399,17 @@ public actor JobRunner {
         var job = job
         let items = try await store.items(job: job.id)
         var digest: Digest
+        var stored = false
         if let newDigest {
             digest = newDigest
         } else if let saved = try await store.digest(id: job.id) {
             digest = saved
+            stored = true
         } else {
             digest = Digest(id: job.id, createdAt: clock.now(), headline: "", emailCount: 0,
                             suggestions: [], info: [], skipped: [])
         }
-        let state = RunState(job: job, digest: digest)
+        let state = RunState(job: job, digest: digest, digestStored: stored)
         var totals = JobTotals(queued: 0, done: 0, failed: 0, skipped: 0)
         for item in items {
             var c = state.counts[item.mailbox] ?? MailboxProgress(done: 0, total: 0)
@@ -515,10 +519,8 @@ public actor JobRunner {
     private func handle(_ item: JobItem, email: EmailMessage?, run: RunState) async throws -> Bool {
         guard let email else {
             let reason = "not found in Mail"
-            run.digest.skipped.append(SkippedEmail(id: item.messageID, sender: item.sender,
-                                                   subject: item.subject, reason: reason))
-            run.digest.emailCount += 1
-            try await store.save(run.digest)
+            try await persist(EmailResult(emailID: item.messageID, skipped: SkippedEmail(
+                id: item.messageID, sender: item.sender, subject: item.subject, reason: reason)), in: run)
             try await complete(run, item, state: .skipped, outcome: "skipped: \(reason)", seconds: nil, error: reason)
             return false
         }
@@ -531,10 +533,8 @@ public actor JobRunner {
         // skipped without consuming an attempt and is not marked processed, so a later job can retry it.
         if email.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let reason = Self.unreadableBodyReason
-            run.digest.skipped.append(SkippedEmail(id: item.messageID, sender: item.sender,
-                                                   subject: item.subject, reason: reason))
-            run.digest.emailCount += 1
-            try await store.save(run.digest)
+            try await persist(EmailResult(emailID: item.messageID, skipped: SkippedEmail(
+                id: item.messageID, sender: item.sender, subject: item.subject, reason: reason)), in: run)
             try await complete(run, item, state: .skipped, outcome: "skipped: \(reason)", seconds: nil, error: reason)
             return false
         }
@@ -568,17 +568,10 @@ public actor JobRunner {
         switch result {
         case .success(let outcome):
             run.stage = .saving
-            if let info = outcome.info { run.digest.info.append(info) }
-            run.digest.suggestions.append(contentsOf: outcome.suggestions)
-            // Backlog digests are not capped; they are reviewed in batches instead.
-            if run.job.kind == .daily {
-                run.digest.suggestions = pipeline.validator.capDigest(run.digest.suggestions,
-                                                                       limit: settings.dailyDigestCap)
-            }
-            if let skipped = outcome.skipped { run.digest.skipped.append(skipped) }
-            run.digest.emailCount += 1
-            // Order matters for crash safety: results first, then "processed", then the item state.
-            try await store.save(run.digest)
+            // Every validated suggestion is kept (Q16); the Daily cap is presentation-only.
+            // Order matters for crash safety: result first, then "processed", then the item state.
+            try await persist(EmailResult(emailID: email.id, info: outcome.info, suggestions: outcome.suggestions,
+                                          skipped: outcome.skipped), in: run)
             let seconds = clock.now().timeIntervalSince(started)
             try await store.markProcessed(ProcessedEmail(id: email.id, receivedAt: email.receivedAt,
                                                          tier: outcome.tier, processedAt: clock.now()))
@@ -605,10 +598,9 @@ public actor JobRunner {
             // waited the full (long) timeout, so it is not retried automatically (Q35); the user can
             // still retry it with `retryFailed(jobID:)`.
             if item.attempts + 1 >= settings.maxAttempts || error as? LLMError == .timedOut {
-                run.digest.skipped.append(SkippedEmail(id: item.messageID, sender: item.sender,
-                                                       subject: item.subject, reason: "failed: \(reason)"))
-                run.digest.emailCount += 1
-                try await store.save(run.digest)
+                try await persist(EmailResult(emailID: item.messageID, skipped: SkippedEmail(
+                    id: item.messageID, sender: item.sender, subject: item.subject, reason: "failed: \(reason)")),
+                                  in: run)
                 try await complete(run, item, state: .failed, outcome: "failed: \(reason)",
                                    seconds: clock.now().timeIntervalSince(started), error: reason)
                 return false
@@ -662,7 +654,6 @@ public actor JobRunner {
             run.nextUp = nil
         }
         try await store.updateJob(run.job)
-        if hasContent(run.digest) { try await store.save(run.digest) }
         emit(force: true)
         return .paused
     }
@@ -672,8 +663,12 @@ public actor JobRunner {
         run.current = nil
         run.nextUp = nil
         if hasContent(run.digest) {
+            // Reload first: the user may have edited suggestions since the last result, and `save` replaces
+            // the stored results with this digest's content.
+            if let fresh = try await store.digest(id: run.digest.id) { run.digest = fresh }
             run.digest.headline = await pipeline.headline(for: run.digest)
             try await store.save(run.digest)
+            run.digestStored = true
             let pending = run.digest.suggestions.filter { $0.status == .pending }.count
             if pending > 0 {
                 await notifier.post(pending == 1 ? "1 suggestion ready" : "\(pending) suggestions ready")
@@ -686,6 +681,29 @@ public actor JobRunner {
     }
 
     // MARK: Helpers
+
+    /// Persists one email's result atomically and mirrors it into the in-memory digest.
+    private func persist(_ result: EmailResult, in run: RunState) async throws {
+        if !run.digestStored {
+            try await store.save(run.digest)
+            run.digestStored = true
+        }
+        try await store.appendEmailResult(result, to: run.digest.id)
+        let d = run.digest
+        let known = d.info.contains { $0.emailID == result.emailID } || d.skipped.contains { $0.id == result.emailID }
+            || d.suggestions.contains { $0.emailID == result.emailID }
+        if known {
+            // Reprocessed after a crash between the write and the item state: replace, as the store does.
+            var results = EmailResult.results(from: d)
+            if let i = results.firstIndex(where: { $0.emailID == result.emailID }) { results[i] = result }
+            run.digest = Digest(id: d.id, createdAt: d.createdAt, headline: d.headline, results: results)
+        } else {
+            if let info = result.info { run.digest.info.append(info) }
+            run.digest.suggestions.append(contentsOf: result.suggestions)
+            if let skipped = result.skipped { run.digest.skipped.append(skipped) }
+            run.digest.emailCount += 1
+        }
+    }
 
     private func cancelInFlight() {
         guard itemActive else { return }
