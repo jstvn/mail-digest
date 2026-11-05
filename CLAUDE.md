@@ -30,6 +30,36 @@ If running in a Linux container without `swift`, install a Swift 6 toolchain fir
 9. Add short, clear English comments where they help: a `///` doc comment on public types and functions, and a brief comment above non-obvious logic explaining why, not what. Don't comment the obvious.
 10. Use short **Conventional Commits** messages (under 50 chars, lowercase, imperative), scoping by task ID or module—for example `feat(T10): add macOS app target` or `fix(core): shadow ObjectiveC.Category`.
 
+## Agent orchestration and model routing
+
+The primary Claude Code session is the **Opus orchestrator and architect**. Start development sessions with `/model opus`; `CLAUDE.md` cannot select the primary model. The primary session owns planning, task decomposition, specification and architecture decisions, integration, final verification, and commits. It must review every implementation diff against `docs/SPEC.md`, the approved decisions in `docs/QUESTIONS.md`, and Apple's HIG before accepting the work.
+
+Use the project subagents in `.claude/agents/` for repeatable delegated work. Their requested models are declared in their frontmatter. A per-invocation model override or `CLAUDE_CODE_SUBAGENT_MODEL` environment variable can take precedence, so do not override the configured model unless there is a specific reason:
+
+| Agent | Model | Delegate when |
+| --- | --- | --- |
+| `fast-recon` | Haiku | Exploring the codebase, locating spec requirements, checking Git/environment state, investigating test output, or running local Ollama preflight checks. Read-only. |
+| `docs-and-boilerplate` | Haiku | Updating `docs/MAC_TODO.md` or recording already-approved decisions in `docs/QUESTIONS.md`; creating straightforward plist, entitlements, LaunchAgent, standalone JXA, or simple boilerplate adapter files. |
+| `swift-implementer` | Sonnet | Implementing one T-numbered task involving Swift 6, strict concurrency, GRDB, Mail/EventKit bridges, or non-trivial SwiftUI. |
+
+Delegate proactively when the work is substantial or self-contained, but do not spawn an agent for a trivial lookup or one-line command. Give each worker a bounded task with its task ID (when applicable), relevant spec sections and question decisions, allowed files, acceptance criteria, and explicit out-of-scope items. Do not have multiple agents edit the same files concurrently. Independent tasks may use isolated worktrees; dependent tasks must be sequenced.
+
+When a task must run on Haiku, invoke `fast-recon` or `docs-and-boilerplate` explicitly by name. Do not assume the built-in `Explore` agent uses Haiku: current Claude Code versions make it inherit the main session's model unless a project/user agent named `Explore` overrides it.
+
+The primary session must:
+
+- Make and explain all product, specification, and architecture decisions with the user. Workers may identify ambiguity and recommend options, but must not decide it or silently change scope.
+- Review the complete diff from every worker, not only its summary. Verify requirements, error handling, Swift 6 concurrency, tests, and HIG/accessibility where UI is involved.
+- Run final verification itself after integration. A worker's successful test report is not a substitute for the final suite and app build required by the task.
+- Own all commits. Subagents must not commit, amend commits, push, or alter branches unless explicitly instructed by the primary session.
+
+### Decision and specification precedence
+
+- `docs/SPEC.md` is the product and implementation specification.
+- `docs/QUESTIONS.md` records decisions explicitly approved by the user. Treat each `Decision` entry as settled and binding; do not ask the user to walk through or re-approve it. Reopen a decision only if implementation reveals a concrete contradiction or an unanticipated technical constraint, and bring that conflict to the primary session before changing behaviour.
+- When a question has both an interim choice and a `Decision` entry, follow the `Decision` entry.
+- `docs/MAC_TODO.md` tracks Mac-only checks and verification status. Update it when a Mac-only task changes what remains to be checked.
+
 ## Token-efficient agent work
 
 - Search first, then read only the lines you need. Don't re-read a file you already have unless it changed.
@@ -45,7 +75,7 @@ If running in a Linux container without `swift`, install a Swift 6 toolchain fir
 
 ## Delegating implementation
 
-The main session orchestrates: it plans, reviews each diff against the spec, makes spec and architecture decisions, runs the final test suite, and commits. Implementation of a single T-numbered task goes to the `swift-implementer` sub-agent (`.claude/agents/swift-implementer.md`). The agent file doesn't pin a model: choose one per session, from any provider, that can write and test Swift 6 code. Mechanical work such as fixture JSON or boilerplate can go to a smaller, cheaper model.
+Implementation of a single T-numbered Swift task goes to `swift-implementer` (`.claude/agents/swift-implementer.md`, Sonnet). Use `docs-and-boilerplate` (Haiku) for approved documentation updates and simple mechanical scaffolding, and `fast-recon` (Haiku) for investigation and preflight checks. Keep complex Swift 6 and SwiftUI implementation with Sonnet.
 
 - One task ID per sub-agent. The prompt names the task ID, the spec sections it needs, the files it may create or change, and the acceptance criteria.
 - The sub-agent runs `swift build` and `swift test` (or `xcodebuild` for app tasks) before reporting back.

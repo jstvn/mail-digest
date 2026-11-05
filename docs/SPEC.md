@@ -2,7 +2,7 @@
 
 Nov 3, 2026 · @Justin
 
-Agent rules (build environment, delegation, token efficiency, code comments) live in `CLAUDE.md` at the repo root. This spec covers what to build.
+Agent rules and model routing (build environment, delegation, token efficiency, code comments) live in `CLAUDE.md` and `.claude/agents/` at the repo root. This spec covers what to build.
 
 ## Product summary
 
@@ -64,10 +64,12 @@ ReviewPanel (app, SwiftUI) reads Digest from DigestStore
 **Repo layout**
 
 ```text
-mail-digest/
-  CLAUDE.md                      # agent rules, build/test commands, delegation
-  .claude/agents/
-    swift-implementer.md         # sub-agent for T-numbered tasks (model chosen per session)
+  mail-digest/
+    CLAUDE.md                      # agent rules, build/test commands, delegation
+    .claude/agents/
+      fast-recon.md                # Haiku: read-only codebase and environment reconnaissance
+      docs-and-boilerplate.md      # Haiku: approved docs and simple mechanical scaffolding
+      swift-implementer.md         # Sonnet: T-numbered Swift implementation tasks
   docs/
     SPEC.md                      # this document
     MAC_TODO.md                  # agent notes for Mac-only verification
