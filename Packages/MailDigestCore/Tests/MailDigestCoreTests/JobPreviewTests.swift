@@ -194,7 +194,7 @@ private struct PreviewHarness {
         await h.runner.waitUntilIdle()
 
         let item = try #require(await h.store.allItems().first { $0.messageID == "gen-1@fixture" })
-        #expect(item.state == .done && item.attempts == 1)
+        #expect(item.state == .done && item.attempts == 0)  // reset by retryFailed; the retry succeeded
         let after = try #require(await h.store.digest(id: jobID))
         #expect(after.skipped.isEmpty && after.emailCount == 3 && after.info.count == 3)
         let job = try #require(await h.store.jobs().first)

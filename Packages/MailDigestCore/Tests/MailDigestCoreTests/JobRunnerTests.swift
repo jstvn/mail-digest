@@ -63,6 +63,82 @@ private func oldMessages(_ count: Int, prefix: String = "old") -> [EmailMessage]
 }
 
 @Suite struct JobRunnerTests {
+    // MARK: Q25 provider failures
+
+    @Test func unhealthyProviderStopsStartBeforeAnyJobIsCreated() async throws {
+        let h = Harness(source: FixtureMailSource(messages: oldMessages(2)), llm: StubLLMClient(healthy: false))
+        await #expect(throws: JobRunnerError.self) { try await h.runner.start(h.plan(boxes: [icloud])) }
+        await #expect(throws: JobRunnerError.self) { try await h.runner.startDaily() }
+        #expect(try await h.store.jobs().isEmpty)
+        #expect(await h.llm.extractCalls.isEmpty)
+        #expect(await h.source.listCalls == 0)
+        // The runner is not left claimed.
+        await h.llm.setHealthy(true)
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        #expect(try await h.job().state == .finished)
+    }
+
+    @Test(arguments: [LLMError.unreachable("connection refused"), LLMError.timedOut, LLMError.http(status: 503)])
+    func outageMidJobFailsTheJobWithoutSpendingAttempts(error: LLMError) async throws {
+        let h = Harness(source: FixtureMailSource(messages: oldMessages(3)), llm: StubLLMClient())
+        await h.collector.attach(h.runner.progress)
+        let llm = h.llm
+        await llm.setOnExtract { email in
+            if email.id == "old-1@fixture" {
+                await llm.setHealthy(false)
+                throw error
+            }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+
+        var job = try await h.job()
+        #expect(job.state == .failed)
+        // The health check's reason is stored (the stub reports "unhealthy"; Ollama gives its fix text).
+        #expect(job.lastError == "unhealthy")
+        let items = await h.store.allItems()
+        let hit = try #require(items.first { $0.messageID == "old-1@fixture" })
+        #expect(hit.state == .queued && hit.attempts == 0)
+        #expect(items.first { $0.messageID == "old-0@fixture" }?.state == .done)
+        #expect(items.first { $0.messageID == "old-2@fixture" }?.state == .queued)
+        #expect(await h.collector.events.last?.error == job.lastError)
+
+        // Resuming while Ollama is still down fails fast and leaves the job as it was.
+        await #expect(throws: JobRunnerError.self) { try await h.runner.resume(jobID: job.id) }
+        #expect(try await h.job().state == .failed)
+
+        // Once it is back, the same job resumes and finishes the remaining emails.
+        await llm.setOnExtract(nil)
+        await llm.setHealthy(true)
+        try await h.runner.resume(jobID: job.id)
+        await h.runner.waitUntilIdle()
+        job = try await h.job()
+        #expect(job.state == .finished && job.lastError == nil)
+        #expect(await h.store.allItems().allSatisfy { $0.state == .done && $0.attempts == 0 })
+    }
+
+    @Test func itemErrorWithHealthyProviderUsesTheRetryBudget() async throws {
+        // StubLLMError.malformed while the provider is healthy is an item failure, not a job failure.
+        let h = Harness(source: FixtureMailSource(messages: oldMessages(2)),
+                        llm: StubLLMClient(failures: ["old-0@fixture": Int.max]))
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        #expect(try await h.job().state == .finished)
+        let bad = try #require(await h.store.allItems().first { $0.messageID == "old-0@fixture" })
+        #expect(bad.state == .failed && bad.attempts == 3)
+    }
+
+    @Test func jobDecodesWithoutLastError() throws {
+        let job = Job(id: UUID(), kind: .daily, mailboxes: [], scopeFrom: Date(timeIntervalSince1970: 0),
+                      scopeTo: Date(timeIntervalSince1970: 60), state: .failed, createdAt: Date(timeIntervalSince1970: 0),
+                      totals: JobTotals(queued: 0, done: 0, failed: 0, skipped: 0), autoPaused: false, lastError: "x")
+        var object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(job)) as? [String: Any])
+        object["lastError"] = nil
+        let decoded = try JSONDecoder().decode(Job.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(decoded.lastError == nil && decoded.id == job.id)
+    }
+
     // MARK: Q35 timeouts
 
     @Test func timedOutExtractionFailsOnceWithoutAutomaticRetry() async throws {
@@ -314,7 +390,8 @@ private actor Counter {
         #expect(calls.count == 3000 && Set(calls).count == 3000)
         #expect(calls[5] == "gen-5@fixture")
         let finalItems = await h.store.allItems()
-        #expect(finalItems.allSatisfy { $0.state == .done && $0.attempts == 1 })
+        // Q22: pausing never spends attempts.
+        #expect(finalItems.allSatisfy { $0.state == .done && $0.attempts == 0 })
         #expect(try await h.job().state == .finished)
         let digest = try await h.digest()
         #expect(digest.emailCount == 3000 && digest.info.count == 3000 && digest.headline == "Big backlog.")
@@ -355,7 +432,8 @@ private actor Counter {
         #expect(await llm2.extractCalls.map(\.id) == ["old-2@fixture", "old-3@fixture"])
         let items = await store.allItems()
         #expect(items.allSatisfy { $0.state == .done })
-        #expect(items.first { $0.id == crashed.id }?.attempts == 2)
+        // Q22: a crash and its recovery do not count as failures.
+        #expect(items.first { $0.id == crashed.id }?.attempts == 0)
         #expect(try await h.job().state == .finished)
         // The resumed run kept appending to the same digest.
         #expect(await store.allDigests().count == 1)
@@ -376,7 +454,7 @@ private actor Counter {
         #expect(bad.state == .failed && bad.attempts == 3 && bad.lastError == "malformed")
         #expect(bad.outcome == "failed: malformed")
         let flaky = try #require(items.first { $0.messageID == "old-1@fixture" })
-        #expect(flaky.state == .done && flaky.attempts == 2)
+        #expect(flaky.state == .done && flaky.attempts == 1)  // one genuine failure
 
         let digest = try await h.digest()
         #expect(digest.skipped.map(\.id) == ["old-0@fixture"])
@@ -418,7 +496,8 @@ private actor Counter {
         await h.runner.waitUntilIdle()
         let items = await h.store.allItems()
         #expect(items.allSatisfy { $0.state == .done })
-        #expect(items.first { $0.messageID == "old-1@fixture" }?.attempts == 2)
+        // Q22: a cancelled in-flight email is not charged an attempt.
+        #expect(items.first { $0.messageID == "old-1@fixture" }?.attempts == 0)
         #expect(try await h.job().state == .finished)
     }
 

@@ -47,6 +47,8 @@ public enum JobRunnerError: Error, Sendable, Equatable {
     /// A job is already listing or processing.
     case alreadyRunning
     case jobNotFound
+    /// The model provider failed its health check (Q25); the message says how to fix it.
+    case providerUnavailable(String)
 }
 
 /// Runs persisted jobs one email at a time with a checkpoint after each email.
@@ -63,6 +65,7 @@ public actor JobRunner {
     private let clock: any Clock
     private let settings: RunnerSettings
     private let pipeline: DigestPipeline
+    private let llm: any LLMClient
     private let sleep: @Sendable (Duration) async throws -> Void
     private let continuation: AsyncStream<JobProgress>.Continuation
 
@@ -111,6 +114,7 @@ public actor JobRunner {
         self.clock = clock
         self.settings = settings
         self.sleep = sleep
+        self.llm = llm
         self.pipeline = DigestPipeline(llm: llm, filter: settings.filter, timeZone: settings.timeZone)
         let (stream, continuation) = AsyncStream<JobProgress>.makeStream(bufferingPolicy: .bufferingNewest(256))
         self.progress = stream
@@ -126,6 +130,12 @@ public actor JobRunner {
     public func start(_ plan: JobPlan) async throws {
         try claim()
         resumeAfter = nil
+        do {
+            try await preflight()
+        } catch {
+            busy = false
+            throw error
+        }
         try await begin(plan)
     }
 
@@ -152,6 +162,7 @@ public actor JobRunner {
                 .filter { $0.kind == .daily && $0.state != .failed && $0.state != .listing }
                 .map(\.scopeTo).max()
             let from = max(lastDaily ?? floor, floor)
+            try await preflight()
             // Mail not running is not fatal here; listing will report it if it matters.
             if (try? await source.checkForNewMail()) != nil { try await sleep(settings.waitAfterCheck) }
             let plan = JobPlan(kind: .daily, mailboxes: settings.dailyMailboxes, from: from, to: clock.now(),
@@ -297,8 +308,11 @@ public actor JobRunner {
                 job = all.first { $0.state == .paused }
             }
             guard var job else { busy = false; return }
+            // Re-check the provider before resuming (Q25), so a still-down Ollama fails fast.
+            try await preflight()
             job.state = .running
             job.autoPaused = false
+            job.lastError = nil
             try await store.updateJob(job)
             resetFlags()
             resumeAfter = nil
@@ -447,8 +461,10 @@ public actor JobRunner {
         do {
             return try await loop(run)
         } catch {
-            // Store or Mail failure: stop the loop but keep the queue so the job can be resumed by id.
+            // Provider outage, store or Mail failure: stop the loop but keep the queue so the job can be
+            // resumed by id once the cause is fixed.
             run.job.state = .failed
+            run.job.lastError = (error as? ProviderFailure)?.message ?? Self.shortReason(error)
             run.current = nil
             try? await store.updateJob(run.job)
             emit(force: true)
@@ -577,6 +593,13 @@ public actor JobRunner {
                 run.current = nil
                 return true
             }
+            // Q25: anything but a malformed answer may be the provider rather than this email. If the
+            // provider is unhealthy, stop the whole job and return the item without spending an attempt.
+            if Self.mightBeProviderFailure(error), let outage = await providerOutage() {
+                try await store.setItemState(item.id, .queued, error: nil)
+                run.current = nil
+                throw ProviderFailure(message: outage)
+            }
             let reason = Self.shortReason(error)
             // `item.attempts` was read before this attempt started. A timed-out extraction already
             // waited the full (long) timeout, so it is not retried automatically (Q35); the user can
@@ -688,6 +711,32 @@ public actor JobRunner {
                        mailbox: item.mailbox, position: item.position, outcome: outcome)
     }
 
+    // MARK: Provider health (Q25)
+
+    /// A job-level stop caused by the model provider, not by the email being processed.
+    private struct ProviderFailure: Error { let message: String }
+
+    /// Throws `providerUnavailable` unless the model provider passes its health check.
+    private func preflight() async throws {
+        if let outage = await providerOutage() { throw JobRunnerError.providerUnavailable(outage) }
+    }
+
+    /// Nil when the provider is healthy, otherwise a message safe to show.
+    private func providerOutage() async -> String? {
+        do {
+            try await llm.healthCheck()
+            return nil
+        } catch {
+            return (error as? LLMError)?.userMessage ?? Self.shortReason(error)
+        }
+    }
+
+    /// A malformed answer is about this email's output; everything else is checked against the provider.
+    private static func mightBeProviderFailure(_ error: Error) -> Bool {
+        if case LLMError.malformedResponse = error { return false }
+        return true
+    }
+
     /// Error text safe to store and show; it never includes email content.
     private static func shortReason(_ error: Error) -> String {
         let text = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
@@ -709,6 +758,6 @@ public actor JobRunner {
             avgSecondsPerEmail: avg, eta: avg.map { $0 * Double(t.queued) },
             stage: run.stage, current: run.current, lastFinished: run.lastFinished,
             nextUp: run.queueHead.first.map { summary($0, outcome: nil) } ?? run.nextUp,
-            countsByMailbox: run.counts))
+            countsByMailbox: run.counts, error: run.job.lastError))
     }
 }

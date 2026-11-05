@@ -110,7 +110,7 @@ public actor InMemoryDigestStore: DigestStore {
         guard let i = itemIndex[itemID] else { return }
         itemList[i].state = state
         itemList[i].lastError = error
-        if state == .processing { itemList[i].attempts += 1 }
+        if error != nil && (state == .queued || state == .failed) { itemList[i].attempts += 1 }
     }
 
     public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws {

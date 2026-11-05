@@ -56,9 +56,13 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
     public var createdAt: Date
     public var totals: JobTotals
     public var autoPaused: Bool
+    /// Why the job stopped as `.failed` (for example "Ollama is not reachable…"). Safe to show; never
+    /// contains email content. Cleared when the job is resumed.
+    public var lastError: String?
 
     public init(id: UUID, kind: JobKind, mailboxes: [MailboxRef], scopeFrom: Date, scopeTo: Date,
-                state: JobState, createdAt: Date, totals: JobTotals, autoPaused: Bool) {
+                state: JobState, createdAt: Date, totals: JobTotals, autoPaused: Bool, lastError: String? = nil) {
+        self.lastError = lastError
         self.id = id
         self.kind = kind
         self.mailboxes = mailboxes
@@ -184,11 +188,14 @@ public struct JobProgress: Codable, Sendable, Equatable {
     public var lastFinished: JobItemSummary? // with outcome, shown when paused
     public var nextUp: JobItemSummary?       // first queued item, shown when paused
     public var countsByMailbox: [MailboxRef: MailboxProgress] // done/total per mailbox
+    /// The job's `lastError` when it stopped as `.failed` (for example a provider outage).
+    public var error: String?
 
     public init(jobID: UUID, kind: JobKind, state: JobState, done: Int, total: Int, failed: Int,
                 avgSecondsPerEmail: Double?, eta: TimeInterval?, stage: JobStage,
                 current: JobItemSummary?, lastFinished: JobItemSummary?, nextUp: JobItemSummary?,
-                countsByMailbox: [MailboxRef: MailboxProgress]) {
+                countsByMailbox: [MailboxRef: MailboxProgress], error: String? = nil) {
+        self.error = error
         self.jobID = jobID
         self.kind = kind
         self.state = state

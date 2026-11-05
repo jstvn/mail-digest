@@ -23,6 +23,10 @@ struct MailDigestApp: App {
             if let banner = run.banner {
                 Text(banner)
             }
+            if run.failedJobID != nil {
+                Button("Retry") { Task { await run.retryFailedJob() } }
+                    .disabled(run.isRunning)
+            }
             Divider()
             Button("Mail Access…") { showMailAccess() }
             Divider()

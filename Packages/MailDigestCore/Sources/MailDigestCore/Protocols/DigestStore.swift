@@ -50,7 +50,9 @@ public protocol DigestStore: Sendable {
     func nextQueued(job jobID: UUID, limit: Int) async throws -> [JobItem]
     /// All items of a job, by position.
     func items(job jobID: UUID) async throws -> [JobItem]
-    /// Sets an item's state; `.processing` increments attempts, and `error` is stored as lastError.
+    /// Sets an item's state and stores `error` as lastError. Attempts count genuine item failures only
+    /// (Q22): moving to `.queued` or `.failed` with a non-nil `error` increments them. Starting an item,
+    /// pausing, stopping, recovery and provider-wide outages (requeued with `error: nil`) do not.
     func setItemState(_ itemID: UUID, _ state: JobItemState, error: String?) async throws
     /// Stores the outcome text, time taken and finish time for a finished item.
     func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws

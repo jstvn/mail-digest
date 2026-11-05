@@ -80,7 +80,10 @@ Verified on this Mac from Terminal (a harness that compiles the real adapter sou
 - **Open:**
   - Q35 resolved: `extract()` now times out after 1,000 s (headline 180 s, health check 10 s), and a timed-out email fails once without automatic retry. Recheck the 12,800-character email (875 s) with the real app.
   - Run Now took 49 min for 14 emails; the 30-emails-in-15-minutes target is not met on this Intel Mac.
-  - Q25 job-level provider failure is not implemented in `JobRunner`.
+  - Q25 implemented. `JobRunner` health-checks Ollama before `start`, `startDaily` and `resume`, and throws `providerUnavailable` with the fix text.
+    - **Mid-job outage:** after any model error other than a malformed answer, the runner re-checks health. If Ollama is down, the job stops as `.failed` with `lastError`, the email returns to `queued` and no attempt is used. The menu shows the reason and a Retry item that resumes the same job.
+    - **Attempt counting:** now follows Q22. Only genuine item failures count; starts, pauses, cancellations and crash recovery do not.
+    - **Not yet tried:** stopping Ollama during a run of the real app.
   - The interim in-memory store loses results on quit until T12.
 
 ## Open items

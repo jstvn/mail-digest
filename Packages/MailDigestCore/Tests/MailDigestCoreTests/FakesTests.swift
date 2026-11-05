@@ -111,7 +111,8 @@ private func header(_ id: String) -> MessageHeader {
         try await store.setItemState(items[0].id, .processing, error: nil)
         try await store.setItemState(items[1].id, .done, error: nil)
         items = try await store.items(job: job)
-        #expect(items[0].attempts == 1)
+        // Q22: starting an item does not count as an attempt; a requeue with an item error does.
+        #expect(items[0].attempts == 0)
         #expect(try await store.isQueued("a"))
         #expect(try await !store.isQueued("b"))
         #expect(try await store.requeueInterrupted() == 1)

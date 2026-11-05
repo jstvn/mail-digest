@@ -15,6 +15,8 @@ final class DigestRunModel {
     private(set) var progressText: String?
     private(set) var lastRunSummary: String?
     private(set) var banner: String?
+    /// A job stopped by a provider outage (Q25); Retry resumes this same job and its queue.
+    private(set) var failedJobID: UUID?
 
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "run")
 
@@ -80,6 +82,35 @@ final class DigestRunModel {
             banner = Self.message(for: error)
             return
         }
+        await finishRun()
+    }
+
+    /// Resumes the job a provider outage stopped. The runner re-checks Ollama first.
+    func retryFailedJob() async {
+        guard !isRunning, let jobID = failedJobID, let runner else { return }
+        isRunning = true
+        banner = nil
+        progressText = "Starting…"
+        defer { isRunning = false; progressText = nil }
+        do {
+            try await runner.resume(jobID: jobID)
+            await runner.waitUntilIdle()
+        } catch {
+            banner = Self.message(for: error)
+            return
+        }
+        await finishRun()
+    }
+
+    /// Shows the outage banner if the job stopped as failed; otherwise summarises it.
+    private func finishRun() async {
+        if let job = try? await store.jobs().first, job.state == .failed {
+            failedJobID = job.id
+            banner = job.lastError ?? "The run stopped. Try again."
+            Self.log.notice("run stopped: state=failed queued=\(job.totals.queued, privacy: .public)")
+            return
+        }
+        failedJobID = nil
         await summariseLastRun()
     }
 
@@ -145,6 +176,7 @@ final class DigestRunModel {
     }
 
     private static func message(for error: Error) -> String {
+        if case JobRunnerError.providerUnavailable(let message) = error { return message }
         if case OsascriptError.automationDenied = error {
             return "Mail automation is off. Open Mail Access to allow it."
         }
