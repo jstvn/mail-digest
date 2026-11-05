@@ -4,6 +4,10 @@ public enum Category: String, Codable, Sendable, Equatable, CaseIterable {
     case uni, work, finance, deliveries, events, newsletters, personal, other
 }
 
+/// Non-colliding alias for app targets that also `import Foundation`, where
+/// `ObjectiveC.Category` shadows the unqualified name.
+public typealias EmailCategory = Category
+
 public struct InfoItem: Codable, Sendable, Equatable, Identifiable {
     public var id: String              // = email id
     public var emailID: String

@@ -383,12 +383,16 @@ private actor Counter {
         let h = Harness(source: source, llm: llm, store: store)
         await h.collector.attach(h.runner.progress)
         let runner = h.runner
+        let collector = h.collector
         let dailyTask = Box<Task<Void, Error>>()
         let backlogWasAutoPaused = Box<Bool>()
         await llm.setOnExtract { email in
             if email.id == "old-4@fixture" {
                 // startDaily waits for this very email to settle, so it must not be awaited here.
                 dailyTask.value = Task { try await runner.startDaily() }
+                // The .pausing event can only appear after startDaily sets pauseRequested (the flag is set
+                // before emit), so waiting for it stops the loop right after old-4 instead of racing on.
+                _ = await eventually { await collector.events.contains { $0.kind == .backlog && $0.state == .pausing } }
             } else if !email.id.hasPrefix("old-"), backlogWasAutoPaused.value == nil {
                 let backlog = try await store.jobs().first { $0.kind == .backlog }
                 backlogWasAutoPaused.value = backlog?.state == .paused && backlog?.autoPaused == true

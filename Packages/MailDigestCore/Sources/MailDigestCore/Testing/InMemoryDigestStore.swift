@@ -7,6 +7,10 @@ public actor InMemoryDigestStore: DigestStore {
     private var decisionList: [Decision] = []
     private var jobList: [Job] = []
     private var itemList: [JobItem] = []
+    /// Item id -> index in `itemList`. Items are never removed, so entries stay valid.
+    private var itemIndex: [UUID: Int] = [:]
+    /// Job id -> indices into `itemList`, in enqueue order (which is position order).
+    private var itemsByJob: [UUID: [Int]] = [:]
 
     public init() {}
 
@@ -66,15 +70,18 @@ public actor InMemoryDigestStore: DigestStore {
     // MARK: Queue
 
     public func enqueue(_ headers: [MessageHeader], job jobID: UUID) async throws {
-        var position = itemList.filter { $0.jobID == jobID }.map(\.position).max() ?? 0
+        var position = itemsByJob[jobID]?.last.map { itemList[$0].position } ?? 0
         for h in headers {
             position += 1
-            itemList.append(JobItem(
+            let item = JobItem(
                 id: UUID(), jobID: jobID, messageID: h.id,
                 mailbox: MailboxRef(account: h.account, name: h.mailbox),
                 sender: h.sender, subject: h.subject, receivedAt: h.receivedAt,
                 position: position, state: .queued, outcome: nil, seconds: nil,
-                attempts: 0, lastError: nil))
+                attempts: 0, lastError: nil)
+            itemIndex[item.id] = itemList.count
+            itemsByJob[jobID, default: []].append(itemList.count)
+            itemList.append(item)
         }
     }
 
@@ -83,23 +90,30 @@ public actor InMemoryDigestStore: DigestStore {
     }
 
     public func nextQueued(job jobID: UUID, limit: Int) async throws -> [JobItem] {
-        Array(itemList.filter { $0.jobID == jobID && $0.state == .queued }
-            .sorted { $0.position < $1.position }.prefix(max(0, limit)))
+        let cap = max(0, limit)
+        guard cap > 0 else { return [] }
+        var result: [JobItem] = []
+        // `itemsByJob` keeps the job's items in position order, so filtering preserves "lowest position first".
+        for i in itemsByJob[jobID] ?? [] where itemList[i].state == .queued {
+            result.append(itemList[i])
+            if result.count == cap { break }
+        }
+        return result
     }
 
     public func items(job jobID: UUID) async throws -> [JobItem] {
-        itemList.filter { $0.jobID == jobID }.sorted { $0.position < $1.position }
+        (itemsByJob[jobID] ?? []).map { itemList[$0] }
     }
 
     public func setItemState(_ itemID: UUID, _ state: JobItemState, error: String?) async throws {
-        guard let i = itemList.firstIndex(where: { $0.id == itemID }) else { return }
+        guard let i = itemIndex[itemID] else { return }
         itemList[i].state = state
         itemList[i].lastError = error
         if state == .processing { itemList[i].attempts += 1 }
     }
 
     public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws {
-        guard let i = itemList.firstIndex(where: { $0.id == itemID }) else { return }
+        guard let i = itemIndex[itemID] else { return }
         itemList[i].outcome = outcome
         itemList[i].seconds = seconds
         itemList[i].finishedAt = finishedAt
