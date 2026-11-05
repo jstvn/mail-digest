@@ -70,7 +70,8 @@ struct MailPermissionProbe: Sendable {
 
     private static func logProbe(_ s: MailAccessStatus) {
         let ppid = getppid()
-        let parent = NSRunningApplication(processIdentifier: ppid)?.bundleIdentifier ?? parentProcessName(ppid)
+        // A LaunchServices launch (Finder, `open`) has launchd (pid 1) as its parent.
+        let parent = ppid == 1 ? "launchd" : (NSRunningApplication(processIdentifier: ppid)?.bundleIdentifier ?? parentProcessName(ppid))
         let app = Bundle.main.bundleURL.lastPathComponent
         log.notice("probe fda=\(s.fullDiskAccess.rawValue, privacy: .public) automation=\(s.automation.rawValue, privacy: .public) mode=\(String(describing: s.mode), privacy: .public) launchedFrom=\(parent, privacy: .public) app=\(app, privacy: .public)")
     }

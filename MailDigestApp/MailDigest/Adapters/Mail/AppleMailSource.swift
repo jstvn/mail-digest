@@ -50,13 +50,20 @@ struct AppleMailSource: MailSource {
         }
 
         // Automation supplies the active set, names and kinds; if it fails, use the directory heuristic.
+        // Ask JXA only when Automation is already granted: listing mailboxes must never be what
+        // shows the Automation prompt (that happens only from "Allow Mail Access…").
         var jxaInfos: [MailboxInfo]?
-        do {
-            jxaInfos = try await jxa.listMailboxesForResolver()
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            Self.log.notice("listMailboxes resolver=heuristic reason=\(Self.reason(error), privacy: .public)")
+        let automation = await Self.offloadNonThrowing { MailPermissionProbe().automation() }
+        if automation == .granted {
+            do {
+                jxaInfos = try await jxa.listMailboxesForResolver()
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                Self.log.notice("listMailboxes resolver=heuristic reason=\(Self.reason(error), privacy: .public)")
+            }
+        } else {
+            Self.log.notice("listMailboxes resolver=heuristic reason=automation.\(automation.rawValue, privacy: .public)")
         }
         let infos = MailboxResolver(rows: rows, jxaMailboxes: jxaInfos, storeDirectoryNames: names).mailboxInfos()
         Self.log.notice("listMailboxes path=sqlite count=\(infos.count, privacy: .public)")
@@ -244,6 +251,13 @@ struct AppleMailSource: MailSource {
                 do { continuation.resume(returning: try work()) }
                 catch { continuation.resume(throwing: MailStoreError.from(error)) }
             }
+        }
+    }
+
+    /// Runs a blocking, non-throwing probe off the cooperative pool.
+    private static func offloadNonThrowing<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { continuation.resume(returning: work()) }
         }
     }
 }

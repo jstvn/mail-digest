@@ -62,6 +62,27 @@ Verified on this Mac from Terminal (a harness that compiles the real adapter sou
 - **Timeout and cancellation (Q6):** checked with a real `osascript` delay script. A 2 s hard timeout terminated the child at 2.0 s (`timedOut`). A cancelled call is not killed: the script finishes and the call then throws `CancellationError`.
 - **Not verified in T11-B:** signed-app FDA/Automation behaviour (T11-C), the busy/locked-database path, FDA-denied and Automation-denied fallbacks, a missing `.emlx` file, Gmail, nested folders containing mail, and the Core suite on Linux.
 
+**T11-C and T11-D done (2026-11-06).** Full results are in `docs/T11-C-VALIDATION.md`.
+
+- **Verified through the signed app:**
+  - Apple Development signing, Team `HF69BFXF2W`, Hardened Runtime.
+  - Automation granted and denied, both detected in-app.
+  - Xcode ⌘R attribution: the parent is `debugserver`, Xcode has no grants of its own, so the app's own grants apply.
+  - Run Now reached filter → Ollama → validator over real inbox mail: 14 emails → 14 info items and 6 suggestions, with canonical IDs.
+  - The `message://` link opened the right message in Mail.
+- **Not verifiable here:** Full Disk Access denial. SIP is disabled on this Mac, so TCC file protection is not enforced and the store stays readable with FDA off. Recheck on a SIP-enabled Mac: switch FDA off, relaunch, expect `fda=denied mode=automationFallback`.
+- **Not tested:**
+  - The "Allow Mail Access…" prompt from a not-determined state; the grant already existed.
+  - Gmail.
+  - EWS messages without local files.
+  - Nested folders containing mail.
+  - UI responsiveness under Instruments.
+- **Open:**
+  - Q35, long emails versus the 180 s Ollama timeout on this CPU. One 12,800-character email needed 875 s.
+  - Run Now took 49 min for 14 emails; the 30-emails-in-15-minutes target is not met on this Intel Mac.
+  - Q25 job-level provider failure is not implemented in `JobRunner`.
+  - The interim in-memory store loses results on quit until T12.
+
 ## Open items
 
 - The core package builds and its tests pass on macOS (Xcode 26.6 SDK), after the `Category` fix. The app target also builds with `CODE_SIGNING_ALLOWED=NO`; its visual menu-bar check is still pending. Ollama 0.40.14 with `qwen3:4b` answered a raw `/api/chat` call (`think: false`, JSON-schema `format`) with valid JSON; still unverified: `OllamaClient.healthCheck()` and one `extract` through the Swift code (item 2), plus the feature-level app-target work in T11–T16, T18 and T19.

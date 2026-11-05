@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct MailDigestApp: App {
     @State private var access = MailAccessModel()
+    @State private var run = DigestRunModel()
     @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
@@ -12,6 +13,17 @@ struct MailDigestApp: App {
             if let status = access.status {
                 Text(status.mode.title)
             }
+            Button("Run Now") { Task { await run.runNow() } }
+                .disabled(run.isRunning || access.status?.mode == .unavailable)
+            if run.isRunning, let text = run.progressText {
+                Text(text)
+            } else if let summary = run.lastRunSummary {
+                Text(summary)
+            }
+            if let banner = run.banner {
+                Text(banner)
+            }
+            Divider()
             Button("Mail Access…") { showMailAccess() }
             Divider()
             Button("Quit Mail Digest") {
@@ -24,7 +36,7 @@ struct MailDigestApp: App {
         }
 
         Window("Mail Access", id: "mail-access") {
-            MailAccessView(model: access)
+            MailAccessView(model: access, run: run)
         }
         .windowResizability(.contentSize)
     }

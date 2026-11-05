@@ -5,6 +5,7 @@ import SwiftUI
 /// Explains Mail permissions and lets the user fix them. Compact settings-style window.
 struct MailAccessView: View {
     let model: MailAccessModel
+    let run: DigestRunModel
 
     var body: some View {
         Form {
@@ -46,6 +47,7 @@ struct MailAccessView: View {
             } else {
                 Section { ProgressView("Checking…") }
             }
+            mailboxSection
             Section {
                 HStack {
                     Spacer()
@@ -57,9 +59,62 @@ struct MailAccessView: View {
         .formStyle(.grouped)
         .frame(width: 480)
         .fixedSize(horizontal: false, vertical: true)
-        .task { await model.refresh() }
+        .task {
+            await model.refresh()
+            if canLoadMailboxes, run.mailboxes.isEmpty { await run.loadMailboxes() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await model.refresh() }
+        }
+    }
+
+    /// Listing mailboxes in automation mode needs the Automation grant, so never load before it.
+    private var canLoadMailboxes: Bool {
+        guard let status = model.status else { return false }
+        return status.mode == .fastLocal || status.automation == .granted
+    }
+
+    private var mailboxGroups: [(account: String, boxes: [MailboxInfo])] {
+        Dictionary(grouping: run.mailboxes, by: { $0.ref.account })
+            .map { (account: $0.key, boxes: $0.value.sorted { $0.ref.name < $1.ref.name }) }
+            .sorted { $0.account < $1.account }
+    }
+
+    @ViewBuilder private var mailboxSection: some View {
+        if canLoadMailboxes {
+            ForEach(mailboxGroups, id: \.account) { group in
+                Section(group.account) {
+                    ForEach(group.boxes, id: \.ref) { box in
+                        HStack {
+                            if box.kind == .inbox {
+                                Image(systemName: "tray").accessibilityLabel("Inbox")
+                            }
+                            Text(box.ref.name)
+                            Spacer()
+                            Text(box.messageCount, format: .number)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            Section("Mailboxes") {
+                if run.isLoadingMailboxes {
+                    ProgressView("Loading mailboxes…")
+                } else if let error = run.mailboxError {
+                    Text(error).foregroundStyle(.secondary)
+                } else {
+                    Text("Daily runs read every inbox (\(run.inboxCount))")
+                        .foregroundStyle(.secondary)
+                }
+                Button("Refresh") { Task { await run.loadMailboxes() } }
+                    .disabled(run.isLoadingMailboxes)
+            }
+        } else if model.status != nil {
+            Section("Mailboxes") {
+                Text("Allow Mail access first to see your mailboxes.")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
