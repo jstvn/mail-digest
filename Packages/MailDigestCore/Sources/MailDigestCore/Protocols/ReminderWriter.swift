@@ -5,6 +5,7 @@ public protocol ReminderWriter: Sendable {
     func ensureList(named name: String, storedID: String?) async throws -> String
     /// Renames the app's list in place.
     func renameList(id: String, to name: String) async throws
-    /// Writes one approved suggestion to the list and returns the reminder id.
-    func write(_ suggestion: Suggestion, category: Category, toList listID: String) async throws -> String
+    /// Writes one approved suggestion to the list and returns the reminder id. `email` supplies the sender and
+    /// subject for the notes; it is nil only when the job's email rows are unavailable.
+    func write(_ suggestion: Suggestion, category: Category, email: EmailContext?, toList listID: String) async throws -> String
 }

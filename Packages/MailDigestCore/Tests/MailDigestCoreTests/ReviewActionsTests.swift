@@ -238,7 +238,7 @@ private let emails: [String: EmailContext] = [
         struct BadWriter: ReminderWriter {
             func ensureList(named name: String, storedID: String?) async throws -> String { throw Boom() }
             func renameList(id: String, to name: String) async throws {}
-            func write(_ suggestion: Suggestion, category: Category, toList listID: String) async throws -> String { "x" }
+            func write(_ suggestion: Suggestion, category: Category, email: EmailContext?, toList listID: String) async throws -> String { "x" }
         }
         let a = sug("Pay fees")
         let state = ReviewState(digest: digest([a]))
@@ -269,8 +269,25 @@ private let emails: [String: EmailContext] = [
 @Suite struct ReviewContentTests {
     @Test func notesString() {
         let s = sug("Pay fees")
-        let notes = ReviewActions.reminderNotes(for: s, email: emails["e1"]!, category: .finance)
+        let notes = ReviewActions.reminderNotes(for: s, email: emails["e1"], category: .finance)
         #expect(notes == "From: Bursar <Bursar@Uni.edu>\nSubject: Fees due\n\"pay by Friday\"\n#finance")
+    }
+
+    @Test func notesWithoutEmailOmitHeaderLines() {
+        let notes = ReviewActions.reminderNotes(for: sug("Pay fees"), email: nil, category: .finance)
+        #expect(notes == "\"pay by Friday\"\n#finance")
+    }
+
+    @Test func approvePassesEmailContextToWriter() async throws {
+        let a = sug("Pay fees"), b = sug("Orphan", email: "missing")
+        let state = ReviewState(digest: digest([a, b]))
+        let store = InMemoryDigestStore()
+        try await store.save(state.digest)
+        let writer = RecordingReminderWriter()
+        _ = await ReviewActions.approve([a, b], state: state, emails: emails, writer: writer, store: store,
+                                        listName: "L", storedListID: nil, clock: FixedClock(t0))
+        let written = await writer.written
+        #expect(written.map(\.email) == [emails["e1"], nil])
     }
 
     @Test func messageURL() {

@@ -7,6 +7,7 @@ enum PanelAlert: Identifiable, Equatable {
     case runProblem(String)
     case mailAutomationDenied
     case fullDiskAccessFallback
+    case remindersNeedAccess
     case remindersUnavailable
 
     var id: String {
@@ -14,7 +15,7 @@ enum PanelAlert: Identifiable, Equatable {
         case .runProblem: return "run"
         case .mailAutomationDenied: return "automation"
         case .fullDiskAccessFallback: return "fda"
-        case .remindersUnavailable: return "reminders"
+        case .remindersNeedAccess, .remindersUnavailable: return "reminders"
         }
     }
 
@@ -22,14 +23,18 @@ enum PanelAlert: Identifiable, Equatable {
 
     /// The banners that apply right now, most urgent first.
     @MainActor
-    static func current(run: DigestRunModel, access: MailAccessModel, remindersAvailable: Bool) -> [PanelAlert] {
+    static func current(run: DigestRunModel, access: MailAccessModel, reminders: RemindersAuthorization) -> [PanelAlert] {
         var alerts: [PanelAlert] = []
         if let banner = run.banner { alerts.append(.runProblem(banner)) }
         if let status = access.status {
             if status.showsAutomationBanner { alerts.append(.mailAutomationDenied) }
             if status.fullDiskAccess == .denied { alerts.append(.fullDiskAccessFallback) }
         }
-        if !remindersAvailable { alerts.append(.remindersUnavailable) }
+        switch reminders {
+        case .granted: break
+        case .notDetermined: alerts.append(.remindersNeedAccess)
+        case .unavailable: alerts.append(.remindersUnavailable)
+        }
         return alerts
     }
 }

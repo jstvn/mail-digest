@@ -24,6 +24,7 @@ final class DigestRunModel {
     /// The panel's digest and selection; refreshed while a job runs.
     let review: ReviewViewModel
     let settings: SettingsStore
+    let reminders: RemindersAccessModel
     private(set) var banner: String?
     /// A job stopped by a provider outage (Q25); Retry resumes this same job and its queue.
     private(set) var failedJobID: UUID?
@@ -51,15 +52,19 @@ final class DigestRunModel {
     init(settings: SettingsStore = SettingsStore()) {
         self.settings = settings
         self.review = ReviewViewModel()
+        self.reminders = RemindersAccessModel()
+        reminders.attach(review: review)
         review.listName = { [settings] in settings.settings.resolvedListName }
     }
 
     /// Previews: fixed run state, no store or Mail access.
     init(preview: SettingsStore = SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
-         review: ReviewViewModel = ReviewViewModel(), progress: JobProgress? = nil, banner: String? = nil, failedJobID: UUID? = nil,
+         review: ReviewViewModel = ReviewViewModel(),
+         reminders: RemindersAccessModel = RemindersAccessModel(preview: .granted), progress: JobProgress? = nil, banner: String? = nil, failedJobID: UUID? = nil,
          lastRunAt: Date? = nil, lastRunFoundNothing: Bool = false, lastRunSummary: String? = nil) {
         self.settings = preview
         self.review = review
+        self.reminders = reminders
         self.progress = progress
         self.banner = banner
         self.failedJobID = failedJobID

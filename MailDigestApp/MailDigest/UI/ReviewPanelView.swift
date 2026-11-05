@@ -33,8 +33,9 @@ struct ReviewPanelView: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    ForEach(PanelAlert.current(run: run, access: access, remindersAvailable: review.reminderWriter != nil)) { alert in
-                        AlertBanner(alert: alert, canRetry: !run.isRunning, onRetry: retry)
+                    ForEach(PanelAlert.current(run: run, access: access, reminders: run.reminders.status)) { alert in
+                        AlertBanner(alert: alert, canRetry: !run.isRunning, onRetry: retry,
+                                    onRequestReminders: { Task { await run.reminders.request() } })
                     }
                     if let progress = run.activeProgress {
                         ProgressStripView(progress: progress,
@@ -53,6 +54,11 @@ struct ReviewPanelView: View {
         }
         .frame(minWidth: 620, idealWidth: 720, minHeight: 480, idealHeight: 640)
         .navigationTitle("Mail Digest")
+        // Pick up a permission change made in System Settings.
+        .onAppear { run.reminders.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            run.reminders.refresh()
+        }
     }
 
     // MARK: Header
@@ -155,7 +161,7 @@ struct ReviewPanelView: View {
                         .keyboardShortcut(.return, modifiers: .command)
                         .buttonStyle(.borderedProminent)
                         .disabled(!review.canAddSelected)
-                        .help(review.reminderWriter == nil ? "Reminders access isn't available yet" : "Add the ticked suggestions to Reminders")
+                        .help(review.reminderWriter == nil ? "Reminders access isn't available" : "Add the ticked suggestions to Reminders")
                 }
             }
         }
@@ -261,6 +267,7 @@ private struct AlertBanner: View {
     let alert: PanelAlert
     let canRetry: Bool
     let onRetry: () -> Void
+    let onRequestReminders: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -274,6 +281,8 @@ private struct AlertBanner: View {
                 Button("Open Automation Settings…") { open(MailAccessStatus.automationSettingsURL) }
             case .fullDiskAccessFallback:
                 Button("Open Full Disk Access Settings…") { open(MailAccessStatus.fullDiskAccessSettingsURL) }
+            case .remindersNeedAccess:
+                Button("Allow Reminders Access…", action: onRequestReminders)
             case .remindersUnavailable:
                 Button("Open Reminders Settings…") { open(PanelAlert.remindersSettingsURL) }
             }
@@ -305,6 +314,8 @@ private struct AlertBanner: View {
             return "Mail Automation is turned off. Enable Mail access for Mail Digest in Automation settings."
         case .fullDiskAccessFallback:
             return "Using the Mail automation fallback. Full Disk Access enables fast local reads of your mail."
+        case .remindersNeedAccess:
+            return "Mail Digest needs access to Reminders to add the suggestions you approve. Add Selected is turned off until you allow it."
         case .remindersUnavailable:
             return "Reminders access isn't available, so Add Selected is turned off. Allow Mail Digest in Privacy & Security > Reminders."
         }

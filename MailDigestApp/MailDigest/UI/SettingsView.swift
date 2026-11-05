@@ -9,7 +9,7 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsTab(run: run)
                 .tabItem { Label("General", systemImage: "gearshape") }
-            ModelSettingsTab(store: run.settings)
+            ModelSettingsTab(run: run)
                 .tabItem { Label("Model & Reminders", systemImage: "sparkles") }
             SendersSettingsTab(store: run.settings)
                 .tabItem { Label("Senders", systemImage: "person.2") }
@@ -131,7 +131,16 @@ private struct MailboxesSection: View {
 // MARK: Model and Reminders
 
 private struct ModelSettingsTab: View {
-    let store: SettingsStore
+    let run: DigestRunModel
+    @FocusState private var listNameFocused: Bool
+
+    private var store: SettingsStore { run.settings }
+
+    /// Renames the Reminders list once the user finishes editing, not on every keystroke.
+    private func commitListName() {
+        let name = store.settings.resolvedListName
+        Task { await run.reminders.renameList(to: name) }
+    }
 
     var body: some View {
         @Bindable var store = store
@@ -152,6 +161,9 @@ private struct ModelSettingsTab: View {
             Section {
                 TextField("List name", text: $store.settings.remindersListName,
                           prompt: Text(DigestSettings.defaultListName))
+                    .focused($listNameFocused)
+                    .onSubmit(commitListName)
+                    .onChange(of: listNameFocused) { _, focused in if !focused { commitListName() } }
             } header: {
                 Text("Reminders")
             } footer: {

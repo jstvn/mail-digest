@@ -10,6 +10,7 @@ public enum RecordingReminderError: Error, Sendable, Equatable {
 public struct WrittenReminder: Sendable, Equatable {
     public var suggestion: Suggestion
     public var category: Category
+    public var email: EmailContext?
     public var listID: String
 }
 
@@ -48,10 +49,10 @@ public actor RecordingReminderWriter: ReminderWriter {
         renames.append((id: id, name: name))
     }
 
-    public func write(_ suggestion: Suggestion, category: Category, toList listID: String) async throws -> String {
+    public func write(_ suggestion: Suggestion, category: Category, email: EmailContext?, toList listID: String) async throws -> String {
         if failingSuggestionIDs.contains(suggestion.id) { throw RecordingReminderError.writeFailed }
         reminderCounter += 1
-        written.append(WrittenReminder(suggestion: suggestion, category: category, listID: listID))
+        written.append(WrittenReminder(suggestion: suggestion, category: category, email: email, listID: listID))
         return "rem-\(reminderCounter)"
     }
 }

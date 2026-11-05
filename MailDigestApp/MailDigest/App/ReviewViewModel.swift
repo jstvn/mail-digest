@@ -27,7 +27,7 @@ final class ReviewViewModel {
     private(set) var message: String?
     /// Daily shows the top 25 first (Q16); this reveals the rest.
     var showAllSuggestions = false
-    /// Nil until T14 provides the EventKit writer; "Add selected" stays disabled until then.
+    /// Nil unless Reminders access is fully granted; "Add selected" stays disabled until then.
     private(set) var reminderWriter: (any ReminderWriter)?
 
     @ObservationIgnored private var store: (any DigestStore)?
@@ -37,7 +37,7 @@ final class ReviewViewModel {
     @ObservationIgnored private var isReloading = false
     @ObservationIgnored private var needsReload = false
     @ObservationIgnored var listName: @MainActor () -> String = { DigestSettings.defaultListName }
-    private static let listIDKey = "remindersListID"
+    static let listIDKey = "remindersListID"
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "review")
 
     init() {}
@@ -76,7 +76,7 @@ final class ReviewViewModel {
         state.map { ReviewActions.category(for: suggestion, in: $0) } ?? .other
     }
 
-    /// T14 injects the EventKit writer here; nothing else changes.
+    /// `RemindersAccessModel` sets the EventKit writer here when access is granted, and clears it otherwise.
     func setReminderWriter(_ writer: (any ReminderWriter)?) { reminderWriter = writer }
 
     // MARK: Loading

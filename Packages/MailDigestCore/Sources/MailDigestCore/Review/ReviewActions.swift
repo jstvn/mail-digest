@@ -200,7 +200,7 @@ public enum ReviewActions {
         var decisions: [Decision] = []
         for var s in suggestions {
             do {
-                s.reminderID = try await writer.write(s, category: category(for: s, in: state), toList: listID)
+                s.reminderID = try await writer.write(s, category: category(for: s, in: state), email: emails[s.emailID], toList: listID)
                 s.status = .approved
                 if let email = emails[s.emailID] {
                     let d = Decision(suggestionID: s.id, sender: MailFilter.address(from: email.sender),
@@ -239,8 +239,16 @@ public enum ReviewActions {
     // MARK: Reminders content
 
     /// The Reminders `notes` text; the trailing `#category` is a searchable hashtag (EventKit has no tag API).
-    public static func reminderNotes(for suggestion: Suggestion, email: EmailContext, category: Category) -> String {
-        "From: \(email.sender)\nSubject: \(email.subject)\n\"\(suggestion.evidence)\"\n#\(category.rawValue)"
+    /// Without email context the From and Subject lines are left out.
+    public static func reminderNotes(for suggestion: Suggestion, email: EmailContext?, category: Category) -> String {
+        var lines: [String] = []
+        if let email {
+            lines.append("From: \(email.sender)")
+            lines.append("Subject: \(email.subject)")
+        }
+        lines.append("\"\(suggestion.evidence)\"")
+        lines.append("#\(category.rawValue)")
+        return lines.joined(separator: "\n")
     }
 
     /// `message://%3C<id>%3E`, which opens the email in Mail.

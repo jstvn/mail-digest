@@ -12,10 +12,10 @@ enum PreviewSupport {
         ReviewViewModel(preview: state, emails: PreviewFixtures.emails, writer: writer)
     }
 
-    static func run(review: ReviewViewModel = review(), progress: JobProgress? = nil, banner: String? = nil,
+    static func run(review: ReviewViewModel = review(), reminders: RemindersAuthorization = .granted, progress: JobProgress? = nil, banner: String? = nil,
                     failedJobID: UUID? = nil, foundNothing: Bool = false) -> DigestRunModel {
         DigestRunModel(preview: SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
-                       review: review, progress: progress, banner: banner, failedJobID: failedJobID,
+                       review: review, reminders: RemindersAccessModel(preview: reminders), progress: progress, banner: banner, failedJobID: failedJobID,
                        lastRunAt: PreviewFixtures.now, lastRunFoundNothing: foundNothing,
                        lastRunSummary: "Last run 6:45 AM · 4 suggestions · 23 emails")
     }
@@ -54,7 +54,11 @@ enum PreviewSupport {
 }
 
 #Preview("Panel · Reminders unavailable") {
-    panel(PreviewSupport.run(review: PreviewSupport.review(writer: nil)))
+    panel(PreviewSupport.run(review: PreviewSupport.review(writer: nil), reminders: .unavailable))
+}
+
+#Preview("Panel · Reminders access needed") {
+    panel(PreviewSupport.run(review: PreviewSupport.review(writer: nil), reminders: .notDetermined))
 }
 
 #Preview("Panel · no new mail") {

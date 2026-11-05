@@ -160,9 +160,9 @@ private func header(_ id: String) -> MessageHeader {
 
         let s = Suggestion(id: UUID(), emailID: "e", title: "T", due: nil, dueHasTime: false, priority: .low,
                            evidence: "x", confidence: 0.8, preselected: true, flags: [], status: .pending, reminderID: nil)
-        #expect(try await writer.write(s, category: .uni, toList: again) == "rem-1")
+        #expect(try await writer.write(s, category: .uni, email: nil, toList: again) == "rem-1")
         await writer.setFailingSuggestionIDs([s.id])
-        await #expect(throws: RecordingReminderError.writeFailed) { _ = try await writer.write(s, category: .uni, toList: again) }
+        await #expect(throws: RecordingReminderError.writeFailed) { _ = try await writer.write(s, category: .uni, email: nil, toList: again) }
         #expect(await writer.written.count == 1)
     }
 

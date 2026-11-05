@@ -27,7 +27,7 @@ Things the cloud agent could not verify; check on the Mac.
 - **T11 JXA fallback contract.** `FetchMail.js` is the compatibility fallback in the hybrid SQLite/`.emlx` design in `docs/SPEC.md`. Its decoder expects `{"messages": [...], "missing": [...]}` (a bare array also works). `rawHeaders` should be the raw header block (e.g. `message.allHeaders()`); `receivedAt` from `toISOString()` is fine (milliseconds are accepted). Nested custom folder names (e.g. "Projects/Uni") must be verified against what `ListMailboxes.js` reports.
 - **T11 timeout.** Each `osascript` call has a 120-second hard timeout (Q6). The 60-second target is the performance benchmark for listing 3,000 messages, not the process timeout.
 - **T12 `GRDBDigestStore`** (done, see T12 status) implements every `DigestStore` method. Beyond the spec's list: `digest(id:)`, `recentSuggestions(since:)`, `updateJob`, `items(job:)`, `isQueued`, `recordItemOutcome(_:outcome:seconds:finishedAt:)`, `requeueFailed(job:)`. `InMemoryDigestStore` is the reference behaviour; consider running the same tests against both.
-- **T13/T14 review panel.** Use `ReviewActions` for selection, edits, approve and dismiss; `ReviewActions.reminderNotes` and `messageURL` build the EventKit notes and `message://` link. Category edits live in `ReviewState.categoryOverrides` (QUESTIONS 19).
+- **T13/T14 review panel.** Use `ReviewActions` for selection, edits, approve and dismiss; `ReviewActions.reminderNotes` and `messageURL` build the EventKit notes and `message://` link. Category edits are persisted on `Suggestion.category` (QUESTIONS 19).
 - **T14 tags.** EventKit has no public API for Reminders tags, so the category is written as `#category` at the end of the notes. Check how this shows in Reminders on macOS 26 and iOS (does it become a real tag or stay searchable text?).
 - **T15 scheduler.** Call `JobRunner.recoverOnLaunch()` on every launch before anything else, then `startDaily()` from the 15-minute check.
 - **T19 job setup.** Pass a plan with a fixed `to` date to `JobRunner.preview(_:)`, then pass the same plan (plus unticked ids in `excludedMessageIDs`) to `start(_:)`; `JobPreviewBuilder.startTitle` and `ActivityFeed` produce the strings in the spec.
@@ -131,6 +131,21 @@ Verified on this Mac from Terminal (a harness that compiles the real adapter sou
 - Q16 Trusted Newsletter senders (8 suggestions instead of 3) are not read by `SuggestionValidator` or the runner yet; the setting is only stored. This gap predates T13.
 - The paused strip cannot show an auto-pause reason: `JobProgress` has no reason field yet. `ReviewPresentation.pausedText` already accepts one.
 - A job left paused by a previous session has no strip after relaunch (the runner only publishes progress once it runs); it is resumable from the job list in T19.
+
+## T14 status
+
+Built: `EventKitReminderWriter` (actor), `ReminderDraft` (core, tested on Linux), `RemindersAccessModel`, a banner button to request access, and list rename on commit in Settings. `xcodebuild` build passes; nothing below has been run against real Reminders.
+
+Please check on the Mac:
+
+- First approval with access granted creates the "Mail Digest" list in iCloud (not "On My Mac") and writes the reminder there.
+- Changing the list name in Settings (press Return or leave the field) renames the existing list in Reminders.
+- Delete the list in Reminders, then approve again: the list is recreated and the stored id replaced.
+- A written reminder shows the due date (and time for timed items), an alarm (9:00 on the day for date-only, 1 hour before for timed), the right priority, notes (`From`, `Subject`, quoted evidence, `#category`), and the link. Check on macOS 26 and on iOS whether `#category` becomes a tag.
+- The `message://` link opens the email in Mail.
+- Permission denied (System Settings > Privacy & Security > Reminders): Add Selected is disabled and the banner shows; granting access and returning to the app enables it without a relaunch.
+- Permission not yet asked: the banner's "Allow Reminders Access…" shows the system prompt.
+- The writer uses Australia/Brisbane for due dates (no time zone setting exists yet).
 
 ## Open items
 
