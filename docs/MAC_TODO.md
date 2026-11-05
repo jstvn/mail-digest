@@ -78,7 +78,7 @@ Verified on this Mac from Terminal (a harness that compiles the real adapter sou
   - Nested folders containing mail.
   - UI responsiveness under Instruments.
 - **Open:**
-  - Q35, long emails versus the 180 s Ollama timeout on this CPU. One 12,800-character email needed 875 s.
+  - Q35 resolved: `extract()` now times out after 1,000 s (headline 180 s, health check 10 s), and a timed-out email fails once without automatic retry. Recheck the 12,800-character email (875 s) with the real app.
   - Run Now took 49 min for 14 emails; the 30-emails-in-15-minutes target is not met on this Intel Mac.
   - Q25 job-level provider failure is not implemented in `JobRunner`.
   - The interim in-memory store loses results on quit until T12.

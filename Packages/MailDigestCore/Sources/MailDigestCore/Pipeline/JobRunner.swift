@@ -578,8 +578,10 @@ public actor JobRunner {
                 return true
             }
             let reason = Self.shortReason(error)
-            // `item.attempts` was read before this attempt started.
-            if item.attempts + 1 >= settings.maxAttempts {
+            // `item.attempts` was read before this attempt started. A timed-out extraction already
+            // waited the full (long) timeout, so it is not retried automatically (Q35); the user can
+            // still retry it with `retryFailed(jobID:)`.
+            if item.attempts + 1 >= settings.maxAttempts || error as? LLMError == .timedOut {
                 run.digest.skipped.append(SkippedEmail(id: item.messageID, sender: item.sender,
                                                        subject: item.subject, reason: "failed: \(reason)"))
                 run.digest.emailCount += 1

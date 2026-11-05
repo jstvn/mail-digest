@@ -63,6 +63,30 @@ private func oldMessages(_ count: Int, prefix: String = "old") -> [EmailMessage]
 }
 
 @Suite struct JobRunnerTests {
+    // MARK: Q35 timeouts
+
+    @Test func timedOutExtractionFailsOnceWithoutAutomaticRetry() async throws {
+        let h = Harness(source: FixtureMailSource(messages: oldMessages(2)), llm: StubLLMClient())
+        await h.llm.setOnExtract { email in
+            if email.id == "old-0@fixture" { throw LLMError.timedOut }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+
+        // One attempt only, then failed; the other email is unaffected.
+        #expect(await h.llm.extractCalls.filter { $0.id == "old-0@fixture" }.count == 1)
+        let item = try #require(await h.store.allItems().first { $0.messageID == "old-0@fixture" })
+        #expect(item.state == .failed)
+        #expect(try await h.job().totals.done == 1)
+
+        // Manual retry is still available and succeeds once the model answers.
+        await h.llm.setOnExtract(nil)
+        let job = try await h.job()
+        #expect(try await h.runner.retryFailed(jobID: job.id) == 1)
+        await h.runner.waitUntilIdle()
+        #expect(try #require(await h.store.allItems().first { $0.messageID == "old-0@fixture" }).state == .done)
+    }
+
     // MARK: Unreadable bodies
 
     @Test(arguments: ["", "  \n\t \r\n "])

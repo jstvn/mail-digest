@@ -6,6 +6,8 @@ import FoundationNetworking
 /// Failures from the model server.
 public enum LLMError: Error, Equatable, Sendable {
     case unreachable(String)
+    /// The server accepted the request but did not answer within the request's timeout.
+    case timedOut
     case modelMissing(String)
     case http(status: Int)
     case malformedResponse(String)
@@ -14,6 +16,7 @@ public enum LLMError: Error, Equatable, Sendable {
     public var userMessage: String {
         switch self {
         case .unreachable: return "Ollama is not reachable. Start Ollama and try again."
+        case .timedOut: return "Ollama did not answer in time."
         case .modelMissing(let m): return "The model \(m) is not installed. Run: ollama pull \(m)"
         case .http(let s): return "Ollama returned HTTP \(s)."
         case .malformedResponse(let r): return "The model gave an unusable answer (\(r))."
@@ -28,15 +31,24 @@ public enum LLMError: Error, Equatable, Sendable {
 public struct OllamaClient: LLMClient {
     public let baseURL: URL
     public let model: String
-    public let timeout: TimeInterval
+    /// Per-email extraction. Long because prompt evaluation of a long email on an Intel CPU can
+    /// take many minutes (Q35: one 7,725-token prompt took 875 s).
+    public let extractTimeout: TimeInterval
+    /// Digest headline, built from short summaries only.
+    public let headlineTimeout: TimeInterval
+    /// `GET /api/tags`; kept short so an unreachable server is reported quickly.
+    public let healthCheckTimeout: TimeInterval
     private let session: URLSession
 
     public init(baseURL: URL = URL(string: "http://localhost:11434")!, model: String = "qwen3:4b",
-                session: URLSession = .shared, timeout: TimeInterval = 180) {
+                session: URLSession = .shared, extractTimeout: TimeInterval = 1000,
+                headlineTimeout: TimeInterval = 180, healthCheckTimeout: TimeInterval = 10) {
         self.baseURL = baseURL
         self.model = model
         self.session = session
-        self.timeout = timeout
+        self.extractTimeout = extractTimeout
+        self.headlineTimeout = headlineTimeout
+        self.healthCheckTimeout = healthCheckTimeout
     }
 
     // MARK: Request builders
@@ -45,17 +57,17 @@ public struct OllamaClient: LLMClient {
     public func makeExtractionRequest(_ email: EmailMessage, tier: MailTier, today: Date, timeZone: TimeZone) throws -> URLRequest {
         try chatRequest(system: Prompts.extractionSystem(today: today, timeZone: timeZone, tier: tier),
                         user: Prompts.extractionUser(email, timeZone: timeZone),
-                        format: ExtractionSchema.json)
+                        format: ExtractionSchema.json, timeout: extractTimeout)
     }
 
     /// Builds the `/api/chat` request for the headline call (no `format`).
     public func makeHeadlineRequest(info: [InfoItem], suggestionCount: Int) throws -> URLRequest {
         try chatRequest(system: Prompts.headlineSystem,
                         user: Prompts.headlineUser(info: info, suggestionCount: suggestionCount),
-                        format: nil)
+                        format: nil, timeout: headlineTimeout)
     }
 
-    private func chatRequest(system: String, user: String, format: JSONValue?) throws -> URLRequest {
+    private func chatRequest(system: String, user: String, format: JSONValue?, timeout: TimeInterval) throws -> URLRequest {
         var body: [String: JSONValue] = [
             "model": .string(model),
             "messages": .array([
@@ -81,7 +93,7 @@ public struct OllamaClient: LLMClient {
     public func healthCheck() async throws {
         var request = URLRequest(url: baseURL.appendingPathComponent("api/tags"))
         request.httpMethod = "GET"
-        request.timeoutInterval = timeout
+        request.timeoutInterval = healthCheckTimeout
         let data = try await send(request)
         struct Tags: Decodable { struct M: Decodable { var name: String }; var models: [M] }
         guard let tags = try? JSONDecoder().decode(Tags.self, from: data) else {
@@ -137,6 +149,8 @@ public struct OllamaClient: LLMClient {
             throw CancellationError()
         } catch let error as URLError where error.code == .cancelled {
             throw CancellationError()
+        } catch let error as URLError where error.code == .timedOut {
+            throw LLMError.timedOut
         } catch {
             throw LLMError.unreachable(error.localizedDescription)
         }

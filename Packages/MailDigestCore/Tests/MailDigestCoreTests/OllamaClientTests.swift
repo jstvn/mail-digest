@@ -93,7 +93,8 @@ private func expectSnapshot(_ request: URLRequest, _ name: String, sourceFile: S
         #expect(request.url?.absoluteString == "http://localhost:11434/api/chat")
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
-        #expect(request.timeoutInterval == 180)
+        // Q35: extraction gets the long timeout; the headline keeps 180 s.
+        #expect(request.timeoutInterval == 1000)
     }
 
     @Test func decodesCannedResponse() async throws {
@@ -107,7 +108,7 @@ private func expectSnapshot(_ request: URLRequest, _ name: String, sourceFile: S
         #expect(sent.url.path == "/api/chat")
         #expect(sent.method == "POST")
         #expect(sent.headers["Content-Type"] == "application/json")
-        #expect(sent.timeout == 180)
+        #expect(sent.timeout == 1000)
         #expect(!sent.body.isEmpty)
     }
 
@@ -151,6 +152,30 @@ private func expectSnapshot(_ request: URLRequest, _ name: String, sourceFile: S
         } catch let error as LLMError {
             guard case .unreachable = error else { Issue.record("wrong error \(error)"); return }
         }
+    }
+
+    @Test func timeoutsAreSeparatePerRequestKind() throws {
+        let c = client()
+        #expect(c.extractTimeout == 1000 && c.headlineTimeout == 180 && c.healthCheckTimeout == 10)
+        #expect(try c.makeHeadlineRequest(info: [], suggestionCount: 0).timeoutInterval == 180)
+        let custom = OllamaClient(session: StubURLProtocol.makeSession(), extractTimeout: 42, headlineTimeout: 7, healthCheckTimeout: 3)
+        #expect(try custom.makeExtractionRequest(assessmentEmail(), tier: .full, today: today, timeZone: tz).timeoutInterval == 42)
+        #expect(try custom.makeHeadlineRequest(info: [], suggestionCount: 0).timeoutInterval == 7)
+    }
+
+    @Test func healthCheckUsesShortTimeout() async throws {
+        StubURLProtocol.install { _ in StubResponse(body: Data(#"{"models":[{"name":"qwen3:4b"}]}"#.utf8)) }
+        try await client().healthCheck()
+        #expect(try #require(StubURLProtocol.requests.first).timeout == 10)
+    }
+
+    @Test func requestTimeoutIsTimedOutNotUnreachable() async throws {
+        StubURLProtocol.install { _ in StubResponse(failure: .timedOut) }
+        await #expect(throws: LLMError.timedOut) {
+            try await client().extract(assessmentEmail(), tier: .full, today: today, timeZone: tz)
+        }
+        // A timeout is not retried inside the client.
+        #expect(StubURLProtocol.requests.count == 1)
     }
 
     @Test func infoOnlyForcesEmptyTasks() async throws {
