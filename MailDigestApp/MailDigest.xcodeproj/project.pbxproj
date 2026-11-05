@@ -20,7 +20,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				MailDigest.entitlements,
 			);
 			target = A10000000000000000000007 /* MailDigest */;
 		};
@@ -114,8 +113,9 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A10000000000000000000022 /* XCLocalSwiftPackageReference "../Packages/MailDigestCore" */,
-				A10000000000000000000023 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				A10000000000000000000023 /* XCRemoteSwiftPackageReference "GRDB" */,
 			);
+			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000005 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -193,7 +193,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = HF69BFXF2W;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MailDigest/Info.plist;
@@ -212,7 +212,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = HF69BFXF2W;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MailDigest/Info.plist;
@@ -227,20 +227,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A1000000000000000000000C /* Build configuration list for PBXProject "MailDigest" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				A1000000000000000000000D /* Debug */,
-				A1000000000000000000000E /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		A10000000000000000000008 /* Build configuration list for PBXNativeTarget "MailDigest" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1000000000000000000000F /* Debug */,
 				A10000000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000000000000000000000C /* Build configuration list for PBXProject "MailDigest" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000000D /* Debug */,
+				A1000000000000000000000E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -255,7 +255,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		A10000000000000000000023 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+		A10000000000000000000023 /* XCRemoteSwiftPackageReference "GRDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
@@ -272,7 +272,7 @@
 		};
 		A10000000000000000000021 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A10000000000000000000023 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = A10000000000000000000023 /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */
