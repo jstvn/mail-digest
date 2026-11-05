@@ -63,6 +63,30 @@ private func oldMessages(_ count: Int, prefix: String = "old") -> [EmailMessage]
 }
 
 @Suite struct JobRunnerTests {
+    // MARK: Unreadable bodies
+
+    @Test(arguments: ["", "  \n\t \r\n "])
+    func emptyBodyIsSkippedWithoutModelCallOrAttempt(body: String) async throws {
+        var messages = oldMessages(2)
+        messages[0].body = body
+        let h = Harness(source: FixtureMailSource(messages: messages), llm: StubLLMClient())
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+
+        // Only the readable message reaches the model.
+        #expect(await h.llm.extractCalls.map(\.id) == ["old-1@fixture"])
+        let item = try #require(await h.store.allItems().first { $0.messageID == "old-0@fixture" })
+        #expect(item.state == .skipped)
+        #expect(item.attempts == 0)
+        #expect(item.outcome == "skipped: no readable body")
+        // Not marked processed, so a later job can try again once Mail has the body.
+        #expect(try await h.store.isProcessed("old-0@fixture") == false)
+        let digest = try await h.digest()
+        #expect(digest.skipped.contains { $0.id == "old-0@fixture" && $0.reason == "no readable body" })
+        #expect(try await h.job().totals.skipped == 1)
+        #expect(try await h.job().totals.done == 1)
+    }
+
     // MARK: 1, 2 End-to-end Daily job
 
     @Test func dailyJobOverFixtures() async throws {

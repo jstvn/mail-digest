@@ -26,6 +26,18 @@ public struct FetchResult: Sendable, Equatable {
     }
 }
 
+/// Result of decoding a header listing: usable headers plus how many lacked a usable Message-ID.
+public struct HeaderListing: Sendable, Equatable {
+    public var headers: [MessageHeader]
+    /// Entries dropped because they had no canonical Message-ID (no identity, so never processed).
+    public var missingIdentityCount: Int
+
+    public init(headers: [MessageHeader], missingIdentityCount: Int) {
+        self.headers = headers
+        self.missingIdentityCount = missingIdentityCount
+    }
+}
+
 /// Turns the JSON printed by `ListMailboxes.js`, `ListMail.js` and `FetchMail.js` into models.
 public struct MailJSONDecoder: Sendable {
     public init() {}
@@ -35,17 +47,20 @@ public struct MailJSONDecoder: Sendable {
     private struct RawMailbox: Decodable {
         var account: String, name: String, kind: String
         var messageCount: Int, unreadCount: Int
+        var accountID: String?, mailboxURL: String?
     }
 
     private struct RawHeader: Decodable {
-        var id: String, account: String, mailbox: String, sender: String, subject: String
+        var id: String?, account: String, mailbox: String, sender: String, subject: String
         var receivedAt: String
+        var storeRowID: Int64?, accountID: String?, mailboxURL: String?
     }
 
     private struct RawMessage: Decodable {
         var id: String, account: String, mailbox: String, sender: String, subject: String
         var receivedAt: String, body: String
         var rawHeaders: String?
+        var storeRowID: Int64?
     }
 
     private struct RawFetch: Decodable {
@@ -58,19 +73,32 @@ public struct MailJSONDecoder: Sendable {
     /// Decodes `ListMailboxes.js` output. Unknown `kind` strings become `.custom`.
     public func decodeMailboxes(_ data: Data) throws -> [MailboxInfo] {
         try decode([RawMailbox].self, from: data).map {
-            MailboxInfo(ref: MailboxRef(account: $0.account, name: $0.name),
+            MailboxInfo(ref: MailboxRef(account: $0.account, name: $0.name,
+                                   accountID: $0.accountID, mailboxURL: $0.mailboxURL),
                         messageCount: $0.messageCount, unreadCount: $0.unreadCount,
                         kind: MailboxKind(rawValue: $0.kind) ?? .custom)
         }
     }
 
-    /// Decodes `ListMail.js` output.
-    public func decodeHeaders(_ data: Data) throws -> [MessageHeader] {
-        try decode([RawHeader].self, from: data).map {
-            MessageHeader(id: Self.cleanID($0.id), account: $0.account, mailbox: $0.mailbox,
-                          sender: $0.sender, subject: $0.subject,
-                          receivedAt: try Self.parseDate($0.receivedAt))
+    /// Decodes `ListMail.js` output. `id` is the raw Message-ID header; entries without a usable
+    /// canonical id are counted in `missingIdentityCount` and not returned.
+    public func decodeHeaderListing(_ data: Data) throws -> HeaderListing {
+        var headers: [MessageHeader] = []
+        var missing = 0
+        for raw in try decode([RawHeader].self, from: data) {
+            guard let id = MessageID.canonical(raw.id ?? "") else { missing += 1; continue }
+            headers.append(MessageHeader(id: id, account: raw.account, mailbox: raw.mailbox,
+                                         sender: raw.sender, subject: raw.subject,
+                                         receivedAt: try Self.parseDate(raw.receivedAt),
+                                         sourceReference: MailMessageReference(messageID: id, storeRowID: raw.storeRowID),
+                                         accountID: raw.accountID, mailboxURL: raw.mailboxURL))
         }
+        return HeaderListing(headers: headers, missingIdentityCount: missing)
+    }
+
+    /// Decodes `ListMail.js` output, dropping entries without a usable id.
+    public func decodeHeaders(_ data: Data) throws -> [MessageHeader] {
+        try decodeHeaderListing(data).headers
     }
 
     /// Decodes `FetchMail.js` output: `{messages, missing}` or a bare array of messages.
@@ -85,7 +113,7 @@ public struct MailJSONDecoder: Sendable {
             raw = try decode(RawFetch.self, from: data)
         }
         return FetchResult(messages: try raw.messages.map(Self.convert),
-                           missingIDs: (raw.missing ?? []).map(Self.cleanID))
+                           missingIDs: (raw.missing ?? []).compactMap(MessageID.canonical))
     }
 
     /// Decodes a single message object (the fixture file format).
@@ -140,18 +168,13 @@ public struct MailJSONDecoder: Sendable {
     }
 
     private static func convert(_ raw: RawMessage) throws -> EmailMessage {
-        EmailMessage(id: cleanID(raw.id), account: raw.account, mailbox: raw.mailbox,
+        EmailMessage(id: MessageID.canonical(raw.id) ?? raw.id.trimmingCharacters(in: .whitespacesAndNewlines), account: raw.account, mailbox: raw.mailbox,
                      sender: raw.sender, subject: raw.subject,
                      receivedAt: try parseDate(raw.receivedAt), body: raw.body,
-                     headers: filterHeaders(raw.rawHeaders ?? ""))
-    }
-
-    /// Strips whitespace and surrounding angle brackets from a Message-ID.
-    private static func cleanID(_ id: String) -> String {
-        var s = id.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s.hasPrefix("<") { s.removeFirst() }
-        if s.hasSuffix(">") { s.removeLast() }
-        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+                     headers: filterHeaders(raw.rawHeaders ?? ""),
+                     sourceReference: MailMessageReference(
+                        messageID: MessageID.canonical(raw.id) ?? raw.id.trimmingCharacters(in: .whitespacesAndNewlines),
+                        storeRowID: raw.storeRowID))
     }
 
     /// JS `toISOString()` emits milliseconds but other sources do not, so accept both forms.

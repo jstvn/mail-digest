@@ -4,16 +4,22 @@ import Foundation
 public actor FixtureMailSource: MailSource {
     private let messages: [EmailMessage]
     private let mailboxes: [MailboxInfo]
+    /// Row-ID hints (by message id) reported in `listHeaders`, to exercise locator pass-through.
+    private let storeRowIDs: [String: Int64]
 
     /// Ids requested per `fetchMessages` call, in call order.
     public private(set) var fetchCalls: [[String]] = []
+    /// References requested per `fetchMessages` call, in call order (includes row-ID hints).
+    public private(set) var fetchReferenceCalls: [[MailMessageReference]] = []
     /// Number of `listHeaders` calls.
     public private(set) var listCalls = 0
     /// Number of `checkForNewMail` calls.
     public private(set) var checkCalls = 0
 
     /// When `mailboxes` is nil they are derived from the messages.
-    public init(messages: [EmailMessage], mailboxes: [MailboxInfo]? = nil) {
+    public init(messages: [EmailMessage], mailboxes: [MailboxInfo]? = nil,
+                storeRowIDs: [String: Int64] = [:]) {
+        self.storeRowIDs = storeRowIDs
         self.messages = messages
         self.mailboxes = mailboxes ?? Self.deriveMailboxes(from: messages)
     }
@@ -43,10 +49,13 @@ public actor FixtureMailSource: MailSource {
                 && $0.receivedAt >= from && $0.receivedAt < to }
             .sorted { $0.receivedAt > $1.receivedAt }
             .map { MessageHeader(id: $0.id, account: $0.account, mailbox: $0.mailbox,
-                                 sender: $0.sender, subject: $0.subject, receivedAt: $0.receivedAt) }
+                                 sender: $0.sender, subject: $0.subject, receivedAt: $0.receivedAt,
+                                 sourceReference: MailMessageReference(messageID: $0.id, storeRowID: storeRowIDs[$0.id])) }
     }
 
-    public func fetchMessages(ids: [String], in mailbox: MailboxRef) async throws -> [EmailMessage] {
+    public func fetchMessages(references: [MailMessageReference], in mailbox: MailboxRef) async throws -> [EmailMessage] {
+        let ids = references.map(\.messageID)
+        fetchReferenceCalls.append(references)
         fetchCalls.append(ids)
         let byID = Dictionary(
             messages.filter { $0.account == mailbox.account && $0.mailbox == mailbox.name }

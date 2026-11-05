@@ -1,5 +1,17 @@
 import Foundation
 
+/// Identity plus a private locator for a message. `messageID` is the only identity;
+/// `storeRowID` is a hint for finding the file quickly and must never be used for identity.
+public struct MailMessageReference: Codable, Sendable, Equatable, Hashable {
+    public var messageID: String
+    public var storeRowID: Int64?
+
+    public init(messageID: String, storeRowID: Int64? = nil) {
+        self.messageID = messageID
+        self.storeRowID = storeRowID
+    }
+}
+
 /// A full message as fetched from Mail, with body and the few headers the filter needs.
 public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     public var id: String              // RFC Message-ID without angle brackets
@@ -10,9 +22,12 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     public var receivedAt: Date
     public var body: String            // plain text as Mail renders it
     public var headers: [String: String] // only List-Unsubscribe, Precedence, Auto-Submitted
+    public var sourceReference: MailMessageReference
 
     public init(id: String, account: String, mailbox: String, sender: String, subject: String,
-                receivedAt: Date, body: String, headers: [String: String]) {
+                receivedAt: Date, body: String, headers: [String: String],
+                sourceReference: MailMessageReference? = nil) {
+        self.sourceReference = sourceReference ?? MailMessageReference(messageID: id, storeRowID: nil)
         self.id = id
         self.account = account
         self.mailbox = mailbox
@@ -21,6 +36,23 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
         self.receivedAt = receivedAt
         self.body = body
         self.headers = headers
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, account, mailbox, sender, subject, receivedAt, body, headers, sourceReference
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let id = try c.decode(String.self, forKey: .id)
+        self.init(id: id, account: try c.decode(String.self, forKey: .account),
+                  mailbox: try c.decode(String.self, forKey: .mailbox),
+                  sender: try c.decode(String.self, forKey: .sender),
+                  subject: try c.decode(String.self, forKey: .subject),
+                  receivedAt: try c.decode(Date.self, forKey: .receivedAt),
+                  body: try c.decode(String.self, forKey: .body),
+                  headers: try c.decode([String: String].self, forKey: .headers),
+                  sourceReference: try c.decodeIfPresent(MailMessageReference.self, forKey: .sourceReference))
     }
 }
 
@@ -32,14 +64,43 @@ public struct MessageHeader: Codable, Sendable, Equatable {
     public var sender: String
     public var subject: String
     public var receivedAt: Date
+    public var sourceReference: MailMessageReference
+    public var accountID: String?
+    public var mailboxURL: String?
 
-    public init(id: String, account: String, mailbox: String, sender: String, subject: String, receivedAt: Date) {
+    /// The mailbox this header was listed from, including its on-disk locator when known.
+    public var mailboxRef: MailboxRef {
+        MailboxRef(account: account, name: mailbox, accountID: accountID, mailboxURL: mailboxURL)
+    }
+
+    public init(id: String, account: String, mailbox: String, sender: String, subject: String, receivedAt: Date,
+                sourceReference: MailMessageReference? = nil, accountID: String? = nil, mailboxURL: String? = nil) {
+        self.sourceReference = sourceReference ?? MailMessageReference(messageID: id, storeRowID: nil)
+        self.accountID = accountID
+        self.mailboxURL = mailboxURL
         self.id = id
         self.account = account
         self.mailbox = mailbox
         self.sender = sender
         self.subject = subject
         self.receivedAt = receivedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, account, mailbox, sender, subject, receivedAt, sourceReference, accountID, mailboxURL
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try c.decode(String.self, forKey: .id),
+                  account: try c.decode(String.self, forKey: .account),
+                  mailbox: try c.decode(String.self, forKey: .mailbox),
+                  sender: try c.decode(String.self, forKey: .sender),
+                  subject: try c.decode(String.self, forKey: .subject),
+                  receivedAt: try c.decode(Date.self, forKey: .receivedAt),
+                  sourceReference: try c.decodeIfPresent(MailMessageReference.self, forKey: .sourceReference),
+                  accountID: try c.decodeIfPresent(String.self, forKey: .accountID),
+                  mailboxURL: try c.decodeIfPresent(String.self, forKey: .mailboxURL))
     }
 }
 

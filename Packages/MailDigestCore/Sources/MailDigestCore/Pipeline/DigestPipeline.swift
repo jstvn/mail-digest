@@ -49,6 +49,15 @@ public struct DigestPipeline: Sendable {
 
         var cleaned = email
         cleaned.body = cleaner.clean(email.body)
+        // Nothing left to read (empty, or only tracking/boilerplate removed by the cleaner): never
+        // send an empty prompt to the model.
+        if cleaned.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let reason = "no readable body"
+            return EmailOutcome(
+                tier: .skip, info: nil, suggestions: [],
+                skipped: SkippedEmail(id: email.id, sender: email.sender, subject: email.subject, reason: reason),
+                summaryText: "skipped: \(reason)")
+        }
         let result = try await llm.extract(cleaned, tier: tier, today: today, timeZone: timeZone)
 
         let info = InfoItem(

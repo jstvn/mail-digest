@@ -18,6 +18,17 @@ private func fixture(_ prefix: String) throws -> EmailMessage {
 }
 
 @Suite struct DigestPipelineTests {
+    @Test func bodyEmptyAfterCleaningSkipsWithoutModelCall() async throws {
+        let llm = StubLLMClient(results: try FixtureLoader.loadResultsByEmailID())
+        var email = try fixture("bill-rent-04")
+        email.body = " \n\n \t"
+        let out = try await run(pipeline(llm), email)
+        #expect(out.tier == .skip)
+        #expect(out.info == nil && out.suggestions.isEmpty)
+        #expect(out.skipped?.reason == "no readable body")
+        #expect(await llm.extractCalls.isEmpty)
+    }
+
     @Test func fullTierProducesInfoAndSuggestion() async throws {
         let llm = StubLLMClient(results: try FixtureLoader.loadResultsByEmailID())
         let out = try await run(pipeline(llm), fixture("bill-rent-04"))

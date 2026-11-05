@@ -75,10 +75,11 @@ public actor InMemoryDigestStore: DigestStore {
             position += 1
             let item = JobItem(
                 id: UUID(), jobID: jobID, messageID: h.id,
-                mailbox: MailboxRef(account: h.account, name: h.mailbox),
+                mailbox: h.mailboxRef,
                 sender: h.sender, subject: h.subject, receivedAt: h.receivedAt,
                 position: position, state: .queued, outcome: nil, seconds: nil,
-                attempts: 0, lastError: nil)
+                attempts: 0, lastError: nil,
+                storeRowID: h.sourceReference.storeRowID)
             itemIndex[item.id] = itemList.count
             itemsByJob[jobID, default: []].append(itemList.count)
             itemList.append(item)

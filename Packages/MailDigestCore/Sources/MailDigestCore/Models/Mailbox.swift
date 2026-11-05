@@ -9,10 +9,16 @@ public enum MailboxKind: String, Codable, Sendable, Equatable {
 public struct MailboxRef: Codable, Sendable, Hashable {
     public var account: String        // "iCloud", "Outlook"
     public var name: String           // "Inbox", "Archive", "Starred", nested names as Mail reports them
+    /// Mail's account UUID, when known (SQLite reader); lets the app find the mailbox on disk.
+    public var accountID: String?
+    /// The raw `scheme://ACCOUNT-ID/path` mailbox URL, when known.
+    public var mailboxURL: String?
 
-    public init(account: String, name: String) {
+    public init(account: String, name: String, accountID: String? = nil, mailboxURL: String? = nil) {
         self.account = account
         self.name = name
+        self.accountID = accountID
+        self.mailboxURL = mailboxURL
     }
 }
 

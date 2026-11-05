@@ -64,7 +64,7 @@ public struct JobPreviewBuilder: Sendable {
         var range: ClosedRange<Date>?
         if let lo = dates.min(), let hi = dates.max() { range = lo...hi }
         var totals: [MailboxRef: Int] = [:]
-        for h in sel.found { totals[MailboxRef(account: h.account, name: h.mailbox), default: 0] += 1 }
+        for h in sel.found { totals[h.mailboxRef, default: 0] += 1 }
         let perEmail = averageSecondsPerEmail ?? defaultSecondsPerEmail
         return JobPreview(plan: plan, mailboxTotals: totals, totalFound: sel.found.count,
                           alreadyProcessed: sel.alreadyProcessed, excluded: sel.excluded,

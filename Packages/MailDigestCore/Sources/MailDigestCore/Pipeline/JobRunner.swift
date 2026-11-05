@@ -468,14 +468,14 @@ public actor JobRunner {
 
             // One fetch call per mailbox, so each call stays within the batch size.
             var order: [MailboxRef] = []
-            var idsByMailbox: [MailboxRef: [String]] = [:]
+            var refsByMailbox: [MailboxRef: [MailMessageReference]] = [:]
             for item in batch {
-                if idsByMailbox[item.mailbox] == nil { order.append(item.mailbox) }
-                idsByMailbox[item.mailbox, default: []].append(item.messageID)
+                if refsByMailbox[item.mailbox] == nil { order.append(item.mailbox) }
+                refsByMailbox[item.mailbox, default: []].append(item.reference)
             }
             var fetched: [String: EmailMessage] = [:]
             for mailbox in order {
-                for email in try await source.fetchMessages(ids: idsByMailbox[mailbox] ?? [], in: mailbox) {
+                for email in try await source.fetchMessages(references: refsByMailbox[mailbox] ?? [], in: mailbox) {
                     fetched[email.id] = email
                 }
             }
@@ -492,6 +492,9 @@ public actor JobRunner {
         }
     }
 
+    /// Skip reason recorded when a fetched message has no readable body text.
+    static let unreadableBodyReason = "no readable body"
+
     /// Processes one item. Returns true if it went back to `queued`.
     private func handle(_ item: JobItem, email: EmailMessage?, run: RunState) async throws -> Bool {
         guard let email else {
@@ -506,6 +509,17 @@ public actor JobRunner {
         // Guards against a crash between "marked processed" and "item done".
         if try await store.isProcessed(item.messageID) {
             try await complete(run, item, state: .skipped, outcome: "skipped: already processed", seconds: nil, error: nil)
+            return false
+        }
+        // An empty body (for example a message Mail never downloaded) must not reach the model. It is
+        // skipped without consuming an attempt and is not marked processed, so a later job can retry it.
+        if email.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let reason = Self.unreadableBodyReason
+            run.digest.skipped.append(SkippedEmail(id: item.messageID, sender: item.sender,
+                                                   subject: item.subject, reason: reason))
+            run.digest.emailCount += 1
+            try await store.save(run.digest)
+            try await complete(run, item, state: .skipped, outcome: "skipped: \(reason)", seconds: nil, error: reason)
             return false
         }
 

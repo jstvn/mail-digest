@@ -88,10 +88,19 @@ public struct JobItem: Codable, Sendable, Equatable, Identifiable {
     public var lastError: String?
     /// When the item reached a final state; the activity log's "time".
     public var finishedAt: Date?
+    /// Private locator from the SQLite listing; a hint only, never identity.
+    public var storeRowID: Int64?
+
+    /// Identity plus locator, as passed to `MailSource.fetchMessages`.
+    public var reference: MailMessageReference {
+        MailMessageReference(messageID: messageID, storeRowID: storeRowID)
+    }
 
     public init(id: UUID, jobID: UUID, messageID: String, mailbox: MailboxRef, sender: String,
                 subject: String, receivedAt: Date, position: Int, state: JobItemState,
-                outcome: String?, seconds: Double?, attempts: Int, lastError: String?, finishedAt: Date? = nil) {
+                outcome: String?, seconds: Double?, attempts: Int, lastError: String?, finishedAt: Date? = nil,
+                storeRowID: Int64? = nil) {
+        self.storeRowID = storeRowID
         self.id = id
         self.jobID = jobID
         self.messageID = messageID
@@ -106,6 +115,29 @@ public struct JobItem: Codable, Sendable, Equatable, Identifiable {
         self.attempts = attempts
         self.lastError = lastError
         self.finishedAt = finishedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, jobID, messageID, mailbox, sender, subject, receivedAt, position, state, outcome
+        case seconds, attempts, lastError, finishedAt, storeRowID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try c.decode(UUID.self, forKey: .id), jobID: try c.decode(UUID.self, forKey: .jobID),
+                  messageID: try c.decode(String.self, forKey: .messageID),
+                  mailbox: try c.decode(MailboxRef.self, forKey: .mailbox),
+                  sender: try c.decode(String.self, forKey: .sender),
+                  subject: try c.decode(String.self, forKey: .subject),
+                  receivedAt: try c.decode(Date.self, forKey: .receivedAt),
+                  position: try c.decode(Int.self, forKey: .position),
+                  state: try c.decode(JobItemState.self, forKey: .state),
+                  outcome: try c.decodeIfPresent(String.self, forKey: .outcome),
+                  seconds: try c.decodeIfPresent(Double.self, forKey: .seconds),
+                  attempts: try c.decode(Int.self, forKey: .attempts),
+                  lastError: try c.decodeIfPresent(String.self, forKey: .lastError),
+                  finishedAt: try c.decodeIfPresent(Date.self, forKey: .finishedAt),
+                  storeRowID: try c.decodeIfPresent(Int64.self, forKey: .storeRowID))
     }
 }
 
