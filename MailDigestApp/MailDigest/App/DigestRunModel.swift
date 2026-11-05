@@ -36,7 +36,7 @@ final class DigestRunModel {
     /// in-memory fallback, so a failure is shown instead of silently losing results.
     @ObservationIgnored private var store: GRDBDigestStore?
     @ObservationIgnored private var didRecoverJobs = false
-    @ObservationIgnored private let notifier = LogNotifier()
+    @ObservationIgnored private let notifier = UserNotifier()
     @ObservationIgnored private let clock = SystemClock()
     @ObservationIgnored private var runner: JobRunner?
     @ObservationIgnored private var runnerKey: RunnerKey?
@@ -86,6 +86,18 @@ final class DigestRunModel {
         OllamaClient(baseURL: settings.settings.resolvedOllamaURL, model: settings.settings.resolvedModel)
     }
 
+    /// Onboarding's Ollama step: nil when the server and model answer, otherwise a message saying how to fix it.
+    func checkOllama() async -> String? {
+        do {
+            try await llm.healthCheck()
+            return nil
+        } catch let error as LLMError {
+            return error.userMessage
+        } catch {
+            return "Ollama is not reachable. Start Ollama, or run `ollama pull qwen3:4b`."
+        }
+    }
+
     /// Daily runs read every inbox.
     var inboxCount: Int { mailboxes.filter { $0.kind == .inbox }.count }
 
@@ -132,8 +144,25 @@ final class DigestRunModel {
         }
     }
 
-    func runNow() async {
+    /// What started a Daily run. Scheduled runs are silent on failure apart from the usual banner.
+    enum RunTrigger { case manual, scheduled }
+
+    /// Run Now: starts the Daily job.
+    func runNow() async { await runDaily(trigger: .manual) }
+
+    /// Called by the scheduler: starts the Daily job only when the core rule says the morning run is due
+    /// and nothing is running. Failures before a job exists (Ollama down) leave no job, so the next check retries.
+    func runIfDue() async {
+        guard !isRunning, activeProgress == nil, let store = await openStore() else { return }
+        guard let jobs = try? await store.jobs() else { return }
+        let s = settings.settings
+        guard MorningSchedule.isDue(now: clock.now(), hour: s.runHour, minute: s.runMinute, jobs: jobs) else { return }
+        await runDaily(trigger: .scheduled)
+    }
+
+    func runDaily(trigger: RunTrigger) async {
         guard !isRunning else { return }
+        Self.log.notice("daily run starting: trigger=\(trigger == .scheduled ? "scheduled" : "manual", privacy: .public)")
         isRunning = true
         banner = nil
         progressText = "Starting…"

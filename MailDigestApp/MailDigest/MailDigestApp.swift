@@ -1,12 +1,14 @@
 import MailDigestCore
 import SwiftUI
 
-/// Menu bar agent entry point: the menu bar window, the review panel, Settings and Mail Access.
-/// The scheduler, onboarding and the Reminders writer arrive in later tasks.
+/// Menu bar agent entry point: the menu bar window, the review panel, onboarding, Settings and Mail Access.
+/// A morning scheduler starts the Daily run after launch.
 @main
 struct MailDigestApp: App {
     @State private var access = MailAccessModel()
     @State private var run = DigestRunModel()
+    @State private var scheduler: MorningScheduler?
+    private let router = NotificationRouter.shared
     @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
@@ -15,6 +17,11 @@ struct MailDigestApp: App {
         } label: {
             menuBarLabel
                 .task { await launch() }
+                // A clicked notification opens the review panel.
+                .onChange(of: router.openReviewRequests) { _, _ in
+                    openWindow(id: "review")
+                    NSApp.activate()
+                }
         }
         .menuBarExtraStyle(.window)
 
@@ -25,6 +32,11 @@ struct MailDigestApp: App {
 
         Window("Mail Access", id: "mail-access") {
             MailAccessView(model: access, run: run)
+        }
+        .windowResizability(.contentSize)
+
+        Window("Welcome to Mail Digest", id: "onboarding") {
+            OnboardingView(run: run, access: access)
         }
         .windowResizability(.contentSize)
 
@@ -44,19 +56,19 @@ struct MailDigestApp: App {
         .accessibilityLabel(count > 0 ? "Mail Digest, \(count) pending suggestions" : "Mail Digest")
     }
 
-    private func showMailAccess() {
-        openWindow(id: "mail-access")
-        NSApp.activate()
-    }
-
-    /// Probes once at launch and shows Mail Access on first run. Never prompts for Automation.
+    /// Opens the database, probes Mail once (never prompting for Automation), shows onboarding on first
+    /// launch and starts the morning scheduler.
     private func launch() async {
+        // The label's task can run again; only start once.
+        guard scheduler == nil else { return }
+        let morning = MorningScheduler(run: run)
+        scheduler = morning
         await run.loadLastRun()
         await access.refresh()
-        let key = "didShowMailAccess"
-        if !UserDefaults.standard.bool(forKey: key) {
-            UserDefaults.standard.set(true, forKey: key)
-            showMailAccess()
+        if !UserDefaults.standard.bool(forKey: OnboardingView.completedKey) {
+            openWindow(id: "onboarding")
+            NSApp.activate()
         }
+        morning.start()
     }
 }

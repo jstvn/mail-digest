@@ -29,7 +29,7 @@ Things the cloud agent could not verify; check on the Mac.
 - **T12 `GRDBDigestStore`** (done, see T12 status) implements every `DigestStore` method. Beyond the spec's list: `digest(id:)`, `recentSuggestions(since:)`, `updateJob`, `items(job:)`, `isQueued`, `recordItemOutcome(_:outcome:seconds:finishedAt:)`, `requeueFailed(job:)`. `InMemoryDigestStore` is the reference behaviour; consider running the same tests against both.
 - **T13/T14 review panel.** Use `ReviewActions` for selection, edits, approve and dismiss; `ReviewActions.reminderNotes` and `messageURL` build the EventKit notes and `message://` link. Category edits are persisted on `Suggestion.category` (QUESTIONS 19).
 - **T14 tags.** EventKit has no public API for Reminders tags, so the category is written as `#category` at the end of the notes. Check how this shows in Reminders on macOS 26 and iOS (does it become a real tag or stay searchable text?).
-- **T15 scheduler.** Call `JobRunner.recoverOnLaunch()` on every launch before anything else, then `startDaily()` from the 15-minute check.
+- **T15 scheduler** (done, see T15 status): `DigestRunModel.runIfDue()` asks `MorningSchedule.isDue` and runs the Daily job; `recoverOnLaunch()` runs when the first runner is built.
 - **T19 job setup.** Pass a plan with a fixed `to` date to `JobRunner.preview(_:)`, then pass the same plan (plus unticked ids in `excludedMessageIDs`) to `start(_:)`; `JobPreviewBuilder.startTitle` and `ActivityFeed` produce the strings in the spec.
 
 ## T10 status
@@ -150,3 +150,24 @@ Please check on the Mac:
 ## Open items
 
 - The core package builds and its tests pass on macOS (Xcode 26.6 SDK), after the `Category` fix. The app target also builds with `CODE_SIGNING_ALLOWED=NO`; its visual menu-bar check is still pending. Ollama 0.40.14 with `qwen3:4b` answered a raw `/api/chat` call (`think: false`, JSON-schema `format`) with valid JSON; still unverified: `OllamaClient.healthCheck()` and one `extract` through the Swift code (item 2), plus the feature-level app-target work in T11–T16, T18 and T19.
+
+## T15 status
+
+**T15 code done; none of the following has been checked by hand.** Build succeeds; the schedule rule is unit tested in core (`MorningScheduleTests`).
+
+**Manual checks (Mac, signed app):**
+
+1. **Onboarding on first launch** (reset with `defaults delete dev.pages.justinwang.maildigest didCompleteOnboarding`): the "Welcome to Mail Digest" window opens once. Check each step: Ollama check (stopped, model missing, ready, Check Again); Allow Mail Access shows the Automation prompt with the Info.plist text; Mail Access Options opens the existing window; Allow Reminders Access and Allow Notifications show their system prompts; list name and run time save; Done and Run Now (Run Now opens the review panel and starts a run). Closing the window by any route means it does not return. Existing users who already saw Mail Access also see onboarding once.
+2. **Notification:** after a run with suggestions, a banner shows "N suggestions ready" (also while the app is frontmost); clicking it opens the review panel. No email text appears in it. If notifications were skipped in onboarding, the first post asks for permission.
+3. **Morning run fires once:** set the run time a few minutes ahead, wait (up to about 15 to 20 minutes with the scheduler tolerance); the Daily job starts by itself.
+4. **No repeat the same day,** including an empty run (no new mail, no digest): leave the app running past two more checks and confirm no second job (Past jobs are not in the UI yet; watch Console, subsystem `dev.pages.justinwang.maildigest`, "daily run starting").
+5. **Retry after Ollama down:** quit Ollama before the run time; the banner shows the fix and no notification appears; start Ollama; the next check (within about 15 minutes) runs. A job stopped as failed (outage mid-run) also retries at the next check.
+6. **Catch up after sleep:** close the lid past the run time, open it; the run starts shortly after wake.
+7. **Launch at login:** Settings > General > Startup toggle (and the onboarding copy). Turn on, check System Settings > Login Items, log out and in. Test the "requires approval" path (remove approval in Login Items): the footer text and "Open Login Items Settings…" button appear. A debug build outside /Applications may fail to register; the error shows inline.
+8. **Optional wake for an early run** (not automated; may be mentioned in the README, none exists yet): `sudo pmset repeat wakeorpoweron MTWRFSU 06:25:00` wakes the Mac a few minutes before a 6:30 run.
+
+**Notes:**
+
+- The run time is interpreted in Australia/Brisbane (the runner's default zone), as in core.
+- Retention cleanup (`RetentionPolicy` plus the store's delete) is still not scheduled. It was mentioned under T12 as "belongs to T15" but is not part of the T15 task row; decide where it goes.
+- Sandbox is off, so `NSBackgroundActivityScheduler` is not throttled by App Nap rules beyond its normal tolerance; confirm in practice that the 15-minute checks fire while the app is idle.

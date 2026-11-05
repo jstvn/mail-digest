@@ -3,7 +3,7 @@ import Foundation
 /// The user's settings that exist today. Stored as one JSON blob by the app; every field has the spec's
 /// default, and missing keys in older blobs fall back to it.
 public struct DigestSettings: Codable, Sendable, Equatable {
-    /// Local time of day for the scheduled Daily run (stored now; the scheduler arrives in T15).
+    /// Local time of day for the scheduled Daily run (read by the morning scheduler).
     public var runHour: Int
     public var runMinute: Int
     /// Daily jobs never look further back than this many hours.

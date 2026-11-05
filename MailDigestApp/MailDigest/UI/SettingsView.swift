@@ -1,7 +1,7 @@
 import MailDigestCore
 import SwiftUI
 
-/// Settings window. Everything here is stored now; `docs/MAC_TODO.md` lists which settings take effect when.
+/// Settings window. `docs/MAC_TODO.md` lists which settings take effect when.
 struct SettingsView: View {
     let run: DigestRunModel
 
@@ -29,7 +29,7 @@ private struct GeneralSettingsTab: View {
         @Bindable var store = store
         Form {
             Section("Daily digest") {
-                DatePicker("Run at", selection: runTime, displayedComponents: .hourAndMinute)
+                DatePicker("Run at", selection: $store.runTime, displayedComponents: .hourAndMinute)
                 Stepper(value: $store.settings.lookbackHours, in: 12...336, step: 12) {
                     LabeledContent("Look back", value: "\(store.settings.lookbackHours) hours")
                 }
@@ -40,6 +40,9 @@ private struct GeneralSettingsTab: View {
                         LabeledContent("Newest emails per run", value: "\(limit)")
                     }
                 }
+            }
+            Section("Startup") {
+                LaunchAtLoginToggle()
             }
             Section("History") {
                 Picker("Keep history for", selection: $store.settings.retention) {
@@ -52,20 +55,6 @@ private struct GeneralSettingsTab: View {
             MailboxesSection(run: run)
         }
         .formStyle(.grouped)
-    }
-
-    /// The scheduler arrives later; the time is only stored for now.
-    private var runTime: Binding<Date> {
-        Binding(
-            get: {
-                Calendar.current.date(bySettingHour: run.settings.settings.runHour,
-                                      minute: run.settings.settings.runMinute, second: 0, of: .now) ?? .now
-            },
-            set: {
-                let parts = Calendar.current.dateComponents([.hour, .minute], from: $0)
-                run.settings.settings.runHour = parts.hour ?? 6
-                run.settings.settings.runMinute = parts.minute ?? 30
-            })
     }
 
     private var limitEnabled: Binding<Bool> {

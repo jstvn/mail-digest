@@ -23,6 +23,19 @@ final class SettingsStore {
         }
     }
 
+    /// The daily run time as a date today, for an hour-and-minute `DatePicker`. Only the hour and minute
+    /// are stored; the scheduler reads them as wall-clock time in the runner's time zone.
+    var runTime: Date {
+        get {
+            Calendar.current.date(bySettingHour: settings.runHour, minute: settings.runMinute, second: 0, of: .now) ?? .now
+        }
+        set {
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+            settings.runHour = parts.hour ?? 6
+            settings.runMinute = parts.minute ?? 30
+        }
+    }
+
     private func save() {
         if let data = try? JSONEncoder().encode(settings) { defaults.set(data, forKey: Self.key) }
     }
