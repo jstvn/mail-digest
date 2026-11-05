@@ -29,6 +29,17 @@ import Testing
         #expect(partial.runHour == 8 && partial.runMinute == 30 && partial.ollamaModel == "qwen3:4b")
     }
 
+    @Test func olderSavedSettingsDecodeWithoutDeclinedSuggestions() throws {
+        // A blob saved before T16 has no `declinedIgnoreSuggestions` key but keeps every other value.
+        let old = #"{"runHour":7,"ignoredSenders":["a@b.com"],"vipSenders":["v@b.com"]}"#
+        let s = try JSONDecoder().decode(DigestSettings.self, from: Data(old.utf8))
+        #expect(s.declinedIgnoreSuggestions.isEmpty && s.runHour == 7 && s.ignoredSenders == ["a@b.com"])
+        var withDeclined = s
+        withDeclined.declinedIgnoreSuggestions = ["x@y.com"]
+        let round = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(withDeclined))
+        #expect(round.declinedIgnoreSuggestions == ["x@y.com"])
+    }
+
     @Test func mapsIntoRunnerSettings() {
         var s = DigestSettings()
         s.lookbackHours = 24; s.maxEmailsPerRun = 50

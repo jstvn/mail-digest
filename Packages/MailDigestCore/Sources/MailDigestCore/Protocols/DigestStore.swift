@@ -30,6 +30,16 @@ public protocol DigestStore: Sendable {
     func recentSuggestions(since: Date) async throws -> [Suggestion]
     /// Replaces a suggestion by id inside whichever digest holds it.
     func update(_ suggestion: Suggestion) async throws
+    /// Every retained digest, for the daily retention cleanup.
+    func retainedDigests() async throws -> [Digest]
+
+    // MARK: Pinned info
+
+    /// Sets the pinned flag of one email's info item and nothing else (no digest rewrite). A digest or
+    /// email without an info item is ignored.
+    func setPinned(_ pinned: Bool, infoID: String, digestID: UUID) async throws
+    /// Every pinned info item across retained digests, newest digest first, with its owning digest.
+    func pinnedInfo() async throws -> [PinnedInfo]
 
     // MARK: Retention
 

@@ -251,6 +251,41 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         }
     }
 
+    public func retainedDigests() async throws -> [Digest] {
+        try await writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT * FROM digest ORDER BY created_at, rowid").map { try Self.aggregate(db, $0) }
+        }
+    }
+
+    // MARK: Pinned info
+
+    public func setPinned(_ pinned: Bool, infoID: String, digestID: UUID) async throws {
+        try await writer.write { db in
+            // Info ids equal email ids, so the result row is addressed directly; only its info payload changes.
+            guard let text = try String.fetchOne(
+                db, sql: "SELECT info FROM digest_email_result WHERE digest_id = ? AND email_id = ? AND info IS NOT NULL",
+                arguments: [digestID.uuidString, infoID]) else { return }
+            var item = try JSON.decode(InfoItem.self, text)
+            item.pinned = pinned
+            try db.execute(sql: "UPDATE digest_email_result SET info = ? WHERE digest_id = ? AND email_id = ?",
+                           arguments: [try JSON.encode(item), digestID.uuidString, infoID])
+        }
+    }
+
+    public func pinnedInfo() async throws -> [PinnedInfo] {
+        try await writer.read { db in
+            // The LIKE narrows the scan cheaply; decoding then decides exactly (sorted-key JSON writes `"pinned":true`).
+            try Row.fetchAll(db, sql: """
+                SELECT r.digest_id, r.info, d.created_at FROM digest_email_result r JOIN digest d ON d.id = r.digest_id
+                WHERE r.info LIKE '%"pinned":true%' ORDER BY d.created_at DESC, d.rowid DESC, r.ordinal
+                """).compactMap { row -> PinnedInfo? in
+                    let item = try JSON.decode(InfoItem.self, row["info"] as String)
+                    guard item.pinned, let id = UUID(uuidString: row["digest_id"]) else { return nil }
+                    return PinnedInfo(item: item, digestID: id, digestCreatedAt: Date(timeIntervalSince1970: row["created_at"]))
+                }
+        }
+    }
+
     // MARK: Retention
 
     public func apply(_ plan: RetentionPlan) async throws {

@@ -13,6 +13,12 @@ enum ReviewPanelState: Equatable {
     case digest
 }
 
+/// Where an info card's "Save to Notes" stands.
+enum NotesSaveState: Equatable {
+    case idle, saving, saved
+    case failed(String)
+}
+
 /// Owns the digest being reviewed and the user's selection. Store work happens off the main actor;
 /// the pure decisions live in `ReviewActions` and `ReviewPresentation` (core).
 @MainActor @Observable
@@ -29,6 +35,15 @@ final class ReviewViewModel {
     var showAllSuggestions = false
     /// Nil unless Reminders access is fully granted; "Add selected" stays disabled until then.
     private(set) var reminderWriter: (any ReminderWriter)?
+    /// Pinned info from earlier digests, newest first; the current digest's own pins stay in its categories.
+    private(set) var carriedPins: [PinnedInfo] = []
+    /// "Save to Notes" progress per info id.
+    private(set) var notesStates: [String: NotesSaveState] = [:]
+    /// A sender the user keeps dismissing, offered as an Ignored sender. One at a time.
+    private(set) var ignoreSuggestion: IgnoreSuggestion?
+    /// Set by `DigestRunModel`; the ignore-rule notice reads and writes the sender lists here.
+    @ObservationIgnored var settingsStore: SettingsStore?
+    @ObservationIgnored var notesWriter: any NotesWriter = AppleScriptNotesWriter()
 
     @ObservationIgnored private var store: (any DigestStore)?
     @ObservationIgnored private let clock = SystemClock()
@@ -36,6 +51,10 @@ final class ReviewViewModel {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var isReloading = false
     @ObservationIgnored private var needsReload = false
+    /// Addresses the user chose "Not Now" for; forgotten at relaunch.
+    @ObservationIgnored private var snoozedSenders: Set<String> = []
+    /// The digest whose senders were last checked for ignore suggestions on load.
+    @ObservationIgnored private var evaluatedDigestID: UUID?
     @ObservationIgnored var listName: @MainActor () -> String = { DigestSettings.defaultListName }
     static let listIDKey = "remindersListID"
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "review")
@@ -44,7 +63,11 @@ final class ReviewViewModel {
 
     /// Previews and tests: shows a fixed state without a store.
     init(preview state: ReviewState?, emails: [String: EmailContext] = [:], jobKind: JobKind = .daily,
-         writer: (any ReminderWriter)? = nil) {
+         writer: (any ReminderWriter)? = nil, carriedPins: [PinnedInfo] = [],
+         ignoreSuggestion: IgnoreSuggestion? = nil) {
+        self.carriedPins = carriedPins
+        self.ignoreSuggestion = ignoreSuggestion
+        self.notesWriter = RecordingNotesWriter()
         self.state = state
         self.emails = emails
         self.jobKind = jobKind
@@ -104,11 +127,18 @@ final class ReviewViewModel {
                 if let latest {
                     let ids = Set(latest.info.map(\.emailID) + latest.suggestions.map(\.emailID))
                     if !ids.isSubset(of: context.keys) {
-                        let items = try await store.items(job: latest.id)
-                        context = Dictionary(items.map { ($0.messageID, EmailContext(sender: $0.sender, subject: $0.subject, mailbox: $0.mailbox)) },
-                                             uniquingKeysWith: { first, _ in first })
+                        Self.merge(try await store.items(job: latest.id), into: &context)
                     }
                     if let job = try await store.jobs().first(where: { $0.id == latest.id }) { kind = job.kind }
+                }
+                // Pins from other digests; an email already in the current digest shows there instead.
+                let currentEmails = Set(latest?.info.map(\.emailID) ?? [])
+                let carried = try await store.pinnedInfo().filter {
+                    $0.digestID != latest?.id && !currentEmails.contains($0.item.emailID)
+                }
+                // Sender and subject for carried items come from their own job's items (Q18).
+                for digestID in Set(carried.filter({ context[$0.item.emailID] == nil }).map(\.digestID)) {
+                    Self.merge(try await store.items(job: digestID), into: &context)
                 }
                 guard startedAt == generation else { needsReload = true; continue }
                 if let latest {
@@ -118,14 +148,26 @@ final class ReviewViewModel {
                     state = nil
                 }
                 emails = context
+                carriedPins = carried
                 jobKind = kind
                 isLoaded = true
+                if let latest, evaluatedDigestID != latest.id {
+                    evaluatedDigestID = latest.id
+                    await evaluateIgnoreSuggestions(senders: Set(latest.suggestions.compactMap { context[$0.emailID]?.sender }))
+                }
             } catch {
                 Self.log.error("could not load digest: \(String(describing: error), privacy: .public)")
                 message = "Could not load the latest digest."
                 isLoaded = true
             }
         } while needsReload
+    }
+
+    /// Adds job items' sender/subject/mailbox to the lookup; the first item for an email wins.
+    private static func merge(_ items: [JobItem], into context: inout [String: EmailContext]) {
+        for item in items where context[item.messageID] == nil {
+            context[item.messageID] = EmailContext(sender: item.sender, subject: item.subject, mailbox: item.mailbox)
+        }
     }
 
     // MARK: Selection
@@ -196,6 +238,7 @@ final class ReviewViewModel {
         do {
             apply(try await ReviewActions.dismiss(suggestions, state: state, emails: emails, store: store, clock: clock))
             message = nil
+            await evaluateIgnoreSuggestions(senders: Set(suggestions.compactMap { emails[$0.emailID]?.sender }))
         } catch {
             message = "Could not dismiss those suggestions."
             await reload()
@@ -206,5 +249,112 @@ final class ReviewViewModel {
         guard let current = state else { return }
         state = ReviewActions.merge(outcome.results, into: current)
         generation += 1
+    }
+
+    // MARK: Pinned info and Notes
+
+    /// Pins or unpins one info item and saves it. Unpinning an item carried over from an older digest removes it
+    /// from the panel.
+    func setPinned(_ pinned: Bool, item: InfoItem) async {
+        guard let store, let digestID = owningDigestID(of: item) else { return }
+        generation += 1
+        do {
+            try await store.setPinned(pinned, infoID: item.id, digestID: digestID)
+        } catch {
+            Self.log.error("could not save pin: \(String(describing: error), privacy: .public)")
+            message = "Could not save the pin."
+            return
+        }
+        generation += 1
+        if state?.digest.id == digestID, let i = state?.digest.info.firstIndex(where: { $0.id == item.id }) {
+            state?.digest.info[i].pinned = pinned
+        } else if let i = carriedPins.firstIndex(where: { $0.digestID == digestID && $0.item.id == item.id }) {
+            if pinned { carriedPins[i].item.pinned = true } else { carriedPins.remove(at: i) }
+        }
+        message = nil
+    }
+
+    private func owningDigestID(of item: InfoItem) -> UUID? {
+        if let state, state.digest.info.contains(where: { $0.id == item.id }) { return state.digest.id }
+        return carriedPins.first { $0.item.id == item.id }?.digestID
+    }
+
+    /// "Save to Notes": runs only from a click. Logs success or failure, never the text.
+    func saveToNotes(_ item: InfoItem) async {
+        guard notesStates[item.id] != .saving else { return }
+        let date: Date
+        if let state, state.digest.info.contains(where: { $0.id == item.id }) {
+            date = state.digest.createdAt
+        } else {
+            date = carriedPins.first { $0.item.id == item.id }?.digestCreatedAt ?? clock.now()
+        }
+        let entry = NotesEntry.make(for: item, email: emails[item.emailID], date: date)
+        notesStates[item.id] = .saving
+        do {
+            try await notesWriter.append(entry)
+            Self.log.notice("save to notes: succeeded")
+            notesStates[item.id] = .saved
+            try? await Task.sleep(for: .seconds(3))
+            if notesStates[item.id] == .saved { notesStates[item.id] = nil }
+        } catch {
+            Self.log.error("save to notes: failed")
+            notesStates[item.id] = .failed(Self.notesMessage(for: error))
+        }
+    }
+
+    private static func notesMessage(for error: Error) -> String {
+        switch error as? OsascriptError {
+        case .automationDenied:
+            return "Notes access is turned off. Allow Mail Digest to control Notes in System Settings > Privacy & Security > Automation."
+        case .timedOut:
+            return "Notes did not respond. Try again."
+        default:
+            return "Could not save to Notes."
+        }
+    }
+
+    // MARK: Learned ignore rules
+
+    /// Checks these senders' dismissals and shows the first match, unless a notice is already showing.
+    private func evaluateIgnoreSuggestions(senders: Set<String>) async {
+        guard let store, let settings = settingsStore?.settings, ignoreSuggestion == nil else { return }
+        for sender in Set(senders.map(MailFilter.address(from:))).subtracting(snoozedSenders).sorted() {
+            guard let decisions = try? await store.decisions(for: sender),
+                  let found = IgnoreRuleSuggester.suggestion(for: sender, decisions: decisions, settings: settings)
+            else { continue }
+            ignoreSuggestion = found
+            return
+        }
+    }
+
+    /// A name for the suggested sender: the display name when this digest knows one, otherwise the address.
+    var ignoreSuggestionName: String? {
+        guard let suggestion = ignoreSuggestion else { return nil }
+        let match = emails.values.first { MailFilter.address(from: $0.sender) == suggestion.sender }
+        return match.map { ReviewPresentation.senderName($0.sender) } ?? suggestion.sender
+    }
+
+    /// "Ignore Sender": the only path that adds to the Ignored list.
+    func acceptIgnoreSuggestion() {
+        guard let suggestion = ignoreSuggestion, let store = settingsStore else { return }
+        if !store.settings.ignoredSenders.contains(where: { MailFilter.address(from: $0) == suggestion.sender }) {
+            store.settings.ignoredSenders.append(suggestion.sender)
+        }
+        ignoreSuggestion = nil
+    }
+
+    /// "Not Now": hides the notice until the app is relaunched.
+    func snoozeIgnoreSuggestion() {
+        if let suggestion = ignoreSuggestion { snoozedSenders.insert(suggestion.sender) }
+        ignoreSuggestion = nil
+    }
+
+    /// "Don't Ask Again": remembers the sender so it is never suggested again.
+    func declineIgnoreSuggestion() {
+        guard let suggestion = ignoreSuggestion, let store = settingsStore else { return }
+        if !store.settings.declinedIgnoreSuggestions.contains(suggestion.sender) {
+            store.settings.declinedIgnoreSuggestions.append(suggestion.sender)
+        }
+        ignoreSuggestion = nil
     }
 }

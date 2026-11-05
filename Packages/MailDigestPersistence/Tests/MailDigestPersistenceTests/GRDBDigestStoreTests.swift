@@ -339,4 +339,47 @@ import MailDigestCore
         let applied = try await reopened.writer.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations") }
         #expect(applied == ["v1"])
     }
+
+    // MARK: Pinned info
+
+    @Test func pinRoundTripsAndOnlyTouchesTheInfoPayload() async throws {
+        let store = try GRDBDigestStore.inMemory()
+        let old = makeDigest(at: t0.addingTimeInterval(-86_400), headline: "old"), new = makeDigest(at: t0, headline: "new")
+        try await store.save(old)
+        try await store.save(new)
+        let s = makeSuggestion("a")
+        try await store.appendEmailResult(EmailResult(emailID: "a", info: makeInfo("a"), suggestions: [s]), to: old.id)
+        try await store.appendEmailResult(EmailResult(emailID: "b", info: makeInfo("b")), to: new.id)
+        try await store.appendEmailResult(EmailResult(emailID: "c", info: makeInfo("c", pinned: true)), to: new.id)
+
+        try await store.setPinned(true, infoID: "a", digestID: old.id)
+        let pinned = try await store.pinnedInfo()
+        #expect(pinned.map(\.item.emailID) == ["c", "a"])
+        #expect(pinned.map(\.digestID) == [new.id, old.id])
+        #expect(pinned.last?.digestCreatedAt == old.createdAt && pinned.last?.item.pinned == true)
+        // Suggestions and ordering of the result are untouched.
+        #expect(try await store.digest(id: old.id)?.suggestions == [s])
+
+        try await store.setPinned(false, infoID: "a", digestID: old.id)
+        try await store.setPinned(true, infoID: "missing", digestID: old.id)
+        try await store.setPinned(true, infoID: "a", digestID: UUID())
+        #expect(try await store.pinnedInfo().map(\.item.emailID) == ["c"])
+        #expect(try await store.retainedDigests().map(\.headline) == ["old", "new"])
+    }
+
+    @Test func pinSurvivesReopen() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanUp() }
+        let d = makeDigest()
+        do {
+            let store = try GRDBDigestStore(path: dir.databasePath)
+            try await store.save(d)
+            try await store.appendEmailResult(EmailResult(emailID: "a", info: makeInfo("a")), to: d.id)
+            try await store.setPinned(true, infoID: "a", digestID: d.id)
+        }
+        let reopened = try GRDBDigestStore(path: dir.databasePath)
+        #expect(try await reopened.pinnedInfo().map(\.item.emailID) == ["a"])
+        try await reopened.setPinned(false, infoID: "a", digestID: d.id)
+        #expect(try await GRDBDigestStore(path: dir.databasePath).pinnedInfo().isEmpty)
+    }
 }

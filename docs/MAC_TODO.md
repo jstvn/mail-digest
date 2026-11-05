@@ -169,5 +169,25 @@ Please check on the Mac:
 **Notes:**
 
 - The run time is interpreted in Australia/Brisbane (the runner's default zone), as in core.
-- Retention cleanup (`RetentionPolicy` plus the store's delete) is still not scheduled. It was mentioned under T12 as "belongs to T15" but is not part of the T15 task row; decide where it goes.
+- Retention cleanup was not scheduled in T15; T16 wires it (see T16 status).
 - Sandbox is off, so `NSBackgroundActivityScheduler` is not throttled by App Nap rules beyond its normal tolerance; confirm in practice that the 15-minute checks fire while the app is idle.
+
+## T16 status
+
+Built: persistent pin/unpin (`DigestStore.setPinned` / `pinnedInfo`, tested on `InMemoryDigestStore` and `GRDBDigestStore` incl. reopen), a "Pinned" group at the top of Info for pins from earlier digests, Save to Notes (`NotesWriter` protocol, `NotesEntry` formatter, `AppleScriptNotesWriter` + `Resources/SaveToNotes.js`), learned ignore-rule suggestions (`IgnoreRuleSuggester`, `declinedIgnoreSuggestions` setting), and the daily retention cleanup. `xcodebuild` build passes and `SaveToNotes.js` is in the built app's Resources; the script compiles with `osacompile` but has never been run against real Notes.
+
+Please check on the Mac:
+
+1. **Save to Notes:** click the note button on an info card. The first time, macOS asks to let Mail Digest control Notes. Note: `NSAppleEventsUsageDescription` in Info.plist mentions only Mail; check the Notes prompt wording reads acceptably (not changed). A note named "Mail Digest" is created in the default account's default folder with the entry (bold date, sender and subject line, summary, key-fact bullets); a second click appends below it instead of creating another note. The button shows progress, then a checkmark for about 3 seconds.
+2. **Escaping:** use an email whose summary or facts contain `<b>`, `&`, quotes and line breaks (or edit a stored summary); Notes must show them as literal text, not formatting.
+3. **Notes denied:** turn Notes off for Mail Digest in Privacy & Security > Automation, click Save to Notes: the inline red message points to Privacy & Security > Automation. Turn it on again and retry.
+4. **Deleted note:** move the "Mail Digest" note to Recently Deleted and save again: a new note is created (the script skips Recently Deleted).
+5. **Pin:** pin an info card (filled pin, VoiceOver says "Unpin"). Quit and relaunch: still pinned. Run a later digest (or open the panel after one): the item shows under "Pinned" at the top of Info with its sender, subject and working open-in-Mail arrow. Unpin it there: it disappears from the panel and stays gone after relaunch.
+6. **Retention keeps pins:** set "Keep history for" to 30 days with a pinned item from a digest older than that and an unpinned old digest; after the cleanup runs, the pinned item is still there and the unpinned digest is gone.
+7. **Daily cleanup runs:** it runs at launch, at each 15-minute scheduler check and after wake, but at most once per 24 hours (key `lastRetentionCleanup` in the app's defaults; `defaults delete dev.pages.justinwang.maildigest lastRetentionCleanup` to force it) and never while a run is active. Console, subsystem `dev.pages.justinwang.maildigest`, message "history cleanup: digests=N jobs=N".
+8. **Ignore suggestion:** dismiss five suggestions from one sender (across any number of digests). After the fifth dismissal an inline notice appears: "You've dismissed 5 suggestions from <sender>. Ignore this sender in future digests?" Ignore Sender adds the address to Settings > Senders > Ignored senders and hides the notice. Not Now hides it until relaunch. Don't Ask Again hides it and it does not return for that sender, including after relaunch. No sender is ever ignored without the click. VIP, Blocked and already Ignored senders never trigger it.
+
+**Notes:**
+
+- "Delete all history now" is in the spec but not in Settings yet; `RetentionPolicy.deleteAllPlan` exists in core. Not added in T16 (out of scope).
+- Only dismissals count toward the suggestion; whether approvals should reset the count is an open question in `docs/QUESTIONS.md`.

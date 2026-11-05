@@ -64,6 +64,8 @@ public actor InMemoryDigestStore: DigestStore {
         Digest(id: row.id, createdAt: row.createdAt, headline: row.headline, results: resultsByDigest[row.id] ?? [])
     }
 
+    public func retainedDigests() async throws -> [Digest] { digestRows.map(aggregate) }
+
     public func recentSuggestions(since: Date) async throws -> [Suggestion] {
         digestRows.filter { $0.createdAt >= since }.flatMap { resultsByDigest[$0.id] ?? [] }.flatMap(\.suggestions)
     }
@@ -76,6 +78,18 @@ public actor InMemoryDigestStore: DigestStore {
                     return
                 }
             }
+        }
+    }
+
+    public func setPinned(_ pinned: Bool, infoID: String, digestID: UUID) async throws {
+        guard let i = resultsByDigest[digestID]?.firstIndex(where: { $0.info?.id == infoID }) else { return }
+        resultsByDigest[digestID]?[i].info?.pinned = pinned
+    }
+
+    public func pinnedInfo() async throws -> [PinnedInfo] {
+        digestRows.sorted { $0.createdAt > $1.createdAt }.flatMap { row in
+            (resultsByDigest[row.id] ?? []).compactMap(\.info).filter(\.pinned)
+                .map { PinnedInfo(item: $0, digestID: row.id, digestCreatedAt: row.createdAt) }
         }
     }
 
@@ -191,10 +205,11 @@ public actor InMemoryDigestStore: DigestStore {
 
     // MARK: Test helpers
 
+    /// Every saved digest, in insertion order, rebuilt from its results.
+    public func allDigests() -> [Digest] { digestRows.map(aggregate) }
+
     /// Every queue item across jobs, in insertion order.
     public func allItems() -> [JobItem] { itemList }
     /// Ids marked processed.
     public func processedIDs() -> Set<String> { Set(processed.keys) }
-    /// Every saved digest, in insertion order, rebuilt from its results.
-    public func allDigests() -> [Digest] { digestRows.map(aggregate) }
 }

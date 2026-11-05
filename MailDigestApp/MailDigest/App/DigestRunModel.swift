@@ -55,6 +55,7 @@ final class DigestRunModel {
         self.reminders = RemindersAccessModel()
         reminders.attach(review: review)
         review.listName = { [settings] in settings.settings.resolvedListName }
+        review.settingsStore = settings
     }
 
     /// Previews: fixed run state, no store or Mail access.
@@ -156,8 +157,36 @@ final class DigestRunModel {
         guard !isRunning, activeProgress == nil, let store = await openStore() else { return }
         guard let jobs = try? await store.jobs() else { return }
         let s = settings.settings
-        guard MorningSchedule.isDue(now: clock.now(), hour: s.runHour, minute: s.runMinute, jobs: jobs) else { return }
+        guard MorningSchedule.isDue(now: clock.now(), hour: s.runHour, minute: s.runMinute, jobs: jobs) else {
+            await cleanUpHistoryIfDue()
+            return
+        }
         await runDaily(trigger: .scheduled)
+        await cleanUpHistoryIfDue()
+    }
+
+    private static let lastCleanupKey = "lastRetentionCleanup"
+
+    /// The daily retention cleanup: at most once a day, never while a job is running. A job or digest created
+    /// after the plan is built is not in the plan, so a run starting meanwhile is safe. Pinned digests keep
+    /// their jobs (Q21); processed ids and decisions are never touched.
+    func cleanUpHistoryIfDue() async {
+        let defaults = UserDefaults.standard
+        let now = clock.now()
+        if let last = defaults.object(forKey: Self.lastCleanupKey) as? Date, now.timeIntervalSince(last) < 86_400 { return }
+        guard !isRunning, activeProgress == nil, let store = await openStore() else { return }
+        do {
+            let plan = RetentionPolicy().plan(retention: settings.settings.retention, now: now,
+                                              digests: try await store.retainedDigests(), jobs: try await store.jobs())
+            if !plan.digestIDs.isEmpty || !plan.jobIDs.isEmpty {
+                try await store.apply(plan)
+                await review.reload()
+            }
+            defaults.set(now, forKey: Self.lastCleanupKey)
+            Self.log.notice("history cleanup: digests=\(plan.digestIDs.count, privacy: .public) jobs=\(plan.jobIDs.count, privacy: .public)")
+        } catch {
+            Self.log.error("history cleanup failed: \(String(describing: error), privacy: .public)")
+        }
     }
 
     func runDaily(trigger: RunTrigger) async {
@@ -274,6 +303,7 @@ final class DigestRunModel {
         relevant.remindersListName = DigestSettings.defaultListName
         relevant.runHour = 6; relevant.runMinute = 30
         relevant.trustedNewsletterSenders = []
+        relevant.declinedIgnoreSuggestions = []
         let key = RunnerKey(settings: relevant, inboxes: Set(inboxes))
         if let runner, key == runnerKey { return runner }
         progressTask?.cancel()

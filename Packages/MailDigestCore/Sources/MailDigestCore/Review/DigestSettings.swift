@@ -18,6 +18,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public var blockedSenders: [String]
     public var ignoredSenders: [String]
     public var trustedNewsletterSenders: [String]
+    /// Senders the user told the app not to suggest ignoring again (normalised addresses).
+    public var declinedIgnoreSuggestions: [String]
     /// Daily mailboxes. Empty means all inboxes.
     public var dailyMailboxes: [MailboxRef]
 
@@ -30,7 +32,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 remindersListName: String = DigestSettings.defaultListName,
                 retention: HistoryRetention = .default, vipSenders: [String] = [], blockedSenders: [String] = [],
                 ignoredSenders: [String] = [], trustedNewsletterSenders: [String] = [],
-                dailyMailboxes: [MailboxRef] = []) {
+                declinedIgnoreSuggestions: [String] = [], dailyMailboxes: [MailboxRef] = []) {
         self.runHour = runHour
         self.runMinute = runMinute
         self.lookbackHours = lookbackHours
@@ -43,12 +45,14 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         self.blockedSenders = blockedSenders
         self.ignoredSenders = ignoredSenders
         self.trustedNewsletterSenders = trustedNewsletterSenders
+        self.declinedIgnoreSuggestions = declinedIgnoreSuggestions
         self.dailyMailboxes = dailyMailboxes
     }
 
     private enum CodingKeys: String, CodingKey {
         case runHour, runMinute, lookbackHours, maxEmailsPerRun, ollamaURL, ollamaModel, remindersListName
-        case retention, vipSenders, blockedSenders, ignoredSenders, trustedNewsletterSenders, dailyMailboxes
+        case retention, vipSenders, blockedSenders, ignoredSenders, trustedNewsletterSenders, declinedIgnoreSuggestions
+        case dailyMailboxes
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
@@ -67,6 +71,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   blockedSenders: try c.decodeIfPresent([String].self, forKey: .blockedSenders) ?? [],
                   ignoredSenders: try c.decodeIfPresent([String].self, forKey: .ignoredSenders) ?? [],
                   trustedNewsletterSenders: try c.decodeIfPresent([String].self, forKey: .trustedNewsletterSenders) ?? [],
+                  declinedIgnoreSuggestions: try c.decodeIfPresent([String].self, forKey: .declinedIgnoreSuggestions) ?? [],
                   dailyMailboxes: try c.decodeIfPresent([MailboxRef].self, forKey: .dailyMailboxes) ?? [])
     }
 

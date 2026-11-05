@@ -80,4 +80,31 @@ private func job(age: TimeInterval, state: JobState = .finished) -> Job {
         #expect(await store.processedIDs() == ["m1"])
         #expect(try await store.decisions(for: "a@b.c").count == 1)
     }
+
+    @Test func pinnedItemKeepsDigestAndJobWhileUnpinnedExpiredOneIsDeleted() async throws {
+        let store = InMemoryDigestStore()
+        let pinned = digest(age: 400 * day), plain = digest(age: 400 * day)
+        let pinnedJob = Job(id: pinned.id, kind: .daily, mailboxes: [], scopeFrom: now, scopeTo: now, state: .finished,
+                            createdAt: pinned.createdAt, totals: JobTotals(queued: 0, done: 0, failed: 0, skipped: 0),
+                            autoPaused: false)
+        var plainJob = pinnedJob
+        plainJob.id = plain.id
+        try await store.save(pinned)
+        try await store.save(plain)
+        try await store.setPinned(true, infoID: "e", digestID: pinned.id)
+
+        // The pin is made through the store, as the panel does, and retention reads it back from there.
+        let plan = policy.plan(retention: .thirtyDays, now: now, digests: try await store.retainedDigests(),
+                               jobs: [pinnedJob, plainJob])
+        #expect(plan.digestIDs == [plain.id] && plan.jobIDs == [plain.id])
+        try await store.apply(plan)
+        #expect(try await store.pinnedInfo().map(\.digestID) == [pinned.id])
+        #expect(try await store.digest(id: plain.id) == nil)
+
+        // Unpinning makes the old digest expire at the next cleanup.
+        try await store.setPinned(false, infoID: "e", digestID: pinned.id)
+        let later = policy.plan(retention: .thirtyDays, now: now, digests: try await store.retainedDigests(),
+                                jobs: [pinnedJob])
+        #expect(later.digestIDs == [pinned.id] && later.jobIDs == [pinned.id])
+    }
 }

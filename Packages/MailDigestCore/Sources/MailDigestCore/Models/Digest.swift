@@ -158,6 +158,20 @@ extension Digest {
     }
 }
 
+/// A pinned info item with the digest that owns it. The digest id is also the id of the job whose items
+/// supply the item's sender and subject (Q18).
+public struct PinnedInfo: Sendable, Equatable {
+    public var item: InfoItem
+    public var digestID: UUID
+    public var digestCreatedAt: Date
+
+    public init(item: InfoItem, digestID: UUID, digestCreatedAt: Date) {
+        self.item = item
+        self.digestID = digestID
+        self.digestCreatedAt = digestCreatedAt
+    }
+}
+
 /// Failures every `DigestStore` reports the same way.
 public enum DigestStoreError: Error, Sendable, Equatable {
     /// A result was appended to a digest that was never saved.

@@ -15,6 +15,7 @@ struct ReviewPanelView: View {
     @FocusState private var focusedID: UUID?
     @State private var collapsedGroups: Set<Category> = [.newsletters]
     @State private var skippedExpanded = false
+    @State private var pinnedExpanded = true
 
     /// What the body shows, derived so previews and tests can reason about each state.
     private var panelState: ReviewPanelState {
@@ -46,6 +47,12 @@ struct ReviewPanelView: View {
                     if let message = review.message {
                         Label(message, systemImage: "exclamationmark.circle")
                             .foregroundStyle(.red)
+                    }
+                    if let suggestion = review.ignoreSuggestion {
+                        IgnoreSuggestionNotice(suggestion: suggestion, name: review.ignoreSuggestionName ?? suggestion.sender,
+                                               onIgnore: review.acceptIgnoreSuggestion,
+                                               onNotNow: review.snoozeIgnoreSuggestion,
+                                               onDecline: review.declineIgnoreSuggestion)
                     }
                     content
                 }
@@ -204,10 +211,20 @@ struct ReviewPanelView: View {
 
     private var infoSection: some View {
         let groups = ReviewPresentation.infoGroups(review.digest?.info ?? [])
+        let pinned = review.carriedPins.map(\.item)
         return VStack(alignment: .leading, spacing: 8) {
-            if !groups.isEmpty {
+            if !groups.isEmpty || !pinned.isEmpty {
                 Text("INFO").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     .accessibilityAddTraits(.isHeader)
+            }
+            // Pinned items from earlier digests come first, as their own group, until they are unpinned.
+            if !pinned.isEmpty {
+                DisclosureGroup(isExpanded: $pinnedExpanded) {
+                    infoCards(pinned)
+                } label: {
+                    Label("Pinned (\(pinned.count))", systemImage: "pin.fill")
+                        .font(.body.weight(.medium))
+                }
             }
             ForEach(groups) { group in
                 DisclosureGroup(isExpanded: Binding(
@@ -215,20 +232,27 @@ struct ReviewPanelView: View {
                     set: { open in
                         if open { collapsedGroups.remove(group.category) } else { collapsedGroups.insert(group.category) }
                     })) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(group.items) { item in
-                            InfoCard(item: item, email: review.emails[item.emailID],
-                                     onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: item.emailID)) })
-                            if item.id != group.items.last?.id { Divider() }
-                        }
-                    }
-                    .padding(.leading, 4)
+                    infoCards(group.items)
                 } label: {
                     Text("\(group.category.rawValue.capitalized) (\(group.items.count))")
                         .font(.body.weight(.medium))
                 }
             }
         }
+    }
+
+    private func infoCards(_ items: [InfoItem]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(items) { item in
+                InfoCard(item: item, email: review.emails[item.emailID],
+                         notesState: review.notesStates[item.id] ?? .idle,
+                         onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: item.emailID)) },
+                         onTogglePin: { Task { await review.setPinned(!item.pinned, item: item) } },
+                         onSaveToNotes: { Task { await review.saveToNotes(item) } })
+                if item.id != items.last?.id { Divider() }
+            }
+        }
+        .padding(.leading, 4)
     }
 
     // MARK: Skipped
@@ -259,6 +283,36 @@ struct ReviewPanelView: View {
         Task {
             if run.failedJobID != nil { await run.retryFailedJob() } else { await run.runNow() }
         }
+    }
+}
+
+/// An inline, non-modal offer to ignore a sender the user keeps dismissing. Nothing changes until "Ignore Sender".
+private struct IgnoreSuggestionNotice: View {
+    let suggestion: IgnoreSuggestion
+    let name: String
+    let onIgnore: () -> Void
+    let onNotNow: () -> Void
+    let onDecline: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "info.circle.fill").foregroundStyle(.blue).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("You've dismissed \(suggestion.dismissedCount) suggestions from \(name). Ignore this sender in future digests?")
+                    .fixedSize(horizontal: false, vertical: true)
+                if name != suggestion.sender {
+                    Text(suggestion.sender).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 8)
+            Button("Ignore Sender", action: onIgnore)
+            Button("Not Now", action: onNotNow)
+            Button("Don't Ask Again", action: onDecline)
+        }
+        .controlSize(.small)
+        .padding(10)
+        .background(Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .contain)
     }
 }
 
