@@ -1,0 +1,128 @@
+import Foundation
+
+/// A calendar day in the settings time zone; the unit Recent Digests groups by.
+public struct DigestDay: Sendable, Hashable, Comparable {
+    public var year: Int
+    public var month: Int
+    public var day: Int
+
+    public init(year: Int, month: Int, day: Int) {
+        self.year = year
+        self.month = month
+        self.day = day
+    }
+
+    /// The day `date` falls on in `calendar`'s time zone.
+    public init(_ date: Date, calendar: Calendar) {
+        let c = calendar.dateComponents([.year, .month, .day], from: date)
+        self.init(year: c.year ?? 0, month: c.month ?? 0, day: c.day ?? 0)
+    }
+
+    public static func < (a: DigestDay, b: DigestDay) -> Bool {
+        (a.year, a.month, a.day) < (b.year, b.month, b.day)
+    }
+}
+
+/// A calendar month, the section header of Recent Digests.
+public struct DigestMonth: Sendable, Hashable, Comparable {
+    public var year: Int
+    public var month: Int
+
+    public init(year: Int, month: Int) {
+        self.year = year
+        self.month = month
+    }
+
+    public init(_ day: DigestDay) { self.init(year: day.year, month: day.month) }
+
+    public static func < (a: DigestMonth, b: DigestMonth) -> Bool { (a.year, a.month) < (b.year, b.month) }
+}
+
+/// One Recent Digests row: every Daily run of one calendar day, merged.
+public struct ArchiveDay: Sendable, Equatable, Identifiable {
+    public var day: DigestDay
+    /// The day's Daily digests in creation order.
+    public var digestIDs: [UUID]
+    /// Summed email counts of those digests.
+    public var emailCount: Int
+    /// Pending plus failed suggestions, the sidebar badge.
+    public var actionableCount: Int
+    public var id: DigestDay { day }
+}
+
+/// A month section of Recent Digests; `days` are newest first.
+public struct ArchiveMonth: Sendable, Equatable, Identifiable {
+    public var month: DigestMonth
+    public var days: [ArchiveDay]
+    public var id: DigestMonth { month }
+}
+
+/// One Backlog entry in the sidebar.
+public struct ArchiveBacklog: Sendable, Equatable, Identifiable {
+    public var id: UUID
+    public var createdAt: Date
+    public var emailCount: Int
+    /// Pending plus failed suggestions.
+    public var actionableCount: Int
+}
+
+/// The sidebar's view of every digest (Q54 to Q56), built purely from summaries, a `now` and a calendar
+/// (whose time zone is the settings time zone) so day boundaries are testable.
+public struct DigestArchive: Sendable, Equatable {
+    /// Daily digests created today, in creation order.
+    public let todayDigestIDs: [UUID]
+    /// Start of today; Daily digests created before it are carried over into Today.
+    public let startOfToday: Date
+    /// Today's actionable badge: today's Daily digests plus unreviewed Daily digests from earlier days.
+    public let todayCount: Int
+    /// Review Queue badge: actionable suggestions in every digest, Backlog included.
+    public let reviewQueueCount: Int
+    /// Pending suggestions in every digest (not failed), for the menu bar badge.
+    public let pendingCount: Int
+    /// Days before today that have a Daily digest, grouped by month; newest first.
+    public let months: [ArchiveMonth]
+    /// Backlog digests, newest first.
+    public let backlogs: [ArchiveBacklog]
+
+    private let digestsByDay: [DigestDay: [UUID]]
+    private let today: DigestDay
+
+    public init(summaries: [DigestSummary], now: Date, calendar: Calendar) {
+        let today = DigestDay(now, calendar: calendar)
+        let start = calendar.startOfDay(for: now)
+        self.today = today
+        startOfToday = start
+
+        let dailies = summaries.filter { $0.kind == .daily }.sorted { $0.createdAt < $1.createdAt }
+        func actionable(_ s: DigestSummary) -> Int { s.pendingCount + s.failedCount }
+
+        todayDigestIDs = dailies.filter { DigestDay($0.createdAt, calendar: calendar) == today }.map(\.id)
+        todayCount = dailies
+            .filter { $0.createdAt < start || DigestDay($0.createdAt, calendar: calendar) == today }
+            .reduce(0) { $0 + actionable($1) }
+        reviewQueueCount = summaries.reduce(0) { $0 + actionable($1) }
+        pendingCount = summaries.reduce(0) { $0 + $1.pendingCount }
+
+        var byDay: [DigestDay: [DigestSummary]] = [:]
+        for s in dailies {
+            let d = DigestDay(s.createdAt, calendar: calendar)
+            if d < today { byDay[d, default: []].append(s) }
+        }
+        digestsByDay = byDay.mapValues { $0.map(\.id) }
+        let days = byDay.map { day, list in
+            ArchiveDay(day: day, digestIDs: list.map(\.id), emailCount: list.reduce(0) { $0 + $1.emailCount },
+                       actionableCount: list.reduce(0) { $0 + actionable($1) })
+        }
+        months = Dictionary(grouping: days) { DigestMonth($0.day) }
+            .map { ArchiveMonth(month: $0.key, days: $0.value.sorted { $0.day > $1.day }) }
+            .sorted { $0.month > $1.month }
+
+        backlogs = summaries.filter { $0.kind == .backlog }.sorted { $0.createdAt > $1.createdAt }
+            .map { ArchiveBacklog(id: $0.id, createdAt: $0.createdAt, emailCount: $0.emailCount, actionableCount: actionable($0)) }
+    }
+
+    /// The Daily digests of an earlier day, in creation order; empty for today or a day without a digest.
+    public func digestIDs(for day: DigestDay) -> [UUID] {
+        day < today ? digestsByDay[day] ?? [] : []
+    }
+}

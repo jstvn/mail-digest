@@ -118,7 +118,13 @@ public enum ReviewActions {
             throw ReviewError.unknownSuggestion
         }
         var s = state
-        var sug = s.digest.suggestions[index]
+        s.digest.suggestions[index] = try applying(edit, to: s.digest.suggestions[index])
+        return s
+    }
+
+    /// The edited copy of one suggestion; the single implementation behind `apply` and `edit(_:record:store:)`.
+    public static func applying(_ edit: SuggestionEdit, to suggestion: Suggestion) throws -> Suggestion {
+        var sug = suggestion
         guard sug.status == .pending || sug.status == .failed else { throw ReviewError.notEditable }
 
         if let title = edit.title {
@@ -141,8 +147,18 @@ public enum ReviewActions {
         }
         if let priority = edit.priority { sug.priority = priority }
         if let category = edit.category { sug.category = category }
-        s.digest.suggestions[index] = sug
-        return s
+        return sug
+    }
+
+    /// Cross-digest edit: validates like `apply`, persists the whole suggestion and returns the updated record
+    /// (its category follows an edited category). Nothing is written when the edit is invalid.
+    public static func edit(_ edit: SuggestionEdit, record: SuggestionRecord, store: DigestStore) async throws -> SuggestionRecord {
+        let sug = try applying(edit, to: record.suggestion)
+        try await store.update(sug)
+        var out = record
+        out.suggestion = sug
+        if let c = sug.category { out.category = c }
+        return out
     }
 
     /// Applies an edit and persists the whole edited suggestion (Q19), so title, date, priority and
@@ -158,8 +174,13 @@ public enum ReviewActions {
 
     /// The suggestion's own category, else the email's InfoItem category (older records), else `.other`.
     public static func category(for suggestion: Suggestion, in state: ReviewState) -> Category {
+        category(for: suggestion, info: state.digest.info)
+    }
+
+    /// Same rule from a bare info list, shared with records built from a loaded digest.
+    public static func category(for suggestion: Suggestion, info: [InfoItem]) -> Category {
         if let c = suggestion.category { return c }
-        return state.digest.info.first { $0.emailID == suggestion.emailID }?.category ?? .other
+        return info.first { $0.emailID == suggestion.emailID }?.category ?? .other
     }
 
     // MARK: Split
@@ -192,7 +213,41 @@ public enum ReviewActions {
     public static func approve(_ suggestions: [Suggestion], state: ReviewState, emails: [String: EmailContext],
                                writer: ReminderWriter, store: DigestStore, listName: String,
                                storedListID: String?, clock: Clock) async -> ApprovalOutcome {
-        guard !suggestions.isEmpty else { return ApprovalOutcome(listID: storedListID, results: [], decisions: []) }
+        await approve(suggestions.map { Entry(suggestion: $0, category: category(for: $0, in: state), email: emails[$0.emailID]) },
+                      writer: writer, store: store, listName: listName, storedListID: storedListID, clock: clock)
+    }
+
+    /// Cross-digest approve: each record is written with its own category and email, and persisted
+    /// against its own digest. Behaves exactly like the per-digest overload.
+    public static func approve(_ records: [SuggestionRecord], writer: ReminderWriter, store: DigestStore,
+                               listName: String, storedListID: String?, clock: Clock) async -> ApprovalOutcome {
+        await approve(records.map { Entry(suggestion: $0.suggestion, category: $0.category, email: $0.email) },
+                      writer: writer, store: store, listName: listName, storedListID: storedListID, clock: clock)
+    }
+
+    /// Marks suggestions dismissed and records a `.dismissed` decision for each.
+    public static func dismiss(_ suggestions: [Suggestion], state: ReviewState, emails: [String: EmailContext],
+                               store: DigestStore, clock: Clock) async throws -> ApprovalOutcome {
+        try await dismiss(suggestions.map { Entry(suggestion: $0, category: category(for: $0, in: state), email: emails[$0.emailID]) },
+                          store: store, clock: clock)
+    }
+
+    /// Cross-digest dismiss over records from any number of digests.
+    public static func dismiss(_ records: [SuggestionRecord], store: DigestStore, clock: Clock) async throws -> ApprovalOutcome {
+        try await dismiss(records.map { Entry(suggestion: $0.suggestion, category: $0.category, email: $0.email) },
+                          store: store, clock: clock)
+    }
+
+    /// What one approve or dismiss needs per suggestion, whichever API it came through.
+    private struct Entry {
+        var suggestion: Suggestion
+        var category: Category
+        var email: EmailContext?
+    }
+
+    private static func approve(_ entries: [Entry], writer: ReminderWriter, store: DigestStore, listName: String,
+                                storedListID: String?, clock: Clock) async -> ApprovalOutcome {
+        guard !entries.isEmpty else { return ApprovalOutcome(listID: storedListID, results: [], decisions: []) }
 
         let listID: String
         do {
@@ -200,7 +255,7 @@ public enum ReviewActions {
         } catch {
             // No list means nothing could be written; all stay retryable.
             var failed: [Suggestion] = []
-            for var s in suggestions {
+            for var s in entries.map(\.suggestion) {
                 s.status = .failed
                 s.decidedAt = nil
                 try? await store.update(s)
@@ -211,12 +266,13 @@ public enum ReviewActions {
 
         var results: [Suggestion] = []
         var decisions: [Decision] = []
-        for var s in suggestions {
+        for entry in entries {
+            var s = entry.suggestion
             do {
-                s.reminderID = try await writer.write(s, category: category(for: s, in: state), email: emails[s.emailID], toList: listID)
+                s.reminderID = try await writer.write(s, category: entry.category, email: entry.email, toList: listID)
                 s.status = .approved
                 s.decidedAt = clock.now()
-                if let email = emails[s.emailID] {
+                if let email = entry.email {
                     let d = Decision(suggestionID: s.id, sender: MailFilter.address(from: email.sender),
                                      action: .approved, decidedAt: clock.now())
                     try? await store.recordDecision(d)
@@ -232,16 +288,15 @@ public enum ReviewActions {
         return ApprovalOutcome(listID: listID, results: results, decisions: decisions)
     }
 
-    /// Marks suggestions dismissed and records a `.dismissed` decision for each.
-    public static func dismiss(_ suggestions: [Suggestion], state: ReviewState, emails: [String: EmailContext],
-                               store: DigestStore, clock: Clock) async throws -> ApprovalOutcome {
+    private static func dismiss(_ entries: [Entry], store: DigestStore, clock: Clock) async throws -> ApprovalOutcome {
         var results: [Suggestion] = []
         var decisions: [Decision] = []
-        for var s in suggestions {
+        for entry in entries {
+            var s = entry.suggestion
             s.status = .dismissed
             s.decidedAt = clock.now()
             try await store.update(s)
-            if let email = emails[s.emailID] {
+            if let email = entry.email {
                 let d = Decision(suggestionID: s.id, sender: MailFilter.address(from: email.sender),
                                  action: .dismissed, decidedAt: clock.now())
                 try await store.recordDecision(d)
