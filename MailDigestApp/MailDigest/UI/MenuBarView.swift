@@ -43,6 +43,9 @@ struct MenuBarView: View {
         }
         .padding(12)
         .frame(width: 340)
+        // Match a native menu: the icon stays highlighted while this panel is open.
+        .onAppear { StatusItemHighlight.set(true) }
+        .onDisappear { StatusItemHighlight.set(false) }
     }
 
     private func row(_ title: String, symbol: String, shortcut: KeyEquivalent? = nil,

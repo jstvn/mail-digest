@@ -57,8 +57,8 @@ struct MailAccessView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        // The grouped form scrolls, so a long mailbox list stays inside the window instead of growing it.
+        .frame(minWidth: 440, idealWidth: 480, minHeight: 360, idealHeight: 560)
         .task {
             await model.refresh()
             if canLoadMailboxes, run.mailboxes.isEmpty { await run.loadMailboxes() }

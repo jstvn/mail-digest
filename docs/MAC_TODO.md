@@ -191,3 +191,8 @@ Please check on the Mac:
 
 - "Delete all history now" is in the spec but not in Settings yet; `RetentionPolicy.deleteAllPlan` exists in core. Not added in T16 (out of scope).
 - Only dismissals since the sender's most recent approval count toward the suggestion (Q36).
+
+## UI fixes after T16 (menu bar highlight, Mail Access size)
+
+- **Menu bar highlight.** `StatusItemHighlight` highlights the app's `NSStatusBarButton` while the `.window`-style panel is open (SwiftUI does not do this for window-style extras). Seen once in the running app: the highlight capsule appeared on click. Still to check by hand: hover highlight, highlight stays while the panel is open, clears when it closes (click outside, Esc, clicking the icon again, opening a window from the panel), and works with the pending-count label and while a job runs.
+- **Mail Access window.** No longer sized to the full mailbox list: default 480 × 560, minimum 440 × 360, resizable, and the grouped form scrolls. Check with many mailboxes that every section (permissions, mailboxes, Refresh, Check Again) is reachable by scrolling and the window opens at the default size.

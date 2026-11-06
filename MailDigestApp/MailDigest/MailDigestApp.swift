@@ -33,7 +33,8 @@ struct MailDigestApp: App {
         Window("Mail Access", id: "mail-access") {
             MailAccessView(model: access, run: run)
         }
-        .windowResizability(.contentSize)
+        .defaultSize(width: 480, height: 560)
+        .windowResizability(.contentMinSize)
 
         Window("Welcome to Mail Digest", id: "onboarding") {
             OnboardingView(run: run, access: access)
