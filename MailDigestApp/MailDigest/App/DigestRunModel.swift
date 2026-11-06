@@ -236,9 +236,8 @@ final class DigestRunModel {
 
     /// Call once at launch: opens the database and shows the last run's summary.
     func loadLastRun() async {
+        // `openStore` attaches the review models.
         guard let store = await openStore() else { return }
-        await review.attach(store: store)
-        await coordinator.attach(store: store)
         // Building the runner puts jobs interrupted by a quit or crash back to paused, so it comes before
         // loading the resumable job.
         _ = await ensureRunner()

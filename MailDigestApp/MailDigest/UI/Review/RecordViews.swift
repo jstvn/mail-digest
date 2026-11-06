@@ -35,7 +35,7 @@ struct ActionableRecordsSection: View {
             if records.isEmpty {
                 Text(emptyText).foregroundStyle(.secondary)
             } else {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     ForEach(records) { record in
                         SuggestionRow(
                             record: record,
@@ -74,10 +74,8 @@ struct SettledRecordRow: View {
                 .padding(.top, 2)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) { titleText; StaticSuggestionPills(suggestion: record.suggestion, category: record.category) }
-                    VStack(alignment: .leading, spacing: 4) { titleText; StaticSuggestionPills(suggestion: record.suggestion, category: record.category) }
-                }
+                titleText
+                StaticSuggestionPills(suggestion: record.suggestion, category: record.category)
                 EvidenceQuote(sender: email.map { ReviewPresentation.senderName($0.sender) } ?? "Unknown sender",
                               evidence: record.suggestion.evidence, emphasised: hovering) {
                     NSWorkspace.shared.open(ReviewActions.messageURL(for: record.suggestion.emailID))
@@ -116,7 +114,7 @@ struct SettledRecordsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("\(title) (\(records.count))")
-            VStack(spacing: 0) {
+            LazyVStack(spacing: 0) {
                 ForEach(records) { record in
                     SettledRecordRow(record: record)
                         .id(record.id)

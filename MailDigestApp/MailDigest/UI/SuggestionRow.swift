@@ -103,17 +103,11 @@ struct SuggestionRow: View {
 
     // MARK: Title and pills
 
-    /// Pills sit beside the title, or wrap beneath it when the row is narrow.
+    /// The title, then a metadata line with the pills. One layout, so nothing is built twice.
     private var titleAndPills: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) {
-                titleField.frame(minWidth: 200)
-                pills
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                titleField
-                pills
-            }
+        VStack(alignment: .leading, spacing: 4) {
+            titleField
+            pills
         }
     }
 

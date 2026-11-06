@@ -18,7 +18,7 @@ struct LogbookView: View {
                                        description: Text("Suggestions you add or dismiss appear here."))
                     .frame(maxWidth: .infinity, minHeight: 200)
             } else {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     ForEach(logbook.records) { record in
                         SettledRecordRow(record: record, showsDecisionDate: true)
                         Divider()

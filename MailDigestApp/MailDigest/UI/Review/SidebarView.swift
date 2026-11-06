@@ -24,16 +24,10 @@ struct SidebarView: View {
     var body: some View {
         List(selection: selection) {
             Section {
-                Label("Today", systemImage: "sun.max")
-                    .tag(SidebarItem.today)
-                    .badge(archive.todayCount)
-                Label("Review Queue", systemImage: "tray.full")
-                    .tag(SidebarItem.reviewQueue)
-                    .badge(archive.reviewQueueCount)
-                Label("Logbook", systemImage: "checkmark.circle")
-                    .tag(SidebarItem.logbook)
-                Label("Mail Cleanup", systemImage: "archivebox")
-                    .tag(SidebarItem.mailCleanup)
+                row(.today, badge: archive.todayCount) { Label("Today", systemImage: "sun.max") }
+                row(.reviewQueue, badge: archive.reviewQueueCount) { Label("Review Queue", systemImage: "tray.full") }
+                row(.logbook) { Label("Logbook", systemImage: "checkmark.circle") }
+                row(.mailCleanup) { Label("Mail Cleanup", systemImage: "archivebox") }
             }
 
             if !archive.months.isEmpty {
@@ -50,10 +44,10 @@ struct SidebarView: View {
 
             Section("Backlog Jobs") {
                 ForEach(archive.backlogs) { backlog in
-                    Label(library.title(forBacklog: backlog.id), systemImage: "tray.and.arrow.down")
-                        .lineLimit(1)
-                        .tag(SidebarItem.backlog(backlog.id))
-                        .badge(backlog.actionableCount)
+                    row(.backlog(backlog.id), badge: backlog.actionableCount) {
+                        Label(library.title(forBacklog: backlog.id), systemImage: "tray.and.arrow.down")
+                            .lineLimit(1)
+                    }
                 }
                 Button {
                     openWindow(id: "job-setup")
@@ -74,6 +68,12 @@ struct SidebarView: View {
         }
     }
 
+    /// A selectable sidebar row; the order of `.badge` and `.tag` lives in `selectableRow`.
+    private func row<Content: View>(_ item: SidebarItem, badge: Int? = nil,
+                                    @ViewBuilder content: () -> Content) -> some View {
+        content().selectableRow(item, badge: badge)
+    }
+
     // MARK: Recent digests
 
     private func dayRow(_ day: ArchiveDay) -> some View {
@@ -88,8 +88,7 @@ struct SidebarView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), \(day.emailCount) \(day.emailCount == 1 ? "email" : "emails")")
-        .tag(SidebarItem.day(day.day))
-        .badge(day.actionableCount)
+        .selectableRow(.day(day.day), badge: day.actionableCount)
     }
 
     /// The current month, and the one holding the selected day, start open; the rest start collapsed.
@@ -167,5 +166,14 @@ struct SidebarView: View {
         case .stopping: return "Stopping…"
         default: return p.total == 0 ? "Starting…" : counts
         }
+    }
+}
+
+private extension View {
+    /// `.tag` must be the outermost modifier: `List(selection:)` does not see a tag that `.badge` wraps, so
+    /// such rows would never show as selected or accept selection. A zero badge is hidden.
+    func selectableRow(_ item: SidebarItem, badge: Int?) -> some View {
+        self.badge(badge ?? 0)
+            .tag(item)
     }
 }

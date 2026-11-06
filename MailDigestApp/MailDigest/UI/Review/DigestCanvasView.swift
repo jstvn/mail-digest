@@ -278,7 +278,7 @@ struct DigestCanvasView: View {
     }
 
     private func infoCards(_ items: [InfoItem]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        LazyVStack(alignment: .leading, spacing: 6) {
             ForEach(items) { item in
                 InfoCard(item: item, email: email(for: item.emailID),
                          notesState: coordinator.notes.states[item.id] ?? .idle,
@@ -297,7 +297,7 @@ struct DigestCanvasView: View {
     @ViewBuilder private var skippedSection: some View {
         if let skipped = content?.skipped, !skipped.isEmpty {
             DisclosureGroup(isExpanded: $skippedExpanded) {
-                VStack(alignment: .leading, spacing: 6) {
+                LazyVStack(alignment: .leading, spacing: 6) {
                     ForEach(skipped) { item in
                         HStack(alignment: .firstTextBaseline) {
                             Text("\(ReviewPresentation.senderName(item.sender)) · \(item.subject)")

@@ -44,7 +44,7 @@ struct CanvasScaffold<Content: View>: View {
                     CanvasNotices(run: run, access: access)
                     content($focusedID)
                 }
-                .onKeyPress(phases: .down) { handleKey($0) }
+                .onKeyPress(phases: .down) { handleKey($0, proxy: proxy) }
                 .frame(maxWidth: 780, alignment: .leading)
                 .padding(.horizontal, 36)
                 .padding(.vertical, 28)
@@ -77,7 +77,7 @@ struct CanvasScaffold<Content: View>: View {
     // MARK: Keyboard
 
     /// ↑/↓ move between rows, space ticks, ⌫ dismisses. Ignored while a text field is being edited.
-    private func handleKey(_ press: KeyPress) -> KeyPress.Result {
+    private func handleKey(_ press: KeyPress, proxy: ScrollViewProxy) -> KeyPress.Result {
         guard press.modifiers.isEmpty, !Self.isEditingText else { return .ignored }
         let ids = records.map(\.id)
         switch press.key {
@@ -85,9 +85,9 @@ struct CanvasScaffold<Content: View>: View {
             guard !ids.isEmpty else { return .ignored }
             let step = press.key == .upArrow ? -1 : 1
             if let current = focusedID.flatMap(ids.firstIndex(of:)) {
-                focusedID = ids[min(max(current + step, 0), ids.count - 1)]
+                focus(ids[min(max(current + step, 0), ids.count - 1)], proxy: proxy)
             } else {
-                focusedID = ids.first
+                focus(ids[0], proxy: proxy)
             }
             return .handled
         case .space:
@@ -99,11 +99,17 @@ struct CanvasScaffold<Content: View>: View {
             let next = ids.indices.contains(index + 1) ? ids[index + 1] : (index > 0 ? ids[index - 1] : nil)
             let record = records[index]
             Task { await coordinator.dismiss(record) }
-            focusedID = next
+            if let next { focus(next, proxy: proxy) } else { focusedID = nil }
             return .handled
         default:
             return .ignored
         }
+    }
+
+    /// Rows are lazy, so the target may not exist yet: scroll it into the realised range, then focus it.
+    private func focus(_ id: UUID, proxy: ScrollViewProxy) {
+        proxy.scrollTo(id)
+        Task { @MainActor in focusedID = id }
     }
 
     private static var isEditingText: Bool {
