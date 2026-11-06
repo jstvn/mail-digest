@@ -499,6 +499,8 @@ All processing runs through a persisted job queue, one email at a time, with a c
 
 A Daily job always runs before a queued Backlog job. If a Backlog job is running when the morning run is due, it pauses, the Daily job runs, then the Backlog job resumes.
 
+At most one Daily job is unresolved at a time (Q52): listing, running, pausing or stopping, or paused, stopped or failed with queued work left. Finished Daily jobs stay in history as separate digests. While a Daily job is unresolved, neither Run Now nor the scheduler creates another Daily job, and the scheduler never resumes the old one; the scheduled run waits until the user has resolved it, then the usual schedule rule and Daily cursor apply. Backlog jobs don't count.
+
 **Queue (persisted in `DigestStore`)**
 
 - `job` table: id, kind, mailboxes, scope from/to, state, created_at, totals (queued, done, failed, skipped)
@@ -666,7 +668,7 @@ The review panel is a single SwiftUI window with three sections: headline, sugge
 | No new mail | "Inbox zero for today" and last run time |
 | Partial failure | Digest shows; failed emails listed under Skipped with reason |
 
-**Menu bar (`MenuBarView`)**: icon with a badge count of pending suggestions; menu items: Open Review Panel, Run Now, Last run time, Settings, Quit.
+**Menu bar (`MenuBarView`)**: icon with a badge count of pending suggestions; menu items: Open Review Panel, Run Now, Last run time, Settings, Quit. The Run Now row follows the current Daily job (Q52): Run Now with none; Resume for a paused Daily job (the menu's progress card then shows no second Resume); "Daily Digest Running…" or "Stopping…" (disabled) while it works; "Review Daily Job…" for a stopped one and "Review Daily Jobs…" for more than one (both open Settings > Jobs); "Retry Daily Job" for a failed one. A paused Backlog job leaves the row as Run Now.
 
 **Settings (`SettingsView`)**: run time (default 6:30), lookback cap, max emails per run, Ollama URL and model, Reminders list name (default "Mail Digest"), history retention (default 90 days), VIP senders, blocked senders, ignored senders, Trusted Newsletter senders, auto-file processed emails toggle (off by default), Daily mailboxes (default: all inboxes), power and quiet-hours rules for Backlog jobs, past jobs, launch at login toggle.
 

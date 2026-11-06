@@ -13,11 +13,29 @@ enum PreviewSupport {
     }
 
     static func run(review: ReviewViewModel = review(), reminders: RemindersAuthorization = .granted, progress: JobProgress? = nil, banner: String? = nil,
-                    failedJobID: UUID? = nil, foundNothing: Bool = false) -> DigestRunModel {
+                    failedJobID: UUID? = nil, foundNothing: Bool = false, jobs: [Job] = [],
+                    scheduledRunWaiting: Bool = false) -> DigestRunModel {
         DigestRunModel(preview: SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
                        review: review, reminders: RemindersAccessModel(preview: reminders), progress: progress, banner: banner, failedJobID: failedJobID,
                        lastRunAt: PreviewFixtures.now, lastRunFoundNothing: foundNothing,
-                       lastRunSummary: "Last run 6:45 AM · 4 suggestions · 23 emails")
+                       lastRunSummary: "Last run 6:45 AM · 4 suggestions · 23 emails",
+                       jobs: jobs, scheduledRunWaiting: scheduledRunWaiting)
+    }
+
+    /// A persisted job for the menu's Daily action previews (Q52); `PreviewFixtures.jobID` by default, the
+    /// job the sample progress describes.
+    static func job(_ state: JobState, kind: JobKind = .daily, id: UUID = PreviewFixtures.jobID,
+                    lastError: String? = nil) -> Job {
+        Job(id: id, kind: kind, mailboxes: [], scopeFrom: PreviewFixtures.now.addingTimeInterval(-86_400),
+            scopeTo: PreviewFixtures.now, state: state, createdAt: PreviewFixtures.now,
+            totals: JobTotals(queued: 12, done: 11, failed: 0, skipped: 0), autoPaused: false, lastError: lastError)
+    }
+
+    /// `PreviewFixtures.pausedProgress` as a Daily job.
+    static var pausedDailyProgress: JobProgress {
+        var progress = PreviewFixtures.pausedProgress
+        progress.kind = .daily
+        return progress
     }
 
     static let fastLocal = MailAccessStatus(fullDiskAccess: .granted, automation: .granted)
@@ -71,9 +89,44 @@ enum PreviewSupport {
     panel(PreviewSupport.run())
 }
 
+@MainActor private func menu(_ run: DigestRunModel) -> some View {
+    MenuBarView(run: run, access: MailAccessModel(preview: PreviewSupport.fastLocal))
+}
+
 #Preview("Menu bar") {
-    MenuBarView(run: PreviewSupport.run(progress: PreviewFixtures.runningProgress),
-                access: MailAccessModel(preview: PreviewSupport.fastLocal))
+    menu(PreviewSupport.run(progress: PreviewFixtures.runningProgress,
+                            jobs: [PreviewSupport.job(.running, kind: .backlog)]))
+}
+
+#Preview("Menu · Run Now") { menu(PreviewSupport.run()) }
+
+#Preview("Menu · Daily paused → Resume") {
+    menu(PreviewSupport.run(progress: PreviewSupport.pausedDailyProgress, jobs: [PreviewSupport.job(.paused)],
+                            scheduledRunWaiting: true))
+}
+
+#Preview("Menu · Backlog paused → Run Now") {
+    menu(PreviewSupport.run(progress: PreviewFixtures.pausedProgress, jobs: [PreviewSupport.job(.paused, kind: .backlog)]))
+}
+
+#Preview("Menu · Daily running") {
+    menu(PreviewSupport.run(progress: PreviewFixtures.dailyRunningProgress, jobs: [PreviewSupport.job(.running)]))
+}
+
+#Preview("Menu · Daily stopping") {
+    var stopping = PreviewFixtures.dailyRunningProgress
+    stopping.state = .stopping
+    return menu(PreviewSupport.run(progress: stopping, jobs: [PreviewSupport.job(.running)]))
+}
+
+#Preview("Menu · Daily stopped") { menu(PreviewSupport.run(jobs: [PreviewSupport.job(.stopped)])) }
+
+#Preview("Menu · Daily failed → Retry") {
+    menu(PreviewSupport.run(jobs: [PreviewSupport.job(.failed, lastError: "Ollama isn't running. Start Ollama, or run `ollama pull qwen3:4b`.")]))
+}
+
+#Preview("Menu · two unfinished Daily jobs") {
+    menu(PreviewSupport.run(jobs: [PreviewSupport.job(.paused, id: UUID()), PreviewSupport.job(.stopped, id: UUID())]))
 }
 
 #Preview("Settings") {

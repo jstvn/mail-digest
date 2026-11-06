@@ -166,4 +166,43 @@ private func normalised(_ digest: Digest) -> Digest {
         let digest = try #require(await store.digest(id: jobID))
         #expect(digest.emailCount == count && digest.skipped.isEmpty && digest.suggestions.count == count)
     }
+
+    /// Q52: a Daily job paused in one session is the one Daily job after a relaunch. Run Now becomes Resume, no
+    /// second Daily job can be created, and Resume continues the same queue.
+    @Test func pausedDailyIsRestoredAsTheCurrentDailyJobAfterRelaunch() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanUp() }
+        let firstRunIDs: [String]
+        let jobID: UUID
+        do {
+            let store = try GRDBDigestStore(path: dir.databasePath)
+            let llm = StubLLMClient(results: answers(), headlineText: "Headline.")
+            let runner = makeRunner(store: store, source: FixtureMailSource(messages: messages(), storeRowIDs: rowIDs()), llm: llm)
+            await llm.setOnExtract { _ in if await llm.extractCalls.count == 5 { await runner.pause() } }
+            try await runner.startDaily()
+            await runner.waitUntilIdle()
+            let job = try #require(await store.jobs().first)
+            #expect(job.kind == .daily && job.state == .paused)
+            jobID = job.id
+            firstRunIDs = await llm.extractCalls.map(\.id)
+        }
+
+        let store = try GRDBDigestStore(path: dir.databasePath)
+        let llm = StubLLMClient(results: answers(), headlineText: "Headline.")
+        let runner = makeRunner(store: store, source: FixtureMailSource(messages: messages(), storeRowIDs: rowIDs()), llm: llm)
+        try await runner.recoverOnLaunch()
+        let lifecycle = DailyLifecycle(jobs: try await store.jobs())
+        #expect(lifecycle.jobs.map(\.id) == [jobID])
+        #expect(lifecycle.menuAction.behavior == .resume(jobID))
+        await #expect(throws: JobRunnerError.dailyJobUnresolved) { try await runner.startDaily() }
+
+        try await runner.resume(jobID: jobID)
+        await runner.waitUntilIdle()
+        let jobs = try await store.jobs()
+        #expect(jobs.map(\.id) == [jobID] && jobs[0].state == .finished && jobs[0].totals.done == count)
+        let secondRunIDs = await llm.extractCalls.map(\.id)
+        #expect(Set(secondRunIDs).isDisjoint(with: firstRunIDs))
+        #expect(firstRunIDs.count + secondRunIDs.count == count)
+        #expect(DailyLifecycle(jobs: jobs) == .none)
+    }
 }

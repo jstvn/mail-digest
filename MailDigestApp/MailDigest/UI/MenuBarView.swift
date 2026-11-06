@@ -19,6 +19,7 @@ struct MenuBarView: View {
                                   onPause: run.pause,
                                   onPauseNow: run.pauseNow,
                                   onResume: { Task { await run.resume() } },
+                                  showsResume: run.menuCardShowsResume(for: progress),
                                   onStop: run.stop)
             } else if let summary = run.lastRunSummary {
                 Text(summary).font(.callout).foregroundStyle(.secondary)
@@ -27,16 +28,21 @@ struct MenuBarView: View {
                 Label(banner, systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
-                if run.failedJobID != nil {
+                if run.showsBannerRetry {
                     Button("Retry") { Task { await run.retryFailedJob() } }
                         .disabled(run.isRunning)
                 }
             }
+            if let note = run.dailyNote {
+                Text(note)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Divider()
             VStack(spacing: 0) {
                 row("Open Review Panel", symbol: "tray.full") { show("review") }
-                row("Run Now", symbol: "play") { Task { await run.runNow() } }
-                    .disabled(run.isRunning || access.status?.mode == .unavailable)
+                dailyRow
                 row("New Backlog Job…", symbol: "tray.and.arrow.down") { show("job-setup") }
                     .disabled(run.isRunning || access.status?.mode == .unavailable)
                 row("Mail Access…", symbol: "lock.shield") { show("mail-access") }
@@ -57,8 +63,25 @@ struct MenuBarView: View {
         .frame(width: 340)
     }
 
+    /// Run Now, or what the current Daily job needs instead (Q52). Never starts a second Daily job.
+    private var dailyRow: some View {
+        let action = run.dailyAction
+        // Opening Settings needs no Mail access; everything else reads Mail.
+        let needsMail = action.behavior != .review
+        return row(action.title, symbol: action.systemImage, accessibilityLabel: action.accessibilityLabel) {
+            switch action.behavior {
+            case .startNew: Task { await run.runNow() }
+            case .resume(let id): Task { await run.resumeDailyJob(id, expecting: .paused) }
+            case .retry(let id): Task { await run.resumeDailyJob(id, expecting: .failed) }
+            case .review: showJobs()
+            case .none: break
+            }
+        }
+        .disabled(!run.isDailyActionEnabled || (needsMail && access.status?.mode == .unavailable))
+    }
+
     private func row(_ title: String, symbol: String, shortcut: KeyEquivalent? = nil,
-                     action: @escaping () -> Void) -> some View {
+                     accessibilityLabel: String? = nil, action: @escaping () -> Void) -> some View {
         let button = Button(action: action) {
             // A fixed icon column, so every title starts at the same x whatever the symbol's own width.
             HStack(spacing: 6) {
@@ -69,10 +92,18 @@ struct MenuBarView: View {
             }
         }
         .buttonStyle(MenuRowButtonStyle())
-        .accessibilityLabel(title)
+        .accessibilityLabel(accessibilityLabel ?? title)
         return Group {
             if let shortcut { button.keyboardShortcut(shortcut) } else { button }
         }
+    }
+
+    /// Settings > Jobs, where unresolved jobs are resumed explicitly.
+    private func showJobs() {
+        run.settingsTab = .jobs
+        dismiss()
+        openSettings()
+        NSApp.activate()
     }
 
     private func show(_ id: String) {

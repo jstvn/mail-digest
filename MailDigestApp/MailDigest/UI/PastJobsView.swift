@@ -50,13 +50,19 @@ private struct PastJobRowView: View {
                 }
                 if JobSummaryText.canRetryFailed(job) {
                     Button("Retry Failed") { Task { await run.retryFailedItems(of: job.id) } }
-                        .disabled(run.isRunning)
+                        .disabled(run.isRunning || blockedByOtherDailyJob)
+                        .help(blockedByOtherDailyJob ? "Finish the unfinished Daily job first." : "")
                 }
             }
             .controlSize(.small)
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .contain)
+    }
+
+    /// Retrying a Daily job's failures would make it a second unresolved Daily job (Q52).
+    private var blockedByOtherDailyJob: Bool {
+        job.kind == .daily && run.dailyLifecycle.jobs.contains { $0.id != job.id }
     }
 
     private var duration: String {

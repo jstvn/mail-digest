@@ -115,7 +115,8 @@ struct ReviewPanelView: View {
             .disabled(run.isRunning || access.status?.mode == .unavailable)
             .help("Process older mail in the mailboxes you choose")
             Button("Run Now") { Task { await run.runNow() } }
-                .disabled(run.isRunning || access.status?.mode == .unavailable)
+                .disabled(!run.canStartDaily || access.status?.mode == .unavailable)
+                .help(run.dailyLifecycle == .none ? "" : "Resume or review the unfinished Daily job first.")
             Button {
                 NSApp.activate()
                 openSettings()

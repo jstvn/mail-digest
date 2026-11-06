@@ -40,6 +40,13 @@ final class DigestRunModel {
     private(set) var activityItems: [JobItem] = []
     /// Every job, newest first, for Settings > Jobs.
     private(set) var pastJobs: [PastJobRow] = []
+    /// The Settings tab to show; the menu's "Review Daily Job…" selects Jobs.
+    var settingsTab: SettingsTab = .general
+    /// Set synchronously when a Daily run or Daily resume starts, before any job or progress exists, so a
+    /// second click or a scheduler check in between cannot start another one (Q52).
+    private(set) var dailyStarting = false
+    /// A scheduler check found the morning run due while a Daily job was unresolved (Q52).
+    private(set) var scheduledRunWaiting = false
     /// Watches power, Low Power Mode, heat and quiet hours (Mac-only adapter).
     @ObservationIgnored let monitor = ResourceMonitor()
     @ObservationIgnored private var lastBlocked: [JobKind: PauseReason] = [:]
@@ -80,7 +87,8 @@ final class DigestRunModel {
     init(preview: SettingsStore = SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
          review: ReviewViewModel = ReviewViewModel(),
          reminders: RemindersAccessModel = RemindersAccessModel(preview: .granted), progress: JobProgress? = nil, banner: String? = nil, failedJobID: UUID? = nil,
-         lastRunAt: Date? = nil, lastRunFoundNothing: Bool = false, lastRunSummary: String? = nil) {
+         lastRunAt: Date? = nil, lastRunFoundNothing: Bool = false, lastRunSummary: String? = nil,
+         jobs: [Job] = [], scheduledRunWaiting: Bool = false) {
         self.settings = preview
         self.review = review
         self.reminders = reminders
@@ -91,6 +99,8 @@ final class DigestRunModel {
         self.lastRunAt = lastRunAt
         self.lastRunFoundNothing = lastRunFoundNothing
         self.lastRunSummary = lastRunSummary
+        self.pastJobs = jobs.map { PastJobRow(job: $0, processingSeconds: 0) }
+        self.scheduledRunWaiting = scheduledRunWaiting
     }
 
     /// The runner's progress while a job is active (listing, running, pausing, paused or stopping), or a
@@ -108,11 +118,66 @@ final class DigestRunModel {
         }
     }
 
-    /// Whether a Daily run may start now: nothing is running, or only a running Backlog job, which the
-    /// runner pauses first (Daily goes before Backlog). A paused or stopped job never blocks it.
+    /// Whether a new Daily run may start now: no Daily job is unresolved (Q52), and nothing is running or
+    /// only a running Backlog job, which the runner pauses first (Daily goes before Backlog). A paused or
+    /// stopped Backlog job never blocks it.
     var canStartDaily: Bool {
-        if !isRunning { return true }
-        return progress?.kind == .backlog && progress?.state == .running
+        dailyLifecycle == .none && canRunDailyWork
+    }
+
+    /// Nothing is running, or only a Backlog job a Daily job may pre-empt (Q23).
+    private var canRunDailyWork: Bool {
+        guard !dailyStarting else { return false }
+        return !isRunning || backlogIsPreemptable
+    }
+
+    private var backlogIsPreemptable: Bool { progress?.kind == .backlog && progress?.state == .running }
+
+    // MARK: Daily lifecycle (Q52)
+
+    /// The current Daily job, from the persisted job list with the runner's live state on top, so it is
+    /// right after a relaunch as well as mid-session.
+    var dailyLifecycle: DailyLifecycle { DailyLifecycle(jobs: pastJobs.map(\.job), live: progress) }
+
+    /// The menu's primary Daily action. A Daily run that is starting has no job yet but already counts as running.
+    var dailyAction: DailyMenuAction {
+        dailyStarting ? .running : dailyLifecycle.menuAction
+    }
+
+    var isDailyActionEnabled: Bool {
+        switch dailyAction.behavior {
+        case .startNew: return canStartDaily
+        case .resume, .retry: return canRunDailyWork
+        case .review: return true
+        case .none: return false
+        }
+    }
+
+    /// Why the Daily action is not Run Now, or that a scheduled run is waiting; nil when there is nothing to say.
+    var dailyNote: String? {
+        let lifecycle = dailyLifecycle
+        var lines: [String] = []
+        // The banner already gives a failed job's error in this session.
+        let bannerExplains = banner != nil && failedJobID != nil && lifecycle.jobs.first?.id == failedJobID
+        if let note = dailyAction.note, !bannerExplains { lines.append(note) }
+        if scheduledRunWaiting, lifecycle != .none {
+            lines.append("Today's scheduled Daily digest will run once the unfinished Daily job is finished.")
+        }
+        return lines.isEmpty ? nil : lines.joined(separator: " ")
+    }
+
+    /// The banner's Retry, unless the menu's Daily action already retries the same failed job.
+    var showsBannerRetry: Bool {
+        guard let failedJobID else { return false }
+        if case .failed(let job) = dailyLifecycle, job.id == failedJobID { return false }
+        return true
+    }
+
+    /// Whether the menu's progress card shows its own Resume. Not for the paused Daily job, whose Resume is
+    /// the menu's primary action (Q52); other surfaces keep theirs.
+    func menuCardShowsResume(for progress: JobProgress) -> Bool {
+        if case .paused(let job) = dailyLifecycle, job.id == progress.jobID { return false }
+        return true
     }
 
     /// What the menu bar icon shows. Progress is bucketed to 5% so the icon is rarely redrawn.
@@ -203,15 +268,23 @@ final class DigestRunModel {
 
     /// Called by the scheduler: starts the Daily job only when the core rule says the morning run is due
     /// and nothing is running. Failures before a job exists (Ollama down) leave no job, so the next check retries.
+    /// While a Daily job is unresolved the run waits (Q52): no second Daily job, no resume of the old one,
+    /// and the next check after the user resolves it starts the run if it is still due.
     func runIfDue() async {
-        guard canStartDaily, let store = await openStore() else { return }
+        guard !dailyStarting, let store = await openStore() else { return }
         guard let jobs = try? await store.jobs() else { return }
         let s = settings.settings
-        guard MorningSchedule.isDue(now: clock.now(), hour: s.runHour, minute: s.runMinute, jobs: jobs) else {
-            await cleanUpHistoryIfDue()
-            return
+        switch MorningSchedule.decision(now: clock.now(), hour: s.runHour, minute: s.runMinute, jobs: jobs,
+                                        live: progress) {
+        case .notDue:
+            scheduledRunWaiting = false
+        case .deferred:
+            if !scheduledRunWaiting { Self.log.notice("scheduled daily run waiting for an unresolved daily job") }
+            scheduledRunWaiting = true
+        case .start:
+            scheduledRunWaiting = false
+            if canRunDailyWork { await runDaily(trigger: .scheduled) }
         }
-        await runDaily(trigger: .scheduled)
         await cleanUpHistoryIfDue()
     }
 
@@ -240,16 +313,25 @@ final class DigestRunModel {
     }
 
     func runDaily(trigger: RunTrigger) async {
-        guard canStartDaily else { return }
+        guard canStartDaily else {
+            if trigger == .manual, !dailyStarting, dailyLifecycle != .none {
+                banner = Self.message(for: JobRunnerError.dailyJobUnresolved)
+            }
+            return
+        }
         // A Daily run that preempts a running Backlog job leaves that run's own bookkeeping alone.
         let preempting = isRunning
         Self.log.notice("daily run starting: trigger=\(trigger == .scheduled ? "scheduled" : "manual", privacy: .public)")
+        dailyStarting = true
         if !preempting {
             busyFlag = true
             progressText = "Starting…"
         }
         banner = nil
-        defer { if !preempting { busyFlag = false; progressText = nil } }
+        defer {
+            dailyStarting = false
+            if !preempting { busyFlag = false; progressText = nil }
+        }
 
         guard let store = await openStore() else { return }
 
@@ -282,11 +364,60 @@ final class DigestRunModel {
             try await runner.startDaily()
             evaluateResources(force: true)
             await runner.waitUntilIdle()
+        } catch JobRunnerError.dailyJobUnresolved {
+            // The store had a Daily job the menu had not loaded yet; show it rather than a second job.
+            if trigger == .scheduled { scheduledRunWaiting = true } else {
+                banner = Self.message(for: JobRunnerError.dailyJobUnresolved)
+            }
+            await refreshJobLists()
+            return
         } catch {
             banner = Self.message(for: error)
             return
         }
         await finishRun(startedAt: startedAt)
+    }
+
+    /// The menu's Resume (paused) or Retry (failed) for the current Daily job (Q52). Continues that exact job
+    /// and its queue; never creates a job. The job is re-read first, so a click on a menu drawn before the job
+    /// changed does nothing but refresh. A running Backlog job is pre-empted, as for Run Now.
+    func resumeDailyJob(_ jobID: UUID, expecting state: JobState) async {
+        guard canRunDailyWork, let store = await openStore() else { return }
+        let preempting = isRunning
+        dailyStarting = true
+        if !preempting {
+            busyFlag = true
+            progressText = "Starting…"
+        }
+        banner = nil
+        defer {
+            dailyStarting = false
+            if !preempting { busyFlag = false; progressText = nil }
+        }
+        guard let jobs = try? await store.jobs(), let job = jobs.first(where: { $0.id == jobID }),
+              job.kind == .daily, job.state == state, DailyLifecycle(jobs: jobs).jobs.map(\.id) == [jobID] else {
+            await refreshJobLists()
+            return
+        }
+        if preempting {
+            // Don't pause the Backlog job for a resume that would fail on a down Ollama anyway (Q25).
+            do { try await llm.healthCheck() } catch {
+                banner = (error as? LLMError)?.userMessage ?? "Ollama is not reachable. Start Ollama, or run `ollama pull qwen3:4b`."
+                return
+            }
+        }
+        guard let runner = await ensureRunner() else { return }
+        do {
+            await runner.setResourceBlockers(currentBlockers())
+            try await runner.resume(jobID: jobID)
+            restoredProgress = nil
+            await runner.waitUntilIdle()
+        } catch {
+            banner = Self.message(for: error)
+            await refreshJobLists()
+            return
+        }
+        await finishRun(jobID: jobID)
     }
 
     /// Resumes the job a provider outage stopped. The runner re-checks Ollama first.
@@ -307,8 +438,23 @@ final class DigestRunModel {
     /// Cancel the email in flight and pause; that email is requeued.
     func pauseNow() { Task { await runner?.pauseNow() } }
 
-    /// Stop the job; finished items stay done and the rest can be resumed later.
-    func stop() { Task { await runner?.stop() } }
+    /// Stop the job; finished items stay done and the rest can be resumed later. A paused job has no loop to
+    /// stop, so it is stored as stopped directly (Q15).
+    func stop() {
+        guard let runner else { return }
+        guard let paused = activeProgress, paused.state == .paused else {
+            Task { await runner.stop() }
+            return
+        }
+        let jobID = paused.jobID
+        Task {
+            do { try await runner.stopPaused(jobID: jobID) } catch {
+                Self.log.error("stop paused job failed: \(String(describing: error), privacy: .public)")
+            }
+            if progress?.jobID == jobID, progress?.state == .paused { progress = nil }
+            await refreshJobLists()
+        }
+    }
 
     /// Resumes a paused, stopped or failed job by id, including one from a previous session.
     func resumeJob(_ jobID: UUID) async {
@@ -329,7 +475,7 @@ final class DigestRunModel {
             await refreshJobLists()
             return
         }
-        await finishRun()
+        await finishRun(jobID: jobID)
     }
 
     /// Retry failed (Q28): requeues the job's failed emails and resumes it. Rejected while any job runs.
@@ -350,7 +496,7 @@ final class DigestRunModel {
             await refreshJobLists()
             return
         }
-        await finishRun()
+        await finishRun(jobID: jobID)
     }
 
     /// Job setup: lists headers for the plan and reports what Start would queue. Nothing is queued.
@@ -388,11 +534,13 @@ final class DigestRunModel {
         return nil
     }
 
-    /// Shows the outage banner if the job stopped as failed; otherwise summarises it.
-    private func finishRun(startedAt: Date? = nil) async {
+    /// Shows the outage banner if the job stopped as failed; otherwise summarises it. `jobID` names the job
+    /// that was resumed, which need not be the newest one.
+    private func finishRun(startedAt: Date? = nil, jobID: UUID? = nil) async {
         guard let store else { return }
         defer { Task { await refreshJobLists() } }
-        let job = try? await store.jobs().first
+        let jobs = try? await store.jobs()
+        let job = jobID.flatMap { id in jobs?.first { $0.id == id } } ?? jobs?.first
         if let job, job.state == .failed {
             failedJobID = job.id
             banner = job.lastError ?? "The run stopped. Try again."
@@ -437,6 +585,11 @@ final class DigestRunModel {
             rows.append(PastJobRow(job: job, processingSeconds: items.compactMap(\.seconds).reduce(0, +)))
         }
         pastJobs = rows
+        // A scheduled run that waited for this Daily job is checked again as soon as the job is resolved,
+        // rather than at the next 15-minute tick; the schedule rule still decides whether it is due.
+        if scheduledRunWaiting, dailyLifecycle == .none, !dailyStarting {
+            Task { await runIfDue() }
+        }
     }
 
     /// Shows the newest paused job's strip when the runner has nothing active (after a relaunch, or after
@@ -561,7 +714,10 @@ final class DigestRunModel {
     }
 
     private func apply(_ update: JobProgress) {
+        let changed = progress?.jobID != update.jobID || progress?.state != update.state
         progress = update
+        // Keeps the Daily lifecycle (built from the job list) in step, for example for a just-created job.
+        if changed { Task { await refreshPastJobs() } }
         // Show finished results while the job runs. The runner already throttles updates to 2 a second.
         if update.state == .running, update.done != lastRefreshedDone {
             lastRefreshedDone = update.done
@@ -617,6 +773,9 @@ final class DigestRunModel {
     private static func message(for error: Error) -> String {
         if case JobRunnerError.providerUnavailable(let message) = error { return message }
         if case JobRunnerError.resourceBlocked(let reason) = error { return reason.blockedMessage }
+        if case JobRunnerError.dailyJobUnresolved = error {
+            return "A Daily job is unfinished. Resume it, or review it in Settings > Jobs, before a new Daily digest runs."
+        }
         if case OsascriptError.automationDenied = error {
             return "Mail automation is off. Open Mail Access to allow it."
         }

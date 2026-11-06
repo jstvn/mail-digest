@@ -1,20 +1,29 @@
 import MailDigestCore
 import SwiftUI
 
+/// The tabs of the Settings window.
+enum SettingsTab: Hashable {
+    case general, model, senders, jobs
+}
+
 /// Settings window. `docs/MAC_TODO.md` lists which settings take effect when.
 struct SettingsView: View {
-    let run: DigestRunModel
+    @Bindable var run: DigestRunModel
 
     var body: some View {
-        TabView {
+        TabView(selection: $run.settingsTab) {
             GeneralSettingsTab(run: run)
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsTab.general)
             ModelSettingsTab(run: run)
                 .tabItem { Label("Model & Reminders", systemImage: "sparkles") }
+                .tag(SettingsTab.model)
             SendersSettingsTab(store: run.settings)
                 .tabItem { Label("Senders", systemImage: "person.2") }
+                .tag(SettingsTab.senders)
             PastJobsView(run: run)
                 .tabItem { Label("Jobs", systemImage: "list.bullet.rectangle") }
+                .tag(SettingsTab.jobs)
         }
         .frame(width: 520, height: 520)
     }

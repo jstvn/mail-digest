@@ -54,6 +54,9 @@ public enum JobRunnerError: Error, Sendable, Equatable {
     /// A resource rule blocks this kind of job right now (Q43). The job was left (or created) paused with
     /// this reason and resumes by itself once the rule clears in this session (Q44).
     case resourceBlocked(PauseReason)
+    /// An unresolved Daily job exists (Q52), so no other Daily job is created or put back to work. The
+    /// user resolves it (Resume, Retry) instead.
+    case dailyJobUnresolved
 }
 
 /// Runs persisted jobs one email at a time with a checkpoint after each email.
@@ -145,6 +148,7 @@ public actor JobRunner {
         try claim()
         resumeAfter = nil
         do {
+            if plan.kind == .daily { try await requireNoUnresolvedDaily() }
             try await preflight()
         } catch {
             busy = false
@@ -154,21 +158,17 @@ public actor JobRunner {
     }
 
     /// Starts the Daily job: mail since the last run, at most `lookbackCap` back. A running Backlog job
-    /// is auto-paused first and resumes by itself once the Daily job finishes.
+    /// is auto-paused first and resumes by itself once the Daily job finishes. Throws `dailyJobUnresolved`,
+    /// without touching any job, while a Daily job is unresolved (Q52).
     public func startDaily() async throws {
-        var backlogToResume: UUID?
-        if busy {
-            guard loopTask != nil, let run, run.job.kind == .backlog else { throw JobRunnerError.alreadyRunning }
-            backlogToResume = run.job.id
-            autoPauseRequested = true
-            autoPauseReason = .dailyJob
-            pauseRequested = true
-            run.job.state = .pausing
-            emit(force: true)
-            await waitUntilIdle()
-        }
+        if busy, loopTask == nil || run?.job.kind != .backlog { throw JobRunnerError.alreadyRunning }
+        // Checked before a Backlog job is pre-empted, so a refused Daily run leaves it running.
+        try await requireNoUnresolvedDaily()
+        let backlogToResume = try await preemptRunningBacklog()
         try claim()
         do {
+            // Again under `busy`: another caller may have created a Daily job while the Backlog job paused.
+            try await requireNoUnresolvedDaily()
             let now = clock.now()
             let floor = now.addingTimeInterval(-settings.lookbackCap)
             // The last Daily job's scope end, not `store.lastRunDate()`: a Backlog digest also moves the
@@ -192,6 +192,27 @@ public actor JobRunner {
     }
 
     // MARK: Preview
+
+    /// Throws `dailyJobUnresolved` when any Daily job other than `except` is unresolved (Q52).
+    private func requireNoUnresolvedDaily(except: UUID? = nil) async throws {
+        let others = try await store.jobs().filter { $0.id != except }
+        guard DailyLifecycle(jobs: others) == .none else { throw JobRunnerError.dailyJobUnresolved }
+    }
+
+    /// Auto-pauses the running Backlog job so a Daily job can go first, and waits until it has paused.
+    /// Returns its id for the hand-off (Q23), or nil when nothing runs. Throws `alreadyRunning` when the
+    /// active job is not a running Backlog job.
+    private func preemptRunningBacklog() async throws -> UUID? {
+        guard busy else { return nil }
+        guard loopTask != nil, let run, run.job.kind == .backlog else { throw JobRunnerError.alreadyRunning }
+        autoPauseRequested = true
+        autoPauseReason = .dailyJob
+        pauseRequested = true
+        run.job.state = .pausing
+        emit(force: true)
+        await waitUntilIdle()
+        return run.job.id
+    }
 
     /// Lists headers for the plan and reports what `start(plan)` would queue. Queues nothing and creates no job.
     public func preview(_ plan: JobPlan) async throws -> JobPreview {
@@ -240,11 +261,14 @@ public actor JobRunner {
     // MARK: Retry
 
     /// Requeues the job's failed emails (attempts reset), removes their "failed: ..." entries from the job's
-    /// digest, then resumes the job. Returns how many were requeued. Throws `alreadyRunning` if a job is active.
+    /// digest, then resumes the job. Returns how many were requeued. Throws `alreadyRunning` if a job is active,
+    /// and `dailyJobUnresolved` for a Daily job while another Daily job is unresolved (Q52), since the retried
+    /// job would become a second one.
     @discardableResult
     public func retryFailed(jobID: UUID) async throws -> Int {
         guard !busy else { throw JobRunnerError.alreadyRunning }
         guard var job = try await store.jobs().first(where: { $0.id == jobID }) else { throw JobRunnerError.jobNotFound }
+        if job.kind == .daily { try await requireNoUnresolvedDaily(except: jobID) }
         let requeued = try await store.requeueFailed(job: jobID)
         guard !requeued.isEmpty else { return 0 }
         // A failed item's only result is its "failed: ..." skip entry, so dropping the result removes it
@@ -333,7 +357,16 @@ public actor JobRunner {
     }
 
     /// Resumes the given paused job, or the most recent paused one. Also used after a restart.
+    /// Resuming a Daily job by id while a Backlog job runs pre-empts it, as `startDaily()` does (Q23, Q52).
     public func resume(jobID: UUID? = nil) async throws {
+        var backlogToResume: UUID?
+        if let run, loopTask != nil, let jobID, jobID != run.job.id {
+            let target = try await store.jobs().first { $0.id == jobID }
+            guard let target, target.kind == .daily, [.paused, .failed, .stopped].contains(target.state) else {
+                throw JobRunnerError.alreadyRunning
+            }
+            backlogToResume = try await preemptRunningBacklog()
+        }
         if let run, loopTask != nil {
             if let jobID, jobID != run.job.id { throw JobRunnerError.alreadyRunning }
             if run.committed {
@@ -373,6 +406,8 @@ public actor JobRunner {
             // or failed job keeps its state, so it is never resumed without the user (Q48).
             if let reason = resourceBlockers[job.kind] {
                 if job.state == .paused { try await parkBlocked(&job, reason: reason) }
+                resumeAfter = backlogToResume
+                try await parkPreemptedBacklog()
                 throw JobRunnerError.resourceBlocked(reason)
             }
             // Re-check the provider before resuming (Q25), so a still-down Ollama fails fast.
@@ -385,15 +420,33 @@ public actor JobRunner {
             autoPausedThisSession.remove(job.id)
             try await store.updateJob(job)
             resetFlags()
-            resumeAfter = nil
+            resumeAfter = backlogToResume
             run = try await loadRun(job)
             if let run { try await store.updateJob(run.job) }
             launch(kind: job.kind)
         } catch {
             busy = false
             run = nil
+            resumeAfter = nil
             throw error
         }
+    }
+
+    /// Stop for a job that is paused and not loaded in the loop: persists it as `.stopped` (Q15), keeping its
+    /// queue, so it is only resumed by hand. Forwards to `stop()` when the job is the one running.
+    public func stopPaused(jobID: UUID) async throws {
+        if let run, loopTask != nil, run.job.id == jobID {
+            guard run.committed else { stop(); return }
+            // The pause is already being stored; let it land, then store the Stop over it.
+            await waitUntilIdle()
+        }
+        guard var job = try await store.jobs().first(where: { $0.id == jobID }), job.state == .paused else { return }
+        // A Backlog job waiting for a Daily job to hand back must not be resumed after it was stopped.
+        if resumeAfter == jobID { resumeAfter = nil }
+        autoPausedThisSession.remove(jobID)
+        job.state = .stopped
+        job.clearPause()
+        try await store.updateJob(job)
     }
 
     /// Call once at launch: items left `processing` go back to `queued` and interrupted jobs become `.paused`.

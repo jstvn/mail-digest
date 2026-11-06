@@ -554,11 +554,14 @@ private actor Counter {
         let runner = h.runner
         let collector = h.collector
         let dailyTask = Box<Task<Void, Error>>()
+        // Waited on, not polled: under a full parallel test run the loop can take longer than `eventually` allows.
+        let dailyTaskCreated = Gate()
         let backlogWasAutoPaused = Box<Bool>()
         await llm.setOnExtract { email in
             if email.id == "old-4@fixture" {
                 // startDaily waits for this very email to settle, so it must not be awaited here.
                 dailyTask.value = Task { try await runner.startDaily() }
+                await dailyTaskCreated.fire()
                 // The .pausing event can only appear after startDaily sets pauseRequested (the flag is set
                 // before emit), so waiting for it stops the loop right after old-4 instead of racing on.
                 _ = await eventually { await collector.events.contains { $0.kind == .backlog && $0.state == .pausing } }
@@ -570,7 +573,7 @@ private actor Counter {
         }
 
         try await h.runner.start(h.plan(boxes: [icloud], to: today.addingTimeInterval(-5 * 86_400)))
-        _ = await eventually { dailyTask.value != nil }
+        await dailyTaskCreated.wait()
         try await #require(dailyTask.value).value
         await h.runner.waitUntilIdle()
 
@@ -1000,11 +1003,14 @@ private func recentMessages(_ count: Int) -> [EmailMessage] {
         let h = Harness(source: source, llm: StubLLMClient(), settings: settings(mailboxes: [icloud]))
         let runner = h.runner
         let dailyTask = Box<Task<Void, Error>>()
+        // Waited on, not polled: under a full parallel test run the loop can take longer than `eventually` allows.
+        let dailyTaskCreated = Gate()
         let collector = h.collector
         await h.collector.attach(h.runner.progress)
         await h.llm.setOnExtract { email in
             if email.id == "old-1@fixture" {
                 dailyTask.value = Task { try await runner.startDaily() }
+                await dailyTaskCreated.fire()
                 _ = await eventually { await collector.events.contains { $0.kind == .backlog && $0.state == .pausing } }
             } else if email.id.hasPrefix("recent-") {
                 // The Mac goes on battery while the Daily job runs.
@@ -1012,7 +1018,7 @@ private func recentMessages(_ count: Int) -> [EmailMessage] {
             }
         }
         try await h.runner.start(h.plan(boxes: [icloud], to: today.addingTimeInterval(-5 * 86_400)))
-        _ = await eventually { dailyTask.value != nil }
+        await dailyTaskCreated.wait()
         try await #require(dailyTask.value).value
         await h.runner.waitUntilIdle()
 
@@ -1023,5 +1029,253 @@ private func recentMessages(_ count: Int) -> [EmailMessage] {
         #expect(try await h.runner.autoResume(blocked: [:]) == backlog.id)
         await h.runner.waitUntilIdle()
         #expect(try await h.job(backlog.id).state == .finished)
+    }
+}
+
+/// Q52: at most one unresolved Daily job; the runner never creates a second one or resumes one by itself.
+@Suite struct JobRunnerDailyLifecycleTests {
+    private func harness(_ messages: [EmailMessage]) async -> Harness {
+        let h = Harness(source: FixtureMailSource(messages: messages), llm: StubLLMClient(),
+                        settings: settings(mailboxes: [icloud]))
+        await h.collector.attach(h.runner.progress)
+        return h
+    }
+
+    /// A Daily job over four recent emails that `interrupt` pauses or stops after the first one.
+    private func interruptedDaily(_ interrupt: @escaping @Sendable (JobRunner) async -> Void,
+                                  messages: [EmailMessage] = recentMessages(4)) async throws -> (Harness, Job) {
+        let h = await harness(messages)
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "recent-0@fixture" { await interrupt(runner) }
+        }
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract(nil)
+        let job = try await h.job()
+        // Pause finishes the email in flight; Stop cancels it and puts it back in the queue.
+        #expect(job.kind == .daily && job.totals.done + job.totals.queued == 4 && job.totals.queued >= 3)
+        return (h, job)
+    }
+
+    private func lifecycle(_ h: Harness) async throws -> DailyLifecycle {
+        DailyLifecycle(jobs: try await h.store.jobs())
+    }
+
+    private func storedJob(_ state: JobState, kind: JobKind = .daily, queued: Int = 1, failed: Int = 0,
+                           created: Date = today) -> Job {
+        Job(id: UUID(), kind: kind, mailboxes: [icloud], scopeFrom: created.addingTimeInterval(-3600),
+            scopeTo: created, state: state, createdAt: created,
+            totals: JobTotals(queued: queued, done: 0, failed: failed, skipped: 0), autoPaused: false)
+    }
+
+    @Test func withNoUnresolvedDailyJobRunNowCreatesOne() async throws {
+        let h = await harness(recentMessages(2))
+        #expect(try await lifecycle(h).menuAction.behavior == .startNew)
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        let jobs = try await h.store.jobs()
+        #expect(jobs.count == 1 && jobs[0].kind == .daily && jobs[0].state == .finished)
+        // A finished Daily job is history, so Run Now is offered again.
+        #expect(try await lifecycle(h) == .none)
+    }
+
+    @Test func pausedDailyResumesTheSameJobAndNeverRepeatsAnEmail() async throws {
+        let (h, paused) = try await interruptedDaily { await $0.pause() }
+        #expect(paused.state == .paused)
+        let state = try await lifecycle(h)
+        #expect(state == .paused(paused))
+        #expect(state.menuAction.behavior == .resume(paused.id))
+
+        // Run Now can't be used to get around it.
+        let itemsBefore = await h.store.allItems()
+        await #expect(throws: JobRunnerError.dailyJobUnresolved) { try await h.runner.startDaily() }
+        await #expect(throws: JobRunnerError.dailyJobUnresolved) {
+            try await h.runner.start(h.plan(kind: .daily, boxes: [icloud]))
+        }
+        #expect(try await h.store.jobs().map(\.id) == [paused.id])
+
+        try await h.runner.resume(jobID: paused.id)
+        await h.runner.waitUntilIdle()
+        let jobs = try await h.store.jobs()
+        #expect(jobs.map(\.id) == [paused.id])
+        #expect(jobs[0].state == .finished && jobs[0].totals.done == 4)
+        // Same queue: nothing enqueued again, and every email went to the model exactly once.
+        let itemsAfter = await h.store.allItems()
+        #expect(Set(itemsAfter.map(\.id)) == Set(itemsBefore.map(\.id)))
+        let calls = await h.llm.extractCalls.map(\.id)
+        #expect(calls.count == 4 && Set(calls).count == 4)
+        #expect(try await lifecycle(h) == .none)
+    }
+
+    @Test func runningDailyBlocksAnotherDailyJob() async throws {
+        let h = await harness(recentMessages(2))
+        let entered = Gate()
+        let release = Gate()
+        await h.llm.setOnExtract { _ in await entered.fire(); await release.wait() }
+        try await h.runner.startDaily()
+        await entered.wait()
+        let running = try await lifecycle(h)
+        if case .running = running {} else { Issue.record("expected running, got \(running)") }
+        #expect(running.menuAction == .running)
+        await #expect(throws: JobRunnerError.alreadyRunning) { try await h.runner.startDaily() }
+        await #expect(throws: JobRunnerError.alreadyRunning) {
+            try await h.runner.start(h.plan(kind: .daily, boxes: [icloud]))
+        }
+        await release.fire()
+        await h.runner.waitUntilIdle()
+        #expect(try await h.store.jobs().count == 1)
+    }
+
+    @Test func stoppedDailyIsNeitherResumedNorReplaced() async throws {
+        let (h, stopped) = try await interruptedDaily { await $0.stop() }
+        #expect(stopped.state == .stopped)
+        #expect(try await lifecycle(h).menuAction.behavior == .review)
+
+        await #expect(throws: JobRunnerError.dailyJobUnresolved) { try await h.runner.startDaily() }
+        #expect(try await h.runner.autoResume(blocked: [:]) == nil)
+        try await h.runner.resume()
+        await h.runner.waitUntilIdle()
+        let job = try await h.job()
+        #expect(try await h.store.jobs().count == 1)
+        #expect(job.state == .stopped && job.totals.queued == 4)
+        #expect(await h.store.allItems().filter { $0.state == .queued }.count == 4)
+
+        // Q48: an explicit Resume from Past Jobs continues it.
+        try await h.runner.resume(jobID: stopped.id)
+        await h.runner.waitUntilIdle()
+        #expect(try await h.job().state == .finished)
+        #expect(try await lifecycle(h) == .none)
+    }
+
+    @Test func stoppingAPausedDailyStoresItStoppedWithItsQueue() async throws {
+        let (h, paused) = try await interruptedDaily { await $0.pause() }
+        try await h.runner.stopPaused(jobID: paused.id)
+        let job = try await h.job()
+        #expect(job.state == .stopped && job.totals.queued == 3 && job.pauseReason == nil)
+        #expect(try await h.runner.autoResume(blocked: [:]) == nil)
+        #expect(try await lifecycle(h) == .stopped(job))
+    }
+
+    @Test func failedDailyKeepsTheRetryPathAndIsNotReplaced() async throws {
+        let h = await harness(recentMessages(3))
+        let llm = h.llm
+        await llm.setOnExtract { email in
+            if email.id == "recent-1@fixture" {
+                await llm.setHealthy(false)
+                throw LLMError.unreachable("connection refused")
+            }
+        }
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        let failed = try await h.job()
+        #expect(failed.state == .failed && failed.totals.queued == 2)
+        #expect(try await lifecycle(h).menuAction.behavior == .retry(failed.id))
+
+        await llm.setOnExtract(nil)
+        await llm.setHealthy(true)
+        await #expect(throws: JobRunnerError.dailyJobUnresolved) { try await h.runner.startDaily() }
+        #expect(try await h.store.jobs().count == 1)
+
+        // Q25: Retry resumes the same job by id.
+        try await h.runner.resume(jobID: failed.id)
+        await h.runner.waitUntilIdle()
+        let jobs = try await h.store.jobs()
+        #expect(jobs.map(\.id) == [failed.id] && jobs[0].state == .finished)
+        #expect(await h.llm.extractCalls.map(\.id).filter { $0 == "recent-0@fixture" }.count == 1)
+    }
+
+    @Test func multipleUnresolvedDailyJobsAreKeptAndNothingIsAdded() async throws {
+        let h = await harness(recentMessages(2))
+        let older = storedJob(.paused, created: today.addingTimeInterval(-2 * 86_400))
+        let newer = storedJob(.stopped, created: today.addingTimeInterval(-86_400))
+        var withFailures = storedJob(.finished, queued: 0, failed: 1, created: today.addingTimeInterval(-3 * 86_400))
+        withFailures.totals.done = 1
+        for job in [older, newer, withFailures] { try await h.store.createJob(job) }
+
+        let state = try await lifecycle(h)
+        #expect(state == .conflict([newer, older]))
+        #expect(state.menuAction.behavior == .review)
+        await #expect(throws: JobRunnerError.dailyJobUnresolved) { try await h.runner.startDaily() }
+        // Retry Failed would turn a third Daily job back into unresolved work.
+        await #expect(throws: JobRunnerError.dailyJobUnresolved) { try await h.runner.retryFailed(jobID: withFailures.id) }
+        let jobs = try await h.store.jobs()
+        #expect(jobs.count == 3)
+        #expect(jobs.first { $0.id == older.id }?.state == .paused)
+        #expect(jobs.first { $0.id == newer.id }?.state == .stopped)
+        #expect(jobs.first { $0.id == withFailures.id }?.state == .finished)
+    }
+
+    @Test func pausedBacklogDoesNotReplaceTheDailyAction() async throws {
+        let h = await harness(recentMessages(2))
+        let backlog = storedJob(.paused, kind: .backlog, queued: 5, created: today.addingTimeInterval(-600))
+        try await h.store.createJob(backlog)
+        #expect(try await lifecycle(h).menuAction.behavior == .startNew)
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        let jobs = try await h.store.jobs()
+        #expect(jobs.first { $0.kind == .daily }?.state == .finished)
+        // A user-paused Backlog job is not resumed by the Daily run (Q46).
+        #expect(jobs.first { $0.id == backlog.id }?.state == .paused)
+    }
+
+    @Test func resumingAPausedDailyPreemptsARunningBacklogThenHandsBack() async throws {
+        let (h, paused) = try await interruptedDaily({ await $0.pause() },
+                                                      messages: recentMessages(4) + oldMessages(8))
+        let runner = h.runner
+        let collector = h.collector
+        let resumeTask = Box<Task<Void, Error>>()
+        // Waited on, not polled: under a full parallel test run the loop can take longer than `eventually` allows.
+        let resumeTaskCreated = Gate()
+        await h.llm.setOnExtract { email in
+            if email.id == "old-2@fixture" {
+                resumeTask.value = Task { try await runner.resume(jobID: paused.id) }
+                await resumeTaskCreated.fire()
+                _ = await eventually { await collector.events.contains { $0.kind == .backlog && $0.state == .pausing } }
+            }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud], to: today.addingTimeInterval(-5 * 86_400)))
+        await resumeTaskCreated.wait()
+        try await #require(resumeTask.value).value
+        await h.runner.waitUntilIdle()
+
+        let jobs = try await h.store.jobs()
+        #expect(jobs.count == 2 && jobs.allSatisfy { $0.state == .finished })
+        #expect(jobs.first { $0.kind == .daily }?.id == paused.id)
+        #expect(await h.collector.events.contains { $0.kind == .backlog && $0.state == .paused })
+        let calls = await h.llm.extractCalls.map(\.id)
+        #expect(calls.count == 12 && Set(calls).count == 12)
+    }
+
+    @Test func afterResolvingTheDailyJobTheNextOneStartsAtTheCursor() async throws {
+        let (h, paused) = try await interruptedDaily { await $0.pause() }
+        try await h.runner.resume(jobID: paused.id)
+        await h.runner.waitUntilIdle()
+
+        h.clock.set(today.addingTimeInterval(3600))
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        let jobs = try await h.store.jobs()
+        #expect(jobs.count == 2)
+        let next = try #require(jobs.first { $0.id != paused.id })
+        // Q23: max(lastDailyScopeTo, now - lookbackCap), unchanged.
+        #expect(next.kind == .daily && next.scopeFrom == paused.scopeTo)
+        #expect(next.scopeTo == today.addingTimeInterval(3600))
+    }
+
+    @Test(arguments: [(JobState.running, JobState.paused), (.listing, .paused), (.pausing, .paused), (.stopping, .stopped)])
+    func stateIsRestoredAfterRelaunch(interrupted: JobState, recovered: JobState) async throws {
+        let store = InMemoryDigestStore()
+        try await store.createJob(storedJob(interrupted, queued: 2))
+        // A new runner on the same store, as after a quit or crash.
+        let h = Harness(source: FixtureMailSource(messages: recentMessages(2)), llm: StubLLMClient(), store: store,
+                        settings: settings(mailboxes: [icloud]))
+        try await h.runner.recoverOnLaunch()
+        let job = try await h.job()
+        #expect(job.state == recovered)
+        let state = try await lifecycle(h)
+        #expect(state.menuAction.behavior == (recovered == .paused ? .resume(job.id) : .review))
+        await #expect(throws: JobRunnerError.dailyJobUnresolved) { try await h.runner.startDaily() }
+        #expect(try await store.jobs().count == 1)
     }
 }

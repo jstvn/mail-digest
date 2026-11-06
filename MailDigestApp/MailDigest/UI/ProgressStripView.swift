@@ -10,6 +10,8 @@ struct ProgressStripView: View {
     /// When set, Pause becomes a menu button with "Pause Now" (cancels the email in flight).
     var onPauseNow: (() -> Void)?
     var onResume: () -> Void = {}
+    /// False where another control already resumes this job, such as the menu's primary Daily action (Q52).
+    var showsResume = true
     var onStop: () -> Void = {}
 
     var body: some View {
@@ -65,7 +67,7 @@ struct ProgressStripView: View {
         HStack(spacing: 8) {
             switch progress.state {
             case .paused:
-                Button("Resume", action: onResume)
+                if showsResume { Button("Resume", action: onResume) }
                 Button("Stop", role: .destructive, action: onStop)
             case .running, .listing:
                 if let onPauseNow {

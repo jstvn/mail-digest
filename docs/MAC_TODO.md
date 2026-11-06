@@ -286,3 +286,19 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 1. **Escape in the menu panel:** with the panel opened by a real click, press Escape. My synthetic Escape did not close the panel, so it is unconfirmed whether the window-style panel closes on Escape. In every state I saw, the status item highlight matched whether the panel was visible.
 2. **Settings from the keyboard:** with the panel open, ⌘, opens Settings in front and closes the panel; type in a field straight away (the keyboard goes to Settings, not the previous app).
 3. **Settings reopen after closing:** close Settings with the red button or ⌘W, reopen from the panel several times; it comes to the front each time.
+
+## Daily lifecycle and the state-aware menu action, Q52 (2026-11-06)
+
+- Core: `DailyLifecycle` (the one unresolved Daily job, from persisted jobs plus live progress) and `DailyMenuAction`; `MorningSchedule.decision` (`notDue` / `start` / `deferred`); `JobRunnerError.dailyJobUnresolved` from `startDaily`, Daily `start` and Daily `retryFailed`; `resume(jobID:)` of a Daily job pre-empts a running Backlog job; `stopPaused(jobID:)`.
+- App: the menu's Run Now row is driven by `DigestRunModel.dailyAction`; `resumeDailyJob(_:expecting:)` re-reads the job before resuming; `runIfDue` uses the schedule decision; Settings opens on the Jobs tab from "Review Daily Job…". Previews: "Menu · …" for each label.
+- Built with `xcodebuild`; the checks below need the running app.
+
+**Still to check by hand:**
+
+1. **Paused Daily:** Run Now, pause after the first email. The lower row reads Resume and the card shows only Stop (no second Resume). Click Resume: the same job continues (Settings > Jobs still lists one Daily job; no email repeats in the Activity log). When it finishes the row is Run Now again. The Review Panel's strip still has its own Resume while paused.
+2. **Relaunch:** pause a Daily job, quit, relaunch: the row reads Resume straight away and the card is the paused Daily job.
+3. **Stop on a paused card:** pause, then Stop in the card: the job shows as Stopped in Settings > Jobs and the row reads "Review Daily Job…", which opens Settings on the Jobs tab. Resume it there; the row returns to Run Now when it finishes.
+4. **Failed Daily:** quit Ollama during a Daily run. The banner shows the error without its own Retry; the row reads "Retry Daily Job". Start Ollama and click it: the same job finishes.
+5. **Backlog:** with a Backlog job paused, the card keeps its Resume and the row stays Run Now. With a Backlog job running, Run Now is enabled and pauses it ("Daily job running"); it continues after the Daily job.
+6. **Scheduler:** leave a Daily job paused overnight (or set the run time a few minutes ahead with one paused). At the run time no new job appears and the menu says the scheduled digest is waiting. Resume and let it finish: a new Daily job starts within a moment, scoped from the previous Daily job's end.
+7. **VoiceOver:** the Resume row reads "Resume Daily Digest"; disabled rows read as dimmed.
