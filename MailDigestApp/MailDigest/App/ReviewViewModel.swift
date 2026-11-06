@@ -13,12 +13,6 @@ enum ReviewPanelState: Equatable {
     case digest
 }
 
-/// Where an info card's "Save to Notes" stands.
-enum NotesSaveState: Equatable {
-    case idle, saving, saved
-    case failed(String)
-}
-
 /// Owns the digest being reviewed and the user's selection. Store work happens off the main actor;
 /// the pure decisions live in `ReviewActions` and `ReviewPresentation` (core).
 @MainActor @Observable
@@ -43,13 +37,21 @@ final class ReviewViewModel {
     private(set) var reminderWriter: (any ReminderWriter)?
     /// Pinned info from earlier digests, newest first; the current digest's own pins stay in its categories.
     private(set) var carriedPins: [PinnedInfo] = []
+    /// Shared with the cross-digest coordinator: "Save to Notes" progress and the ignore-rule notice.
+    @ObservationIgnored let notes: NotesSaver
+    @ObservationIgnored let ignore: IgnoreSuggestionModel
     /// "Save to Notes" progress per info id.
-    private(set) var notesStates: [String: NotesSaveState] = [:]
+    var notesStates: [String: NotesSaveState] { notes.states }
     /// A sender the user keeps dismissing, offered as an Ignored sender. One at a time.
-    private(set) var ignoreSuggestion: IgnoreSuggestion?
+    var ignoreSuggestion: IgnoreSuggestion? { ignore.suggestion }
     /// Set by `DigestRunModel`; the ignore-rule notice reads and writes the sender lists here.
-    @ObservationIgnored var settingsStore: SettingsStore?
-    @ObservationIgnored var notesWriter: any NotesWriter = AppleScriptNotesWriter()
+    var settingsStore: SettingsStore? {
+        get { ignore.settingsStore }
+        set { ignore.settingsStore = newValue }
+    }
+    /// Called after a reload that changed what the store holds, so the cross-digest library and the shown
+    /// canvas refresh at the same moments (job progress, run end, cleanup).
+    @ObservationIgnored var onReloaded: (@MainActor () async -> Void)?
     /// Called after approve or dismiss changed what is pending; auto-file uses it to move newly processed mail.
     @ObservationIgnored var onSuggestionsSettled: (@MainActor () async -> Void)?
 
@@ -59,23 +61,24 @@ final class ReviewViewModel {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var isReloading = false
     @ObservationIgnored private var needsReload = false
-    /// Addresses the user chose "Not Now" for; forgotten at relaunch.
-    @ObservationIgnored private var snoozedSenders: Set<String> = []
     /// The digest whose senders were last checked for ignore suggestions on load.
     @ObservationIgnored private var evaluatedDigestID: UUID?
     @ObservationIgnored var listName: @MainActor () -> String = { DigestSettings.defaultListName }
     static let listIDKey = "remindersListID"
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "review")
 
-    init() {}
+    init() {
+        notes = NotesSaver()
+        ignore = IgnoreSuggestionModel()
+    }
 
     /// Previews and tests: shows a fixed state without a store.
     init(preview state: ReviewState?, emails: [String: EmailContext] = [:], jobKind: JobKind = .daily,
          writer: (any ReminderWriter)? = nil, carriedPins: [PinnedInfo] = [],
          ignoreSuggestion: IgnoreSuggestion? = nil) {
         self.carriedPins = carriedPins
-        self.ignoreSuggestion = ignoreSuggestion
-        self.notesWriter = RecordingNotesWriter()
+        self.ignore = IgnoreSuggestionModel(suggestion: ignoreSuggestion)
+        self.notes = NotesSaver(preview: RecordingNotesWriter())
         self.state = state
         self.emails = emails
         self.jobKind = jobKind
@@ -161,11 +164,11 @@ final class ReviewViewModel {
 
     /// Loads the latest digest. Safe to call often (a running job calls it as results arrive): overlapping
     /// calls coalesce, and a result that raced with a local edit is discarded and reloaded.
-    func reload() async {
+    /// `notifying: false` skips `onReloaded`, for callers that refresh the cross-digest views themselves.
+    func reload(notifying: Bool = true) async {
         guard let store else { return }
         if isReloading { needsReload = true; return }
         isReloading = true
-        defer { isReloading = false }
         repeat {
             needsReload = false
             let startedAt = generation
@@ -214,7 +217,7 @@ final class ReviewViewModel {
                 isLoaded = true
                 if let latest, evaluatedDigestID != latest.id {
                     evaluatedDigestID = latest.id
-                    await evaluateIgnoreSuggestions(senders: Set(latest.suggestions.compactMap { context[$0.emailID]?.sender }))
+                    await ignore.evaluate(senders: Set(latest.suggestions.compactMap { context[$0.emailID]?.sender }), store: store)
                 }
             } catch {
                 Self.log.error("could not load digest: \(String(describing: error), privacy: .public)")
@@ -222,6 +225,9 @@ final class ReviewViewModel {
                 isLoaded = true
             }
         } while needsReload
+        // Cleared before the hook so a reload requested from inside it is not lost.
+        isReloading = false
+        if notifying { await onReloaded?() }
     }
 
     /// Adds job items' sender/subject/mailbox to the lookup; the first item for an email wins.
@@ -316,7 +322,7 @@ final class ReviewViewModel {
         do {
             apply(try await ReviewActions.dismiss(suggestions, state: state, emails: emails, store: store, clock: clock))
             message = nil
-            await evaluateIgnoreSuggestions(senders: Set(suggestions.compactMap { emails[$0.emailID]?.sender }))
+            await ignore.evaluate(senders: Set(suggestions.compactMap { emails[$0.emailID]?.sender }), store: store)
             await onSuggestionsSettled?()
         } catch {
             message = "Could not dismiss those suggestions."
@@ -358,82 +364,28 @@ final class ReviewViewModel {
         return carriedPins.first { $0.item.id == item.id }?.digestID
     }
 
-    /// "Save to Notes": runs only from a click. Logs success or failure, never the text.
+    /// "Save to Notes": runs only from a click.
     func saveToNotes(_ item: InfoItem) async {
-        guard notesStates[item.id] != .saving else { return }
         let date: Date
         if let state, state.digest.info.contains(where: { $0.id == item.id }) {
             date = state.digest.createdAt
         } else {
             date = carriedPins.first { $0.item.id == item.id }?.digestCreatedAt ?? clock.now()
         }
-        let entry = NotesEntry.make(for: item, email: emails[item.emailID], date: date)
-        notesStates[item.id] = .saving
-        do {
-            try await notesWriter.append(entry)
-            Self.log.notice("save to notes: succeeded")
-            notesStates[item.id] = .saved
-            try? await Task.sleep(for: .seconds(3))
-            if notesStates[item.id] == .saved { notesStates[item.id] = nil }
-        } catch {
-            Self.log.error("save to notes: failed")
-            notesStates[item.id] = .failed(Self.notesMessage(for: error))
-        }
-    }
-
-    private static func notesMessage(for error: Error) -> String {
-        switch error as? OsascriptError {
-        case .automationDenied:
-            return "Notes access is turned off. Allow Mail Digest to control Notes in System Settings > Privacy & Security > Automation."
-        case .timedOut:
-            return "Notes did not respond. Try again."
-        default:
-            return "Could not save to Notes."
-        }
+        await notes.save(item, email: emails[item.emailID], date: date)
     }
 
     // MARK: Learned ignore rules
 
-    /// Checks these senders' dismissals and shows the first match, unless a notice is already showing.
-    private func evaluateIgnoreSuggestions(senders: Set<String>) async {
-        guard let store, let settings = settingsStore?.settings, ignoreSuggestion == nil else { return }
-        for sender in Set(senders.map(MailFilter.address(from:))).subtracting(snoozedSenders).sorted() {
-            guard let decisions = try? await store.decisions(for: sender),
-                  let found = IgnoreRuleSuggester.suggestion(for: sender, decisions: decisions, settings: settings)
-            else { continue }
-            ignoreSuggestion = found
-            return
-        }
-    }
-
     /// A name for the suggested sender: the display name when this digest knows one, otherwise the address.
-    var ignoreSuggestionName: String? {
-        guard let suggestion = ignoreSuggestion else { return nil }
-        let match = emails.values.first { MailFilter.address(from: $0.sender) == suggestion.sender }
-        return match.map { ReviewPresentation.senderName($0.sender) } ?? suggestion.sender
-    }
+    var ignoreSuggestionName: String? { ignore.displayName }
 
     /// "Ignore Sender": the only path that adds to the Ignored list.
-    func acceptIgnoreSuggestion() {
-        guard let suggestion = ignoreSuggestion, let store = settingsStore else { return }
-        if !store.settings.ignoredSenders.contains(where: { MailFilter.address(from: $0) == suggestion.sender }) {
-            store.settings.ignoredSenders.append(suggestion.sender)
-        }
-        ignoreSuggestion = nil
-    }
+    func acceptIgnoreSuggestion() { ignore.accept() }
 
     /// "Not Now": hides the notice until the app is relaunched.
-    func snoozeIgnoreSuggestion() {
-        if let suggestion = ignoreSuggestion { snoozedSenders.insert(suggestion.sender) }
-        ignoreSuggestion = nil
-    }
+    func snoozeIgnoreSuggestion() { ignore.snooze() }
 
     /// "Don't Ask Again": remembers the sender so it is never suggested again.
-    func declineIgnoreSuggestion() {
-        guard let suggestion = ignoreSuggestion, let store = settingsStore else { return }
-        if !store.settings.declinedIgnoreSuggestions.contains(suggestion.sender) {
-            store.settings.declinedIgnoreSuggestions.append(suggestion.sender)
-        }
-        ignoreSuggestion = nil
-    }
+    func declineIgnoreSuggestion() { ignore.decline() }
 }

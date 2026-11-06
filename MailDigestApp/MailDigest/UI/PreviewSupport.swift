@@ -38,6 +38,81 @@ enum PreviewSupport {
         return progress
     }
 
+    // MARK: Cross-digest review (T24 previews)
+
+    /// Gregorian calendar in the fixtures' time zone.
+    static var calendar: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = PreviewFixtures.timeZone
+        return c
+    }
+
+    /// The sample digest copied to another day with fresh suggestion ids, so several days can coexist.
+    static func digest(daysAgo: Int, id: UUID = UUID()) -> Digest {
+        var d = PreviewFixtures.digest
+        d.id = id
+        d.createdAt = PreviewFixtures.now.addingTimeInterval(-Double(daysAgo) * 86_400)
+        d.suggestions = d.suggestions.map { var s = $0; s.id = UUID(); return s }
+        return d
+    }
+
+    /// A multi-day library: today, two earlier days (the older in another month) and one Backlog job.
+    static func library(backlogID: UUID = UUID(), backlogJob: Job? = nil) -> ReviewLibrary {
+        let summaries = [
+            DigestSummary(id: UUID(), createdAt: PreviewFixtures.now, kind: .daily, emailCount: 23, pendingCount: 4, failedCount: 0),
+            DigestSummary(id: UUID(), createdAt: PreviewFixtures.now.addingTimeInterval(-86_400), kind: .daily, emailCount: 12, pendingCount: 2, failedCount: 1),
+            DigestSummary(id: UUID(), createdAt: PreviewFixtures.now.addingTimeInterval(-40 * 86_400), kind: .daily, emailCount: 9, pendingCount: 0, failedCount: 0),
+            DigestSummary(id: backlogID, createdAt: PreviewFixtures.now.addingTimeInterval(-3_600), kind: .backlog, emailCount: 40, pendingCount: 6, failedCount: 0),
+        ]
+        let archive = DigestArchive(summaries: summaries, now: PreviewFixtures.now, calendar: calendar)
+        return ReviewLibrary(preview: archive, calendar: calendar, backlogJobs: backlogJob.map { [$0] } ?? [])
+    }
+
+    /// A coordinator with multi-day fixtures and no store: Today (with carry-over), a Day, a Backlog batch,
+    /// the Review Queue and the Logbook all filled, so each canvas can be previewed by `selection`.
+    static func coordinator(selection: SidebarItem = .today, review: ReviewViewModel = review(),
+                            writer: (any ReminderWriter)? = RecordingReminderWriter()) -> ReviewCoordinator {
+        let emails = PreviewFixtures.emails
+        let todayDigest = digest(daysAgo: 0)
+        let earlier = digest(daysAgo: 1)
+        let carry = SuggestionRecord.records(from: earlier, kind: .daily, emails: emails)
+            .filter { $0.suggestion.status == .pending }
+        let todayContent = DayContent(digests: [todayDigest], kind: .daily, emails: emails)
+        let owners = Dictionary(uniqueKeysWithValues: todayDigest.info.map {
+            ($0.id, InfoOwner(digestID: todayDigest.id, createdAt: todayDigest.createdAt))
+        })
+        let today = TodayCanvasModel(
+            preview: DayCanvasModel(preview: todayContent, emails: emails, owners: owners),
+            carryOver: PagedRecordsModel(preview: carry, pageSize: 100))
+        let day = DayCanvasModel(preview: DayContent(digests: [earlier], kind: .daily, emails: emails), emails: emails)
+        let backlogDigest = digest(daysAgo: 0)
+        let batching = BacklogBatching(jobOrder: backlogDigest.suggestions.map(\.emailID),
+                                       resultIDs: Set(backlogDigest.suggestions.map(\.emailID)), size: 2)
+        let backlog = BacklogCanvasModel(
+            preview: DayContent(digests: [batching.digest(backlogDigest, batch: 0)], kind: .backlog, emails: emails),
+            emails: emails, batching: batching)
+        let queueRecords = carry + SuggestionRecord.records(from: backlogDigest, kind: .backlog, emails: emails)
+        var decided = SuggestionRecord.records(from: earlier, kind: .daily, emails: emails).prefix(2).map { r -> SuggestionRecord in
+            var r = r
+            r.suggestion.status = .approved
+            r.suggestion.decidedAt = PreviewFixtures.now
+            return r
+        }
+        decided[1].suggestion.status = .dismissed
+        let c = coordinator(selection: selection, review: review, writer: writer, today: today, day: day, backlog: backlog,
+                            queue: queueRecords, decided: decided)
+        return c
+    }
+
+    private static func coordinator(selection: SidebarItem, review: ReviewViewModel, writer: (any ReminderWriter)?,
+                                    today: TodayCanvasModel, day: DayCanvasModel, backlog: BacklogCanvasModel,
+                                    queue: [SuggestionRecord], decided: [SuggestionRecord]) -> ReviewCoordinator {
+        ReviewCoordinator(
+            preview: library(), review: review, today: today, day: day, backlog: backlog,
+            reviewQueue: PagedRecordsModel(preview: queue, groups: ReviewCanvasLogic.groupByDay(queue, calendar: calendar)),
+            logbook: PagedRecordsModel(preview: decided), selection: selection, writer: writer)
+    }
+
     static let fastLocal = MailAccessStatus(fullDiskAccess: .granted, automation: .granted)
     static let fallback = MailAccessStatus(fullDiskAccess: .denied, automation: .granted)
     static let automationDenied = MailAccessStatus(fullDiskAccess: .denied, automation: .denied)

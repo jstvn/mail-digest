@@ -26,6 +26,9 @@ final class DigestRunModel {
     private(set) var lastRunFoundNothing = false
     /// The panel's digest and selection; refreshed while a job runs.
     let review: ReviewViewModel
+    /// The sidebar summaries (Q56) and the cross-digest canvases and triage actions (Q54).
+    let library: ReviewLibrary
+    let coordinator: ReviewCoordinator
     let settings: SettingsStore
     let reminders: RemindersAccessModel
     /// The Processed tab: cleanup, Undo history and auto-file.
@@ -74,10 +77,15 @@ final class DigestRunModel {
     init(settings: SettingsStore = SettingsStore()) {
         self.settings = settings
         self.review = ReviewViewModel()
+        self.library = ReviewLibrary()
+        self.coordinator = ReviewCoordinator(library: library, review: review)
         self.reminders = RemindersAccessModel()
         self.processed = ProcessedMailModel(review: review, settings: settings)
         reminders.attach(review: review)
+        reminders.attach(coordinator: coordinator)
         review.onSuggestionsSettled = { [processed] in await processed.refresh() }
+        // Every existing `review.reload()` (job progress, run end, cleanup) also refreshes the sidebar and the shown canvas.
+        review.onReloaded = { [coordinator] in await coordinator.storeDidChange() }
         review.listName = { [settings] in settings.settings.resolvedListName }
         review.settingsStore = settings
         settings.onChange = { [weak self] in self?.evaluateResources() }
@@ -86,11 +94,15 @@ final class DigestRunModel {
     /// Previews: fixed run state, no store or Mail access.
     init(preview: SettingsStore = SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
          review: ReviewViewModel = ReviewViewModel(),
+         coordinator: ReviewCoordinator? = nil,
          reminders: RemindersAccessModel = RemindersAccessModel(preview: .granted), progress: JobProgress? = nil, banner: String? = nil, failedJobID: UUID? = nil,
          lastRunAt: Date? = nil, lastRunFoundNothing: Bool = false, lastRunSummary: String? = nil,
          jobs: [Job] = [], scheduledRunWaiting: Bool = false) {
         self.settings = preview
         self.review = review
+        let coordinator = coordinator ?? ReviewCoordinator.empty(review: review)
+        self.coordinator = coordinator
+        self.library = coordinator.library
         self.reminders = reminders
         self.processed = ProcessedMailModel(review: review, settings: preview, actions: RecordingMailActions(locations: [:]))
         self.progress = progress
@@ -227,6 +239,7 @@ final class DigestRunModel {
     func loadLastRun() async {
         guard let store = await openStore() else { return }
         await review.attach(store: store)
+        await coordinator.attach(store: store)
         // Building the runner puts jobs interrupted by a quit or crash back to paused, so it comes before
         // loading the resumable job.
         _ = await ensureRunner()
@@ -251,6 +264,7 @@ final class DigestRunModel {
             let opened = try await Task.detached(priority: .userInitiated) { try GRDBDigestStore(path: path) }.value
             store = opened
             await review.attach(store: opened)
+            await coordinator.attach(store: opened)
             await processed.attach(store: opened)
             return opened
         } catch {

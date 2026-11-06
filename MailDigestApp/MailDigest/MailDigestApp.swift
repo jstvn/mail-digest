@@ -19,6 +19,7 @@ struct MailDigestApp: App {
                 .task { await launch() }
                 // A clicked notification opens the review panel.
                 .onChange(of: router.openReviewRequests) { _, _ in
+                    run.coordinator.select(.today)
                     openWindow(id: "review")
                     NSApp.activate()
                 }
@@ -55,7 +56,8 @@ struct MailDigestApp: App {
     /// suggestions when there are any. The icon is a template image, so the status item keeps its native
     /// look and highlight.
     private var menuBarLabel: some View {
-        let count = run.review.pendingCount
+        // All pending suggestions across every digest, not just the latest one.
+        let count = run.library.archive.pendingCount
         let icon = run.menuBarIcon
         var label = count > 0 ? "Mail Digest, \(count) pending suggestions" : "Mail Digest"
         if let extra = icon.accessibilityText { label += ", \(extra)" }

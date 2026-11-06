@@ -125,4 +125,15 @@ public struct DigestArchive: Sendable, Equatable {
     public func digestIDs(for day: DigestDay) -> [UUID] {
         day < today ? digestsByDay[day] ?? [] : []
     }
+
+    /// Whether this digest belongs to Today's Daily digests.
+    public func isToday(digestID: UUID) -> Bool { todayDigestIDs.contains(digestID) }
+
+    /// The earlier day whose Daily digests include this digest, or nil for today, a Backlog or an unknown id.
+    public func day(ofDigest id: UUID) -> DigestDay? {
+        digestsByDay.first { $0.value.contains(id) }?.key
+    }
+
+    /// Whether `item` still points at something the sidebar lists, so a stale selection can fall back to Today.
+    public func hasBacklog(_ id: UUID) -> Bool { backlogs.contains { $0.id == id } }
 }

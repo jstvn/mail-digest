@@ -80,4 +80,14 @@ private func summary(_ kind: JobKind, _ date: Date, emails: Int = 1, pending: In
         #expect(archive.backlogs.map(\.actionableCount) == [4, 6] && archive.backlogs.map(\.emailCount) == [20, 30])
         #expect(!archive.months.flatMap(\.days).flatMap(\.digestIDs).contains(oldBacklog.id))
     }
+
+    @Test func locatesADigestsSidebarEntry() {
+        let today = summary(.daily, at(2026, 3, 5, 6)), earlier = summary(.daily, at(2026, 3, 2))
+        let backlog = summary(.backlog, at(2026, 3, 1))
+        let archive = DigestArchive(summaries: [today, earlier, backlog], now: at(2026, 3, 5), calendar: cal)
+        #expect(archive.isToday(digestID: today.id) && !archive.isToday(digestID: earlier.id))
+        #expect(archive.day(ofDigest: earlier.id) == DigestDay(year: 2026, month: 3, day: 2))
+        #expect(archive.day(ofDigest: today.id) == nil && archive.day(ofDigest: backlog.id) == nil)
+        #expect(archive.hasBacklog(backlog.id) && !archive.hasBacklog(earlier.id))
+    }
 }

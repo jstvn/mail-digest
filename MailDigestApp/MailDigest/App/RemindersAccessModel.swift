@@ -11,6 +11,7 @@ final class RemindersAccessModel {
 
     @ObservationIgnored private let writer: EventKitReminderWriter?
     @ObservationIgnored private weak var review: ReviewViewModel?
+    @ObservationIgnored private weak var coordinator: ReviewCoordinator?
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "reminders")
 
     init(writer: EventKitReminderWriter = EventKitReminderWriter()) {
@@ -27,6 +28,12 @@ final class RemindersAccessModel {
     /// Connects the review panel and applies the current status to it.
     func attach(review: ReviewViewModel) {
         self.review = review
+        apply()
+    }
+
+    /// Connects the cross-digest coordinator, which writes approvals with the same writer.
+    func attach(coordinator: ReviewCoordinator) {
+        self.coordinator = coordinator
         apply()
     }
 
@@ -59,6 +66,8 @@ final class RemindersAccessModel {
     }
 
     private func apply() {
-        review?.setReminderWriter(status == .granted ? writer : nil)
+        let granted: (any ReminderWriter)? = status == .granted ? writer : nil
+        review?.setReminderWriter(granted)
+        coordinator?.setReminderWriter(granted)
     }
 }
