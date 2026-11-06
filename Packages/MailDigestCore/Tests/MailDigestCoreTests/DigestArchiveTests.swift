@@ -75,7 +75,9 @@ private func summary(_ kind: JobKind, _ date: Date, emails: Int = 1, pending: In
         let archive = DigestArchive(summaries: [daily, oldBacklog, todayDaily, newBacklog], now: at(2026, 3, 5, 8), calendar: cal)
         #expect(archive.todayCount == 4)
         #expect(archive.reviewQueueCount == 14)
-        #expect(archive.pendingCount == 12)
+        #expect(archive.carryOverCount == 2)
+        // Menu bar and Review Queue share one count, failed suggestions included.
+        #expect(archive.reviewQueueCount == 14)
         #expect(archive.backlogs.map(\.id) == [newBacklog.id, oldBacklog.id])
         #expect(archive.backlogs.map(\.actionableCount) == [4, 6] && archive.backlogs.map(\.emailCount) == [20, 30])
         #expect(!archive.months.flatMap(\.days).flatMap(\.digestIDs).contains(oldBacklog.id))

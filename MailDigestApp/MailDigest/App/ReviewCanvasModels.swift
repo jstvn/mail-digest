@@ -84,11 +84,11 @@ final class DayCanvasModel {
     }
 
     var actionable: [SuggestionRecord] {
-        content?.records.filter { $0.suggestion.status == .pending || $0.suggestion.status == .failed } ?? []
+        content.map { ReviewCanvasLogic.split($0.records).actionable } ?? []
     }
     /// Approved, dismissed and other settled suggestions, still shown in a snapshot.
     var settled: [SuggestionRecord] {
-        content?.records.filter { $0.suggestion.status != .pending && $0.suggestion.status != .failed } ?? []
+        content.map { ReviewCanvasLogic.split($0.records).settled } ?? []
     }
     var page: RecordPage {
         ReviewCanvasLogic.page(actionable, limit: Self.presentationLimit, showAll: showAll)
@@ -324,10 +324,10 @@ final class BacklogCanvasModel {
 
     /// A Backlog has no digest-wide cap, so the shown batch lists every actionable suggestion.
     var actionable: [SuggestionRecord] {
-        content?.records.filter { $0.suggestion.status == .pending || $0.suggestion.status == .failed } ?? []
+        content.map { ReviewCanvasLogic.split($0.records).actionable } ?? []
     }
     var settled: [SuggestionRecord] {
-        content?.records.filter { $0.suggestion.status != .pending && $0.suggestion.status != .failed } ?? []
+        content.map { ReviewCanvasLogic.split($0.records).settled } ?? []
     }
 
     var batchTitle: String? { batching.map { $0.title(batch: batchIndex) } }

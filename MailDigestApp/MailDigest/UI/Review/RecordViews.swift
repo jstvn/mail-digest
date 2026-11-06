@@ -19,6 +19,12 @@ struct SelectionButtons: View {
 
 /// A titled list of actionable suggestion rows. `count` is the section's full size, which may exceed
 /// `records` when the Q16 page hides some; keyboard focus is shared across all sections of a canvas.
+struct ScopeAction {
+    var title: String
+    var help: String
+    var action: () -> Void
+}
+
 struct ActionableRecordsSection: View {
     let coordinator: ReviewCoordinator
     let title: String
@@ -26,11 +32,23 @@ struct ActionableRecordsSection: View {
     let records: [SuggestionRecord]
     let focus: FocusState<UUID?>.Binding
     var emptyText: String = "Nothing to review."
+    /// Replaces the plain count, e.g. "25 of 42" when the section is truncated.
+    var countText: String?
+    /// Header button that widens or narrows the section, e.g. Show All.
+    var scopeAction: ScopeAction?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "\(title) (\(count))") {
-                SelectionButtons(coordinator: coordinator, records: records)
+            SectionHeader(title: "\(title) · \(countText ?? String(count))") {
+                HStack(spacing: 10) {
+                    if let scopeAction {
+                        Button(scopeAction.title, action: scopeAction.action)
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
+                            .help(scopeAction.help)
+                    }
+                    SelectionButtons(coordinator: coordinator, records: records)
+                }
             }
             if records.isEmpty {
                 Text(emptyText).foregroundStyle(.secondary)
@@ -113,7 +131,7 @@ struct SettledRecordsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader("\(title) (\(records.count))")
+            SectionHeader("\(title) · \(records.count)")
             LazyVStack(spacing: 0) {
                 ForEach(records) { record in
                     SettledRecordRow(record: record)

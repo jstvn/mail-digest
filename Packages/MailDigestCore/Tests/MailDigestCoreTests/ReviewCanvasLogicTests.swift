@@ -50,4 +50,44 @@ import Testing
         let carried = ReviewCanvasLogic.carriedPins(pins, excludingDigests: [today], shownEmailIDs: ["c"])
         #expect(carried.map(\.item.emailID) == ["b"])
     }
+
+    private func record(_ n: Int, status: SuggestionStatus) -> SuggestionRecord {
+        var r = record(n, created: PreviewFixtures.now)
+        r.suggestion.status = status
+        return r
+    }
+
+    @Test func splitKeepsFailedActionable() {
+        let all = [record(1, status: .pending), record(2, status: .failed), record(3, status: .approved),
+                   record(4, status: .dismissed)]
+        let split = ReviewCanvasLogic.split(all)
+        #expect(split.actionable.map(\.id) == [all[0].id, all[1].id])
+        #expect(split.settled.map(\.id) == [all[2].id, all[3].id])
+    }
+
+    @Test func pageReportsScope() {
+        let records = (0..<30).map { record($0, created: PreviewFixtures.now) }
+        let partial = ReviewCanvasLogic.page(records, limit: 25, showAll: false)
+        #expect(partial.shownCount == 25 && partial.totalCount == 30 && partial.isPartial)
+        #expect(partial.countText == "25 of 30")
+        let all = ReviewCanvasLogic.page(records, limit: 25, showAll: true)
+        #expect(all.shownCount == 30 && all.totalCount == 30 && !all.isPartial && all.countText == "30")
+    }
+
+    @Test func scopeTexts() {
+        #expect(ReviewCanvasLogic.showingText(shown: 50, total: 130) == "Showing 50 of 130")
+        #expect(ReviewCanvasLogic.selectionText(selected: 3, shown: 25, isPartial: true) == "3 selected of 25 shown")
+        #expect(ReviewCanvasLogic.selectionText(selected: 3, shown: 25, isPartial: false) == "3 selected")
+    }
+
+    @Test func nextStartOfDayUsesTheCalendarZone() {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "Pacific/Auckland")!
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let next = ReviewCanvasLogic.nextStartOfDay(after: now, calendar: c)
+        #expect(next > now && next.timeIntervalSince(now) <= 86_400 + 3_600)
+        #expect(c.startOfDay(for: next) == next)
+        // Exactly at midnight, the next one is a day later.
+        #expect(ReviewCanvasLogic.nextStartOfDay(after: next, calendar: c) > next)
+    }
 }

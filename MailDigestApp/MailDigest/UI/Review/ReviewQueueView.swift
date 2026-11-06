@@ -27,7 +27,7 @@ struct ReviewQueueView: View {
         let groups = groups
         let shown = groups.flatMap(\.records)
         CanvasScaffold(run: run, access: access, title: "Review Queue",
-                       subtitle: "\(run.library.archive.reviewQueueCount) unreviewed", records: shown,
+                       subtitle: "\(run.library.archive.reviewQueueCount) unreviewed", records: shown, isPartial: queue.hasMore,
                        revealTarget: { _ in nil }) { focus in
             if !queue.isLoaded {
                 ProgressView("Loading…").frame(maxWidth: .infinity, minHeight: 160)
@@ -47,8 +47,13 @@ struct ReviewQueueView: View {
                         count: group.records.count, records: group.records, focus: focus)
                 }
                 if queue.hasMore {
-                    Button("Load More") { Task { await coordinator.loadMoreReviewQueue() } }
-                        .frame(maxWidth: .infinity)
+                    HStack(spacing: 12) {
+                        Text(ReviewCanvasLogic.showingText(
+                            shown: shown.count, total: max(run.library.archive.reviewQueueCount, shown.count)))
+                            .foregroundStyle(.secondary)
+                        Button("Load More") { Task { await coordinator.loadMoreReviewQueue() } }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
         }

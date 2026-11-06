@@ -14,6 +14,8 @@ struct CanvasScaffold<Content: View>: View {
     let subtitle: String?
     let headline: String
     let records: [SuggestionRecord]
+    /// Whether actionable suggestions are hidden from `records` (Show All not chosen, or more pages unloaded).
+    let isPartial: Bool
     /// The scroll id of whatever shows this email (a suggestion or info card); nil when nothing does.
     let revealTarget: (String) -> AnyHashable?
     let content: (FocusState<UUID?>.Binding) -> Content
@@ -22,7 +24,7 @@ struct CanvasScaffold<Content: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(run: DigestRunModel, access: MailAccessModel, title: String, subtitle: String? = nil, headline: String = "",
-         records: [SuggestionRecord] = [], revealTarget: @escaping (String) -> AnyHashable? = { _ in nil },
+         records: [SuggestionRecord] = [], isPartial: Bool = false, revealTarget: @escaping (String) -> AnyHashable? = { _ in nil },
          @ViewBuilder content: @escaping (FocusState<UUID?>.Binding) -> Content) {
         self.run = run
         self.access = access
@@ -30,6 +32,7 @@ struct CanvasScaffold<Content: View>: View {
         self.subtitle = subtitle
         self.headline = headline
         self.records = records
+        self.isPartial = isPartial
         self.revealTarget = revealTarget
         self.content = content
     }
@@ -67,7 +70,7 @@ struct CanvasScaffold<Content: View>: View {
         }
         .safeAreaInset(edge: .bottom) {
             if !records.isEmpty {
-                TriageBar(coordinator: coordinator, records: records)
+                TriageBar(coordinator: coordinator, records: records, isPartial: isPartial)
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }

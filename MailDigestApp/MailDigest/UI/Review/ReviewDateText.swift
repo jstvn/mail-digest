@@ -33,8 +33,3 @@ enum ReviewDateText {
         return formatter.string(from: date)
     }
 }
-
-extension SuggestionRecord {
-    /// Pending or failed: the user can still act on it.
-    var isActionable: Bool { suggestion.status == .pending || suggestion.status == .failed }
-}

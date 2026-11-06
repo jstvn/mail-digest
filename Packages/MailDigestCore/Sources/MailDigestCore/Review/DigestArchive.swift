@@ -75,10 +75,10 @@ public struct DigestArchive: Sendable, Equatable {
     public let startOfToday: Date
     /// Today's actionable badge: today's Daily digests plus unreviewed Daily digests from earlier days.
     public let todayCount: Int
-    /// Review Queue badge: actionable suggestions in every digest, Backlog included.
+    /// Actionable suggestions in Daily digests created before today (the whole carry-over).
+    public let carryOverCount: Int
+    /// Review Queue and menu bar badge: pending plus failed suggestions in every digest, Backlog included.
     public let reviewQueueCount: Int
-    /// Pending suggestions in every digest (not failed), for the menu bar badge.
-    public let pendingCount: Int
     /// Days before today that have a Daily digest, grouped by month; newest first.
     public let months: [ArchiveMonth]
     /// Backlog digests, newest first.
@@ -100,8 +100,8 @@ public struct DigestArchive: Sendable, Equatable {
         todayCount = dailies
             .filter { $0.createdAt < start || DigestDay($0.createdAt, calendar: calendar) == today }
             .reduce(0) { $0 + actionable($1) }
+        carryOverCount = dailies.filter { $0.createdAt < start }.reduce(0) { $0 + actionable($1) }
         reviewQueueCount = summaries.reduce(0) { $0 + actionable($1) }
-        pendingCount = summaries.reduce(0) { $0 + $1.pendingCount }
 
         var byDay: [DigestDay: [DigestSummary]] = [:]
         for s in dailies {

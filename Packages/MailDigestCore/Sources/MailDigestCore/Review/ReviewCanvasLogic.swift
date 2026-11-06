@@ -11,6 +11,16 @@ public struct RecordGroup: Sendable, Equatable, Identifiable {
 public struct RecordPage: Sendable, Equatable {
     public var visible: [SuggestionRecord]
     public var hiddenCount: Int
+
+    /// Records on screen.
+    public var shownCount: Int { visible.count }
+    /// Records in the whole set, shown or not.
+    public var totalCount: Int { visible.count + hiddenCount }
+    /// Whether some records are hidden, so actions cover only part of the set.
+    public var isPartial: Bool { hiddenCount > 0 }
+
+    /// Section header count: "25 of 42" when partial, else "42".
+    public var countText: String { ReviewCanvasLogic.countText(shown: shownCount, total: totalCount) }
 }
 
 /// Pure grouping and filtering behind the review canvases, so the app models stay thin.
@@ -26,6 +36,32 @@ public enum ReviewCanvasLogic {
             byDay[d, default: []].append(r)
         }
         return order.map { RecordGroup(day: $0, records: byDay[$0] ?? []) }
+    }
+
+    /// Splits records into those the user can still act on (pending, failed) and settled ones
+    /// (approved, dismissed), keeping order.
+    public static func split(_ records: [SuggestionRecord]) -> (actionable: [SuggestionRecord], settled: [SuggestionRecord]) {
+        (records.filter(\.isActionable), records.filter { !$0.isActionable })
+    }
+
+    /// "25 of 42" when only part of a set is shown, otherwise just the total.
+    public static func countText(shown: Int, total: Int) -> String {
+        shown < total ? "\(shown) of \(total)" : "\(total)"
+    }
+
+    /// "Showing 50 of 130".
+    public static func showingText(shown: Int, total: Int) -> String { "Showing \(shown) of \(total)" }
+
+    /// The triage bar's count: "3 selected", or "3 selected of 25 shown" when the view hides actionable
+    /// suggestions that the actions will not touch.
+    public static func selectionText(selected: Int, shown: Int, isPartial: Bool) -> String {
+        isPartial ? "\(selected) selected of \(shown) shown" : "\(selected) selected"
+    }
+
+    /// The first start of day strictly after `now` in `calendar`'s time zone; when to refresh "today".
+    public static func nextStartOfDay(after now: Date, calendar: Calendar) -> Date {
+        let start = calendar.startOfDay(for: now)
+        return calendar.date(byAdding: .day, value: 1, to: start) ?? now.addingTimeInterval(86_400)
     }
 
     /// The Q16 presentation limit over records: the highest-confidence ones stay (in their own order),

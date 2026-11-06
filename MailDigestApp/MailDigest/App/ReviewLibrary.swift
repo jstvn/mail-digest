@@ -51,6 +51,8 @@ final class ReviewLibrary {
     @ObservationIgnored private let clock: any Clock
     @ObservationIgnored private let gate = ReloadGate()
     @ObservationIgnored private var dayObserver: (any NSObjectProtocol)?
+    /// One-shot sleep until the next start of day in the settings time zone; replaced on every re-arm.
+    @ObservationIgnored private var dayTimer: Task<Void, Never>?
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "review")
 
     init(clock: any Clock = SystemClock(), timeZone: TimeZone = RunnerSettings().timeZone) {
@@ -77,14 +79,32 @@ final class ReviewLibrary {
             // Today is derived from the clock, so a new day must rebuild the archive even if no job runs.
             dayObserver = NotificationCenter.default.addObserver(
                 forName: .NSCalendarDayChanged, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in
-                    guard let self else { return }
-                    await self.refresh()
-                    await self.onDayChanged?()
-                }
+                Task { @MainActor in await self?.dayDidChange() }
             }
         }
         await refresh()
+    }
+
+    /// Rebuilds the archive for the new day, then lets Today reload. Shared by the system notification and the timer.
+    private func dayDidChange() async {
+        await refresh()
+        await onDayChanged?()
+    }
+
+    /// `NSCalendarDayChanged` follows the system time zone, but "today" follows the settings one, so also
+    /// wake at the next start of day in `calendar`. Re-armed by every refresh, which replaces the old timer.
+    private func armDayTimer() {
+        dayTimer?.cancel()
+        let now = clock.now()
+        // A second of slack so the wake-up lands after midnight, not just before it.
+        let delay = ReviewCanvasLogic.nextStartOfDay(after: now, calendar: calendar).timeIntervalSince(now) + 1
+        dayTimer = Task { [weak self] in
+            // Continuous clock: keeps counting while the Mac sleeps.
+            try? await ContinuousClock().sleep(for: .seconds(max(delay, 1)))
+            guard !Task.isCancelled else { return }
+            // A fresh task: the refresh re-arms (cancels) this timer and must not cancel its own work.
+            Task { @MainActor in await self?.dayDidChange() }
+        }
     }
 
     /// Reloads the summaries and re-derives "today". Safe to call often: overlapping calls coalesce.
@@ -104,6 +124,7 @@ final class ReviewLibrary {
             }
             isLoaded = true
         }
+        armDayTimer()
     }
 
     /// Whether the sidebar still lists this item; a selection that vanished (retention cleanup) falls back to Today.

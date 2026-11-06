@@ -104,6 +104,11 @@ struct DigestCanvasView: View {
     /// Exactly the actionable records this canvas shows, in on-screen order.
     private var shownRecords: [SuggestionRecord] { carryOver + page.visible }
 
+    /// Whether actionable suggestions of this view are hidden from the triage scope.
+    private var isPartial: Bool {
+        page.isPartial || (kind == .today && todayModel.hasMoreCarryOver)
+    }
+
     // MARK: Phase and titles
 
     private var phase: Phase {
@@ -150,17 +155,15 @@ struct DigestCanvasView: View {
 
     var body: some View {
         CanvasScaffold(run: run, access: access, title: title, subtitle: subtitle,
-                       headline: content?.headline ?? "", records: shownRecords,
+                       headline: content?.headline ?? "", records: shownRecords, isPartial: isPartial,
                        revealTarget: revealTarget) { focus in
             if case .backlog = kind { batchBar }
             if !carryOver.isEmpty { carryOverSection(focus) }
             switch phase {
             case .loading:
-                ProgressView("Loading…").frame(maxWidth: .infinity, minHeight: 160)
+                ProgressView("Loading…").frame(maxWidth: .infinity, minHeight: carryOver.isEmpty ? 160 : 40)
             case .failed:
-                ContentUnavailableView("Couldn't load this digest", systemImage: "exclamationmark.triangle",
-                                       description: Text("Try again in a moment."))
-                    .frame(maxWidth: .infinity, minHeight: 200)
+                emptyState("Couldn't load this digest", systemImage: "exclamationmark.triangle", "Try again in a moment.")
             case .neverRun:
                 emptyState("No digest yet", systemImage: "envelope.open", "Choose Run Now to read your new mail.")
             case .noDigestToday:
@@ -176,7 +179,8 @@ struct DigestCanvasView: View {
         }
     }
 
-    /// A full-size empty state, or one quiet line when carry-over is already on screen.
+    /// A full-size empty state, or one quiet line beneath the carry-over when that is on screen. The empty
+    /// state describes only this canvas's own digests, so it never replaces the carry-over.
     @ViewBuilder
     private func emptyState(_ title: String, systemImage: String, _ detail: String) -> some View {
         if carryOver.isEmpty {
@@ -216,32 +220,45 @@ struct DigestCanvasView: View {
             ActionableRecordsSection(coordinator: coordinator, title: "Unreviewed from Earlier",
                                      count: carryOver.count, records: carryOver, focus: focus)
             if todayModel.hasMoreCarryOver {
-                Button("More unreviewed suggestions are in the Review Queue") { coordinator.select(.reviewQueue) }
-                    .buttonStyle(.link)
+                HStack {
+                    Text(ReviewCanvasLogic.showingText(
+                        shown: carryOver.count, total: max(library.archive.carryOverCount, carryOver.count)))
+                        .foregroundStyle(.secondary)
+                    Button("More unreviewed suggestions are in the Review Queue") { coordinator.select(.reviewQueue) }
+                        .buttonStyle(.link)
+                }
             }
         }
     }
 
     private func suggestionsSection(_ focus: FocusState<UUID?>.Binding) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                ActionableRecordsSection(coordinator: coordinator, title: "Suggested Reminders",
-                                         count: actionable.count, records: page.visible, focus: focus,
-                                         emptyText: settled.isEmpty ? "No reminders suggested." : "Nothing left to review.")
-                if let model = pagedModel {
-                    if page.hiddenCount > 0 {
-                        Button("Show all \(actionable.count) suggestions") { model.showAll = true }
-                            .buttonStyle(.link)
-                    } else if model.showAll, actionable.count > DayCanvasModel.presentationLimit {
-                        Button("Show top \(DayCanvasModel.presentationLimit) only") { model.showAll = false }
-                            .buttonStyle(.link)
-                    }
-                }
-            }
+            ActionableRecordsSection(coordinator: coordinator, title: "Suggested Reminders",
+                                     count: actionable.count, records: page.visible, focus: focus,
+                                     emptyText: settled.isEmpty ? "No reminders suggested." : "Nothing left to review.",
+                                     countText: page.countText, scopeAction: scopeAction)
             if !settled.isEmpty {
                 SettledRecordsSection(title: "Reviewed", records: settled)
             }
         }
+    }
+
+    /// Show All when the Q16 page hides suggestions; Show Top 25 once everything is shown.
+    private var scopeAction: ScopeAction? {
+        guard let model = pagedModel else { return nil }
+        if page.isPartial {
+            return ScopeAction(title: "Show All",
+                               help: "Show all \(page.totalCount) suggestions. Add and Dismiss then cover all of them.") {
+                model.showAll = true
+            }
+        }
+        if model.showAll, actionable.count > DayCanvasModel.presentationLimit {
+            return ScopeAction(title: "Show Top \(DayCanvasModel.presentationLimit)",
+                               help: "Show only the \(DayCanvasModel.presentationLimit) highest-confidence suggestions") {
+                model.showAll = false
+            }
+        }
+        return nil
     }
 
     // MARK: Info

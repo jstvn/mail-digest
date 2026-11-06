@@ -52,14 +52,14 @@ struct MailDigestApp: App {
         }
     }
 
-    /// The icon (with a progress ring or pause badge while a job is active), plus the number of pending
-    /// suggestions when there are any. The icon is a template image, so the status item keeps its native
+    /// The icon (with a progress ring or pause badge while a job is active), plus the number of suggestions
+    /// to review (pending and failed) when there are any. The icon is a template image, so the status item keeps its native
     /// look and highlight.
     private var menuBarLabel: some View {
-        // All pending suggestions across every digest, not just the latest one.
-        let count = run.library.archive.pendingCount
+        // Pending plus failed across every digest: always the Review Queue's number.
+        let count = run.library.archive.reviewQueueCount
         let icon = run.menuBarIcon
-        var label = count > 0 ? "Mail Digest, \(count) pending suggestions" : "Mail Digest"
+        var label = count > 0 ? "Mail Digest, \(count) \(count == 1 ? "suggestion" : "suggestions") to review" : "Mail Digest"
         if let extra = icon.accessibilityText { label += ", \(extra)" }
         return HStack(spacing: 2) {
             if let image = MenuBarIconRenderer.image(for: icon) {

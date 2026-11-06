@@ -214,6 +214,8 @@ public struct SuggestionRecord: Sendable, Equatable, Identifiable {
     /// Sender, subject and mailbox from the email's `job_item`, when it still exists.
     public var email: EmailContext?
     public var id: UUID { suggestion.id }
+    /// Pending or failed: the user can still act on it. A failed Reminders write is retried by Add.
+    public var isActionable: Bool { suggestion.status == .pending || suggestion.status == .failed }
 
     public init(suggestion: Suggestion, digestID: UUID, digestCreatedAt: Date, kind: JobKind,
                 category: Category, email: EmailContext?) {

@@ -650,9 +650,10 @@ The review window is a two-column `NavigationSplitView` (Q54): a sidebar for nav
 
 **Sidebar (`SidebarView`)** — selection is a `SidebarItem`: `today`, `reviewQueue`, `logbook`, `mailCleanup`, `day(DigestDay)`, `backlog(UUID)`.
 
-- **Workflows:** Today (default; badge = pending suggestions of today's Daily digests plus Daily carry-over), Review Queue (badge = all pending and failed suggestions, Daily and Backlog), Logbook, Mail Cleanup.
+- **Workflows:** Today (default), Review Queue, Logbook, Mail Cleanup. Every row is selectable with the mouse and the keyboard; `.tag` is applied after `.badge` so `List(selection:)` sees it.
 - **Recent Digests:** every retained day before today that has at least one Daily digest, newest first, grouped into collapsible months (the current month expanded by default). Several Daily runs on one calendar day (in the settings time zone) merge into one entry with their summed email count.
-- **Backlog Jobs:** each Backlog job with a digest, with its pending count as a badge, plus **New Backlog Job…**.
+- **Backlog Jobs:** each Backlog job with a digest, plus **New Backlog Job…**.
+- **Badges (Q58).** A suggestion is *actionable* while `pending` or `failed` (a failed Reminders write stays selectable and editable, and Add retries it). Every badge counts actionable suggestions: Review Queue = all digests, Daily and Backlog; Today = today's Daily digests plus the Daily carry-over; a day = that day's Daily digests; a Backlog job = that job. The menu bar badge equals the Review Queue count, so it never under-reports. A zero badge is hidden.
 - **Job status:** a compact pill pinned to the bottom of the sidebar while a job is listing, running, pausing or paused. It shows the job name and counts with a small progress indicator; clicking it opens a popover with the full progress strip (Pause / Pause Now / Resume / Stop), Recent, per-mailbox counts and the Activity log. None of these appear in the canvas.
 - The sidebar is built only from `digestSummaries()` and `jobs()`; it never loads digest contents.
 
@@ -661,13 +662,19 @@ The review window is a two-column `NavigationSplitView` (Q54): a sidebar for nav
 | View | Shows | Loads |
 | --- | --- | --- |
 | Today | *Unreviewed from Earlier*: pending and failed suggestions from Daily digests created before today (never Backlog), then today's suggested reminders, info and skipped mail, scoped to today's Daily digests only; pinned info from earlier digests stays at the top of Info | carry-over via `actionableSuggestions`, today's digests via `digest(id:)` |
-| Day (`day`) | A snapshot of that day's Daily digests: suggestions (any status, pending ones actionable), info, skipped | `digest(id:)` for that day's digests, on selection |
-| Backlog job | The job's digest in 50-email batches (Q47) with Previous / Next Batch | `digest(id:)` and `items(job:)`, on selection |
+| Day (`day`) | A snapshot of that day's Daily digests: actionable suggestions, a read-only **Reviewed** section (approved and dismissed: no checkbox, editing, menus or keyboard focus), info, skipped | `digest(id:)` for that day's digests, on selection |
+| Backlog job | The job's digest in 50-email batches (Q47) with Previous / Next Batch, with the same read-only **Reviewed** section | `digest(id:)` and `items(job:)`, on selection |
 | Review Queue | Every pending and failed suggestion across Daily and Backlog digests, grouped by digest date, loaded in pages | `actionableSuggestions`, paged |
-| Logbook | Approved and dismissed suggestions, newest decision first (Q57), with their outcome | `decidedSuggestions`, paged |
+| Logbook | A flat list (no date sections) of approved and dismissed suggestions, ordered by `decidedAt` descending, falling back to the digest's `createdAt` for older records (Q57), with their outcome and decision time | `decidedSuggestions`, paged |
 | Mail Cleanup | The Mail cleanup list (see Mail cleanup), still scoped to the latest digest (Q55) | as before |
 
 **Selection and triage (cross-digest).** Selection is one session-wide map keyed by suggestion id: a suggestion is selected when the user ticked it, or when untouched and `preselected`. It survives navigation. Each canvas acts on the suggestions it shows: a translucent floating bar (`.ultraThinMaterial` capsule, bottom-centred) reads "N selected · **Dismiss Unselected** · **Add to Reminders** ⌘↩". Add approves the selected suggestions in view; Dismiss Unselected dismisses the pending suggestions in view that are not selected (Q54 keeps this meaning). Both may span several digests; each suggestion is written, recorded as a decision and persisted against its own digest. Select All / Select None in each section header apply to that section.
+
+**Action scope (Q58).** The triage bar acts only on the actionable suggestions currently displayed: Today = the carry-over loaded on screen plus today's visible page; a Day = its visible page; a Backlog = the current batch; Review Queue = the loaded pages. Suggestions hidden by the Daily 25 limit (Q16) or not yet loaded are never implicitly approved or dismissed. **Show All** makes the whole day's digests the scope. A partial scope is always visible: the section header reads "25 of 42" beside Show All, carry-over and Review Queue read "Showing 100 of 130" beside their links, and the triage bar names the shown count ("3 selected of 25 shown"). Failed suggestions stay in the actionable section with their failure note and are never dismissed by Dismiss Unselected.
+
+**Today's empty states.** "No digest yet today", "Inbox zero for today" and "never run" describe only today's digest content. They never hide *Unreviewed from Earlier*, which stays at the top whenever it has suggestions. Today follows the settings time zone and rolls over at its midnight while the app is open: the sidebar and Today reload, and yesterday moves into Recent Digests.
+
+**Responsiveness.** Opening the window must not wait for data or build every row: the canvas uses lazy stacks for rows and cards, each row is built once (no `ViewThatFits` duplicates), and content loads asynchronously after the window shows.
 
 **Toast.** Mail Cleanup's Undo message is a bottom-centred floating capsule with a subtle shadow, not a full-width bar.
 
@@ -704,7 +711,7 @@ The review window is a two-column `NavigationSplitView` (Q54): a sidebar for nav
 | No new mail | Today shows "Inbox zero for today" and the last run time |
 | Partial failure | Digest shows; failed emails listed under Skipped with reason |
 
-**Menu bar (`MenuBarView`)**: icon with a badge count of pending suggestions; menu items: Open Review Panel, Run Now, Last run time, Settings, Quit. The Run Now row follows the current Daily job (Q52): Run Now with none; Resume for a paused Daily job (the menu's progress card then shows no second Resume); "Daily Digest Running…" or "Stopping…" (disabled) while it works; "Review Daily Job…" for a stopped one and "Review Daily Jobs…" for more than one (both open Settings > Jobs); "Retry Daily Job" for a failed one. A paused Backlog job leaves the row as Run Now.
+**Menu bar (`MenuBarView`)**: icon with a badge count of actionable (pending and failed) suggestions across all digests, equal to the Review Queue badge; menu items: Open Review Panel, Run Now, Last run time, Settings, Quit. The Run Now row follows the current Daily job (Q52): Run Now with none; Resume for a paused Daily job (the menu's progress card then shows no second Resume); "Daily Digest Running…" or "Stopping…" (disabled) while it works; "Review Daily Job…" for a stopped one and "Review Daily Jobs…" for more than one (both open Settings > Jobs); "Retry Daily Job" for a failed one. A paused Backlog job leaves the row as Run Now.
 
 **Settings (`SettingsView`)**: run time (default 6:30), lookback cap, max emails per run, Ollama URL and model, Reminders list name (default "Mail Digest"), history retention (default 90 days), VIP senders, blocked senders, ignored senders, Trusted Newsletter senders, auto-file processed emails toggle (off by default), Daily mailboxes (default: all inboxes), power and quiet-hours rules for Backlog jobs, past jobs, launch at login toggle.
 

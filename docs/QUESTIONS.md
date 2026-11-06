@@ -170,5 +170,19 @@ Each item says what the spec leaves open and the interim choice the build uses, 
      - Logbook sorts by `decidedAt` descending, falling back to the digest's `createdAt` for historical records without one.
      - Never fabricate historical timestamps; the migration preserves existing data.
 58. **Do triage actions include suggestions hidden by the Daily 25-limit?** The old panel's Add Selected and Dismiss Unselected acted on the whole digest, including preselected or unselected suggestions hidden beyond the first 25 (Q16). In the new window, each canvas acts only on the actionable suggestions it shows.
-   - *Interim:* follow SPEC "Selection and triage" ("each canvas acts on the suggestions it shows"). Suggestions hidden by Q16 are neither added nor dismissed until the user chooses Show All. A Backlog canvas still acts on the current 50-email batch (Q47). The Review Queue acts on the loaded pages.
-   - Also interim: Logbook is a flat list, newest decision first, with each decision's date and time. Review Queue groups by digest date. Past Day and Backlog canvases list settled suggestions read-only in a "Reviewed" section. Today adds a "No digest yet today" empty state. Banner copy says "Add to Reminders".
+   - **Decision:** Each canvas acts only on the suggestions it shows.
+     - Action scope = the currently displayed suggestions. **Add to Reminders** approves only selected suggestions in the displayed scope; **Dismiss Unselected** dismisses only unselected pending ones in it.
+     - Suggestions hidden by the Daily 25-limit (Q16) or not yet loaded are never implicitly approved or dismissed.
+     - **Show All** makes the whole day's digests the scope.
+     - A Backlog canvas acts on its current 50-email batch (Q47). Review Queue acts on its loaded pages. Today acts on its loaded carry-over plus today's visible page.
+     - Partial scope is always visible: "25 of 42" in the section header beside Show All, "Showing 100 of 130" for carry-over and Review Queue, and the triage bar names the shown count (e.g. "3 selected of 25 shown").
+     - Logbook stays a flat list (no date sections) ordered by `decidedAt` descending, with the digest `createdAt` fallback for older records (Q57).
+     - Past Day and Backlog views keep a read-only **Reviewed** section for approved and dismissed suggestions (no checkbox, editing, menus or keyboard focus; never in triage scope). Pending suggestions stay actionable. Failed suggestions stay actionable with their failure note (selectable, editable, retried by Add, never dismissed by Dismiss Unselected).
+     - Today keeps "No digest yet today" for today's own content, but it never hides "Unreviewed from Earlier". Today rolls over at midnight in the settings time zone while the app is open.
+     - Badges: `failed` is not terminal (a failed Reminders write; Add retries it), so actionable = pending + failed everywhere. Review Queue = global actionable count; Today = today's Daily digests plus Daily carry-over; a day = that day; a Backlog job = that job. The menu bar badge equals the Review Queue count (it previously counted pending only).
+     - Banner copy says "Add to Reminders".
+59. **Review window regressions found after T24/T25 (2026-11-07).**
+   - **Decision (fixed in a33ab29):**
+     - Opening the window took about 5 s (Debug) or 3 s (Release). It was synchronous SwiftUI/AppKit layout of every row's controls, doubled by `ViewThatFits`, inside `showWindow`.
+     - Rows are now built once and lazily, and the window opens in about 0.3 s (Debug, measured).
+     - Badged sidebar rows (Today, Review Queue, days, Backlog jobs) could not be selected because `.badge` was applied after `.tag`, which hid the tag from `List(selection:)`. `.tag` is now always outermost, via one helper.
