@@ -190,4 +190,4 @@ Please check on the Mac:
 **Notes:**
 
 - "Delete all history now" is in the spec but not in Settings yet; `RetentionPolicy.deleteAllPlan` exists in core. Not added in T16 (out of scope).
-- Only dismissals count toward the suggestion; whether approvals should reset the count is an open question in `docs/QUESTIONS.md`.
+- Only dismissals since the sender's most recent approval count toward the suggestion (Q36).

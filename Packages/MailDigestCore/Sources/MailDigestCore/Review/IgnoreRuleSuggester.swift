@@ -19,17 +19,20 @@ public enum IgnoreRuleSuggester {
     public static let threshold = 5
 
     /// A suggestion for `sender`, or nil below the threshold or when a rule already covers it. Only dismissals
-    /// count (approvals neither count nor reset). Blocked and ignored senders are already skipped, and VIP
-    /// outranks Ignored (Q9), so suggesting those would do nothing; declined senders are not asked again.
+    /// after the sender's most recent approval count (Q36): an approval resets the count, and nothing expires.
+    /// Blocked and ignored senders are already skipped, and VIP outranks Ignored (Q9), so suggesting those
+    /// would do nothing; declined senders are not asked again.
     public static func suggestion(for sender: String, decisions: [Decision], settings: DigestSettings) -> IgnoreSuggestion? {
         let address = MailFilter.address(from: sender)
         guard !address.isEmpty else { return nil }
         func listed(_ list: [String]) -> Bool { list.contains { MailFilter.address(from: $0) == address } }
         guard !listed(settings.ignoredSenders), !listed(settings.blockedSenders), !listed(settings.vipSenders),
               !listed(settings.declinedIgnoreSuggestions) else { return nil }
+        let mine = decisions.filter { MailFilter.address(from: $0.sender) == address }
+        let lastApproval = mine.filter { $0.action == .approved }.map(\.decidedAt).max()
         // One suggestion can be dismissed only once, so duplicate rows for it count once.
-        let dismissed = Set(decisions.filter {
-            $0.action == .dismissed && MailFilter.address(from: $0.sender) == address
+        let dismissed = Set(mine.filter { d in
+            d.action == .dismissed && lastApproval.map { d.decidedAt > $0 } ?? true
         }.map(\.suggestionID))
         guard dismissed.count >= threshold else { return nil }
         return IgnoreSuggestion(sender: address, dismissedCount: dismissed.count)
