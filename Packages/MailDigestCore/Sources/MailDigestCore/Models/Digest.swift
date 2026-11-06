@@ -49,11 +49,16 @@ public struct Suggestion: Codable, Sendable, Equatable, Identifiable {
     /// Category tag (Q19). Set from the email's `InfoItem` when created; edits persist via `DigestStore.update`.
     /// Absent in older records: resolve as `category`, then the matching `InfoItem`, then `.other`.
     public var category: Category?
+    /// When the suggestion became `.approved` or `.dismissed` (Q57); nil while pending or failed, and for
+    /// records decided before this field existed (never back-filled).
+    public var decidedAt: Date?
 
     public init(id: UUID, emailID: String, title: String, due: Date?, dueHasTime: Bool,
                 priority: Priority, evidence: String, confidence: Double, preselected: Bool,
-                flags: [String], status: SuggestionStatus, reminderID: String?, category: Category? = nil) {
+                flags: [String], status: SuggestionStatus, reminderID: String?, category: Category? = nil,
+                decidedAt: Date? = nil) {
         self.category = category
+        self.decidedAt = decidedAt
         self.id = id
         self.emailID = emailID
         self.title = title
@@ -176,4 +181,64 @@ public struct PinnedInfo: Sendable, Equatable {
 public enum DigestStoreError: Error, Sendable, Equatable {
     /// A result was appended to a digest that was never saved.
     case digestNotFound(UUID)
+}
+
+/// One row of the sidebar: a digest's counts without any suggestion, info or evidence payload (Q56).
+public struct DigestSummary: Sendable, Equatable, Identifiable {
+    public var id: UUID
+    public var createdAt: Date
+    public var kind: JobKind
+    /// Number of stored email results, equal to `Digest.emailCount` for the same digest.
+    public var emailCount: Int
+    public var pendingCount: Int
+    public var failedCount: Int
+
+    public init(id: UUID, createdAt: Date, kind: JobKind, emailCount: Int, pendingCount: Int, failedCount: Int) {
+        self.id = id
+        self.createdAt = createdAt
+        self.kind = kind
+        self.emailCount = emailCount
+        self.pendingCount = pendingCount
+        self.failedCount = failedCount
+    }
+}
+
+/// A suggestion with the context a list row needs, so it can be shown and approved without loading its digest.
+public struct SuggestionRecord: Sendable, Equatable, Identifiable {
+    public var suggestion: Suggestion
+    public var digestID: UUID
+    public var digestCreatedAt: Date
+    public var kind: JobKind
+    /// The suggestion's own category, else the email's info category, else `.other`.
+    public var category: Category
+    /// Sender, subject and mailbox from the email's `job_item`, when it still exists.
+    public var email: EmailContext?
+    public var id: UUID { suggestion.id }
+
+    public init(suggestion: Suggestion, digestID: UUID, digestCreatedAt: Date, kind: JobKind,
+                category: Category, email: EmailContext?) {
+        self.suggestion = suggestion
+        self.digestID = digestID
+        self.digestCreatedAt = digestCreatedAt
+        self.kind = kind
+        self.category = category
+        self.email = email
+    }
+}
+
+/// Filter and page for `DigestStore.actionableSuggestions`.
+public struct SuggestionQuery: Sendable, Equatable {
+    /// Only digests of these job kinds; nil means all kinds.
+    public var kinds: Set<JobKind>?
+    /// Only digests created strictly before this date.
+    public var digestsCreatedBefore: Date?
+    public var limit: Int
+    public var offset: Int
+
+    public init(kinds: Set<JobKind>? = nil, digestsCreatedBefore: Date? = nil, limit: Int, offset: Int = 0) {
+        self.kinds = kinds
+        self.digestsCreatedBefore = digestsCreatedBefore
+        self.limit = limit
+        self.offset = offset
+    }
 }

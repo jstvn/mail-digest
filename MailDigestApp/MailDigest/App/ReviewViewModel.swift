@@ -227,8 +227,7 @@ final class ReviewViewModel {
     /// Adds job items' sender/subject/mailbox to the lookup; the first item for an email wins.
     private static func merge(_ items: [JobItem], into context: inout [String: EmailContext]) {
         for item in items where context[item.messageID] == nil {
-            context[item.messageID] = EmailContext(sender: item.sender, subject: item.subject, mailbox: item.mailbox,
-                                                   receivedAt: item.receivedAt, storeRowID: item.storeRowID)
+            context[item.messageID] = EmailContext(item: item)
         }
     }
 

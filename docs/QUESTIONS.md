@@ -141,3 +141,31 @@ Each item says what the spec leaves open and the interim choice the build uses, 
    - **Backlog.** Reconcile only: no new-mail listing, no "check for new mail", and `scopeFrom`/`scopeTo`, mailboxes and job identity stay as the user confirmed them.
    - **Failure and consistency.** Every listing (reconciliation and discovery) and dedupe lookup runs before anything changes. If any listing fails, the resume aborts with the existing "Could not read Mail…" error and the job keeps its state (paused, stopped or failed), queue and scope. The skips, relocations, appended items and new `scopeTo` are then written in one store transaction, so repeated or interrupted resumes never duplicate or half-apply work. Resource rules (Q43, Q44) and the provider check (Q25) still run before any listing.
    - **Related rules.** Q52's one-unresolved-Daily-job rule holds: discovery only extends the resumed job and is skipped when another Daily job is unresolved. Every Resume goes through this: the Resume buttons, Retry Daily Job, `retryFailed` (Q28) and Q44 auto-resume, so a Backlog job re-lists its mailboxes over its scope each time it is resumed. The same-session hand-off back to a Backlog job after a Daily job (Q23, Q46) is a continuation, not a Resume, and does not reconcile; an email that disappeared meanwhile is still skipped at fetch time as "not found in Mail". Q26's preview `deferredByLimit` count is still not implemented and is unchanged by this decision.
+
+## Two-column review window (2026-11-07)
+
+54. **Two-column review window and triage semantics.** The single-column panel with a Review | Processed switch read like a debug panel.
+   - **Decision:** Replace it with a `NavigationSplitView`:
+     - Sidebar sections: Today (default), Review Queue, Logbook, Mail Cleanup; Recent Digests; Backlog Jobs with New Backlog Job….
+     - A compact job status pill at the bottom of the sidebar. Its popover holds the progress strip, Recent, mailbox counts and the Activity log (removed from the canvas).
+     - Today shows "Unreviewed from Earlier" = pending/failed suggestions from earlier **Daily** digests only (never Backlog), then today's suggestions, info and skipped mail scoped to today's Daily digests only.
+     - Review Queue is the global entry point for all pending and failed suggestions across Daily and Backlog. Backlog jobs in the sidebar show their pending count.
+     - Recent Digests lists every retained day that has a Daily digest (no 7/14-day cap), grouped by month. Months are collapsible, and the current month is expanded by default. Several Daily runs on one calendar day merge into one entry with aggregated email counts.
+     - Selection semantics are unchanged: suggestions start selected when preselected; the floating bar keeps **Dismiss Unselected** (not Dismiss Selected) and **Add to Reminders** approves the selected ones. Selection, approval and dismissal work across digests.
+     - Preserve keyboard shortcuts, the Daily 25-suggestion presentation limit (Q16), Backlog 50-email batches (Q47) and all job lifecycle behaviour (Q52, Q53).
+55. **Where email cleanup lives.** Logbook (reminder triage outcomes) and email cleanup (Move to Trash / Move to Mail Digest / Keep / Undo / auto-file) are different jobs.
+   - **Decision:** Email cleanup is its own sidebar item labelled **Mail Cleanup**. For this iteration it keeps its existing scope: the latest digest. Wider historical scope is a separate, later decision.
+56. **Loading the sidebar and canvases.** Loading every retained digest to build the sidebar would be slow.
+   - **Decision:** Separate summary loading from detail loading.
+     - Add `digestSummaries()` (dates, kind, email counts, pending/failed counts, no payload decoding).
+     - Add `actionableSuggestions(_:)` (paged, filterable by job kind and digest date) for Review Queue and Today's carry-over.
+     - Add `decidedSuggestions(limit:offset:)` for Logbook.
+     - Keep `digest(id:)` as the on-demand detail query.
+     - A `suggestion_ref` index table (GRDB v4) backs the counts and paging and is kept in step with `digest_email_result` in the same transaction.
+     - The global badge is the sum of summary counts, so no separate count query.
+     - Today loads only its own sections. Review Queue never builds every `ReviewState`.
+57. **Logbook ordering.** Sorting by digest date would show a 5 Nov suggestion approved on 7 Nov under 5 Nov.
+   - **Decision:** Add `Suggestion.decidedAt`.
+     - Set it when a suggestion becomes approved or dismissed; nil while pending or failed, and cleared on any return to those states.
+     - Logbook sorts by `decidedAt` descending, falling back to the digest's `createdAt` for historical records without one.
+     - Never fabricate historical timestamps; the migration preserves existing data.

@@ -127,6 +127,62 @@ public actor InMemoryDigestStore: DigestStore {
         }
     }
 
+    // MARK: Summaries and paging
+
+    public func digestSummaries() async throws -> [DigestSummary] {
+        // Reversed first so the stable sort puts the later-saved digest first on equal timestamps.
+        digestRows.reversed().sorted { $0.createdAt > $1.createdAt }.map { row in
+            let suggestions = (resultsByDigest[row.id] ?? []).flatMap(\.suggestions)
+            return DigestSummary(
+                id: row.id, createdAt: row.createdAt, kind: kind(of: row.id),
+                emailCount: resultsByDigest[row.id]?.count ?? 0,
+                pendingCount: suggestions.filter { $0.status == .pending }.count,
+                failedCount: suggestions.filter { $0.status == .failed }.count)
+        }
+    }
+
+    public func actionableSuggestions(_ query: SuggestionQuery) async throws -> [SuggestionRecord] {
+        let all = records { $0.status == .pending || $0.status == .failed }.filter { rec in
+            (query.kinds?.contains(rec.kind) ?? true) && (query.digestsCreatedBefore.map { rec.digestCreatedAt < $0 } ?? true)
+        }
+        return page(all, limit: query.limit, offset: query.offset)
+    }
+
+    public func decidedSuggestions(limit: Int, offset: Int) async throws -> [SuggestionRecord] {
+        // Stable sort keeps the digest/ordinal/position order from `records` for equal sort keys.
+        let all = records { $0.status == .approved || $0.status == .dismissed }
+            .sorted { ($0.suggestion.decidedAt ?? $0.digestCreatedAt) > ($1.suggestion.decidedAt ?? $1.digestCreatedAt) }
+        return page(all, limit: limit, offset: offset)
+    }
+
+    private func page(_ list: [SuggestionRecord], limit: Int, offset: Int) -> [SuggestionRecord] {
+        let start = max(0, offset)
+        guard limit > 0, start < list.count else { return [] }
+        return Array(list[start..<min(list.count, start + limit)])
+    }
+
+    private func kind(of digestID: UUID) -> JobKind { jobList.first { $0.id == digestID }?.kind ?? .daily }
+
+    /// Every matching suggestion as a record, in digest (newest, later save first), ordinal, position order.
+    private func records(where include: (Suggestion) -> Bool) -> [SuggestionRecord] {
+        var out: [SuggestionRecord] = []
+        for row in digestRows.reversed().sorted(by: { $0.createdAt > $1.createdAt }) {
+            let kind = kind(of: row.id)
+            let items = itemsByJob[row.id] ?? []
+            for result in resultsByDigest[row.id] ?? [] {
+                // First item for an email wins, as in the review window.
+                let email = items.lazy.map { self.itemList[$0] }.first { $0.messageID == result.emailID }
+                    .map(EmailContext.init(item:))
+                for s in result.suggestions where include(s) {
+                    out.append(SuggestionRecord(
+                        suggestion: s, digestID: row.id, digestCreatedAt: row.createdAt, kind: kind,
+                        category: s.category ?? result.info?.category ?? .other, email: email))
+                }
+            }
+        }
+        return out
+    }
+
     // MARK: Decisions
 
     public func recordDecision(_ decision: Decision) async throws { decisionList.append(decision) }

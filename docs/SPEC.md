@@ -44,7 +44,7 @@ Scheduler / user ──> JobRunner (core actor: queue, pause, resume, stop)
 ReviewPanel (app, SwiftUI) reads Digest from DigestStore
   user approves ──> ReminderWriter.write(suggestions)   app: EventKitReminderWriter
   user dismisses ──> DigestStore.recordDecision
-  processed tab ──> MailActions.moveToTrash / move       app: AppleScriptMailActions
+  mail cleanup ──> MailActions.moveToTrash / move       app: AppleScriptMailActions
 ```
 
 ## Tech stack and repo layout
@@ -179,6 +179,8 @@ public struct Suggestion: Codable, Sendable, Equatable, Identifiable {
     public var flags: [String]         // e.g. "money-new-sender"
     public var status: SuggestionStatus
     public var reminderID: String?     // EKReminder.calendarItemIdentifier after approval
+    public var category: Category?     // tag override (Q19); nil = the email's InfoItem category
+    public var decidedAt: Date?        // when it became approved or dismissed (Q57); nil while pending or failed
 }
 
 public struct Digest: Codable, Sendable, Equatable, Identifiable {
@@ -210,10 +212,20 @@ public struct Decision: Codable, Sendable {
 | `job` | one row per Daily or Backlog job: kind, mailboxes, date scope, state, totals |
 | `job_item` | one row per queued email: mailbox identity, canonical RFC message id, optional Mail store row id, sender, subject, received_at, state, outcome, seconds taken, attempts, last error |
 | `setting` | key/value app settings |
+| `suggestion_ref` | (Q56) a lightweight index of every stored suggestion: suggestion id (PK), owning digest (cascade delete), email id, result ordinal, position in the result, status, confidence, decided_at. Kept in step with `digest_email_result` in the same transaction; it never holds titles or evidence. Answers sidebar counts and Review Queue / Logbook paging without decoding suggestion payloads |
 
 **Retention (setting `historyRetention`)**: Keep forever, 1 year, 90 days (default) or 30 days. A daily cleanup deletes expired digest records and their `digest_email_result` children together with eligible finished job rows and their `job_item` rows. Retain the owning job and source context for as long as a digest or pinned item can still be reviewed, opened, or used to create a Reminder. It never deletes `processed_email` ids (so old mail is never reprocessed) or `decision` rows (so learned sender rules survive). Pinned info items and their required digest/job context are kept regardless. Settings also has "Delete all history now", with a confirmation.
 
 `DigestStore` protocol: `lastRunDate()`, `isProcessed(_:)`, `markProcessed(_:)`, `save(_: Digest)` for digest-level metadata, `appendEmailResult(_:to:)` for one atomic per-email result, `latestDigest()`, `digest(id:)`, `recentSuggestions(since:)`, `update(_: Suggestion)`, `recordDecision(_:)`, `decisions(for sender:)`, plus the queue: `createJob(_:)`, `updateJob(_:)`, `enqueue(_: [MessageHeader], job:)`, `isQueued(_:)`, `nextQueued(job:limit:)`, `items(job:)`, `setItemState(_:_:error:)`, `recordItemOutcome`, `requeueFailed(job:)`, `requeueInterrupted()` and `jobs()`. Persist each email's result atomically as a child record; do not rewrite the entire growing digest JSON after every email. `digest(id:)` reconstructs the logical aggregate from the digest row and its child results. This is required for pause/resume and crash recovery.
+
+**Summary and on-demand queries (Q56).** The review window separates lightweight summary loading from detail loading:
+
+- `digestSummaries() -> [DigestSummary]`: one row per retained digest (id, createdAt, job kind, email count, pending count, failed count), newest first. It reads only the `digest`, `job`, `suggestion_ref` and result counts; it never decodes suggestion, info or evidence payloads. A digest whose job row is gone counts as Daily. The global pending badge is the sum of these counts, so no separate count query is needed.
+- `actionableSuggestions(_ query: SuggestionQuery) -> [SuggestionRecord]`: pending and failed suggestions, filtered by job kind and/or "digest created before" and paged with `limit`/`offset`, ordered newest digest first, then result ordinal, then position. Only the result rows of the returned page are decoded.
+- `decidedSuggestions(limit:offset:) -> [SuggestionRecord]`: approved and dismissed suggestions ordered by `decidedAt` descending, using the owning digest's `createdAt` as the sort key when `decidedAt` is nil (historical records; never back-filled).
+- `digest(id:)` remains the detail query for one Daily digest or Backlog job, loaded only when that view is opened.
+
+A `SuggestionRecord` carries the `Suggestion`, its digest id, digest `createdAt`, job kind, effective category (override, else the email's info category, else `.other`) and the email's `EmailContext` (from its `job_item`), so a row can be shown and approved without loading its digest.
 
 ## Mail ingestion
 
@@ -611,38 +623,59 @@ The aim is a clear sense of where the job is, not a firehose of logs.
 
 ## Review panel UI
 
-The review panel is a single SwiftUI window with three sections: headline, suggested reminders, and info summaries, plus the Processed tab described under Mail cleanup. Nothing reaches Reminders until the user clicks **Add selected**.
+The review window is a two-column `NavigationSplitView` (Q54): a sidebar for navigation and a detail canvas for the selected view. Nothing reaches Reminders until the user clicks **Add to Reminders**. Layout, typography, controls and accessibility follow Apple's Human Interface Guidelines; the sidebar uses the system sidebar list style and material, not a custom tint.
 
-**Window layout (about 720 × 640, resizable)**
+**Window layout (about 980 × 680, resizable; sidebar about 220 pt)**
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│ Today · Wed 4 Nov · 23 emails              [Run now] [⚙︎]      │
-│ "IFN735 exam timetable is out and your rent is due Friday."   │
-├──────────────────────────────────────────────────────────────┤
-│ SUGGESTED REMINDERS (4)                    [Select all/none]  │
-│ [x] Pay rent                   Fri 6 Nov    High   #finance  │
-│     From: Ray White · "Rent of $... is due this Friday"  ↗    │
-│ [x] Submit INN700 A2           Mon 9 Nov 5pm  Med            │
-│     From: QUT Canvas · "Assessment 2 is due ..."         ↗    │
-│ [ ] Reply to Sam about Sat     no date        Low   ⚠︎ review │
-│                       [Dismiss unselected]  [Add selected ⌘↩] │
-├──────────────────────────────────────────────────────────────┤
-│ INFO                                                          │
-│ Uni (3)        ▸ Exam timetable released · IFN735 18 Nov 9am  │
-│ Deliveries (2) ▸ Parcel arriving Thu · AusPost                │
-│ Finance (1)    ▸ Card statement ready                         │
-│ Newsletters (9) collapsed                                     │
-├──────────────────────────────────────────────────────────────┤
-│ ▸ Skipped (6)                                                 │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────┬───────────────────────────────────────────────────────┐
+│ ☀︎ Today       5 │  Today · Fri 6 Nov                         [Run Now] ⚙︎ │
+│ ☰ Review Queue 9 │  14 emails processed                                  │
+│ ✓ Logbook        │  "IFN735 exam timetable is out and rent is due Fri."  │
+│ ✉︎ Mail Cleanup   │                                                       │
+│                  │  UNREVIEWED FROM EARLIER (2)                          │
+│ RECENT DIGESTS   │  ☐ Renew library loan   [Thu 12 Nov] [Low] [#uni]     │
+│ ▾ November       │    ┃ QUT Library  "Your loan is due back…"         ↗  │
+│   Thu 5 Nov  12  │                                                       │
+│   Wed 4 Nov   9  │  SUGGESTED REMINDERS (3)          Select All · None   │
+│ ▸ October        │  ☑ Pay rent        [Fri 6 Nov] [High] [#finance]      │
+│                  │    ┃ Ray White  "Rent of $… is due this Friday"     ↗  │
+│ BACKLOG JOBS     │                                                       │
+│   Inbox 2025  40 │  INFO  ▸ Uni (3)  ▸ Deliveries (2)  ▸ Newsletters (9) │
+│ + New Backlog Job│  ▸ Skipped (6)                                        │
+│ ─────────────    │      ╭──────────────────────────────────────────╮     │
+│ ◔ Daily 12 of 23 │      │ 3 selected · Dismiss Unselected · Add ⌘↩ │     │
+└──────────────────┴──────╰──────────────────────────────────────────╯─────┘
 ```
+
+**Sidebar (`SidebarView`)** — selection is a `SidebarItem`: `today`, `reviewQueue`, `logbook`, `mailCleanup`, `day(DigestDay)`, `backlog(UUID)`.
+
+- **Workflows:** Today (default; badge = pending suggestions of today's Daily digests plus Daily carry-over), Review Queue (badge = all pending and failed suggestions, Daily and Backlog), Logbook, Mail Cleanup.
+- **Recent Digests:** every retained day before today that has at least one Daily digest, newest first, grouped into collapsible months (the current month expanded by default). Several Daily runs on one calendar day (in the settings time zone) merge into one entry with their summed email count.
+- **Backlog Jobs:** each Backlog job with a digest, with its pending count as a badge, plus **New Backlog Job…**.
+- **Job status:** a compact pill pinned to the bottom of the sidebar while a job is listing, running, pausing or paused. It shows the job name and counts with a small progress indicator; clicking it opens a popover with the full progress strip (Pause / Pause Now / Resume / Stop), Recent, per-mailbox counts and the Activity log. None of these appear in the canvas.
+- The sidebar is built only from `digestSummaries()` and `jobs()`; it never loads digest contents.
+
+**Canvas (`DigestCanvasView` and friends)** — content is centred with a maximum width of 780 pt and generous horizontal padding. A large title and a secondary subtitle head every view (for example "Today · Fri 6 Nov" / "14 emails processed"), followed by the headline in reading typography where there is one. Alert banners (States table) sit under the header. The toolbar holds **Run Now** and a Settings button (a menu bar agent has no app menu, so Settings must stay reachable from the window).
+
+| View | Shows | Loads |
+| --- | --- | --- |
+| Today | *Unreviewed from Earlier*: pending and failed suggestions from Daily digests created before today (never Backlog), then today's suggested reminders, info and skipped mail, scoped to today's Daily digests only; pinned info from earlier digests stays at the top of Info | carry-over via `actionableSuggestions`, today's digests via `digest(id:)` |
+| Day (`day`) | A snapshot of that day's Daily digests: suggestions (any status, pending ones actionable), info, skipped | `digest(id:)` for that day's digests, on selection |
+| Backlog job | The job's digest in 50-email batches (Q47) with Previous / Next Batch | `digest(id:)` and `items(job:)`, on selection |
+| Review Queue | Every pending and failed suggestion across Daily and Backlog digests, grouped by digest date, loaded in pages | `actionableSuggestions`, paged |
+| Logbook | Approved and dismissed suggestions, newest decision first (Q57), with their outcome | `decidedSuggestions`, paged |
+| Mail Cleanup | The Mail cleanup list (see Mail cleanup), still scoped to the latest digest (Q55) | as before |
+
+**Selection and triage (cross-digest).** Selection is one session-wide map keyed by suggestion id: a suggestion is selected when the user ticked it, or when untouched and `preselected`. It survives navigation. Each canvas acts on the suggestions it shows: a translucent floating bar (`.ultraThinMaterial` capsule, bottom-centred) reads "N selected · **Dismiss Unselected** · **Add to Reminders** ⌘↩". Add approves the selected suggestions in view; Dismiss Unselected dismisses the pending suggestions in view that are not selected (Q54 keeps this meaning). Both may span several digests; each suggestion is written, recorded as a decision and persisted against its own digest. Select All / Select None in each section header apply to that section.
+
+**Toast.** Mail Cleanup's Undo message is a bottom-centred floating capsule with a subtle shadow, not a full-width bar.
 
 **Suggestion row (`SuggestionRow`)**
 
-- Checkbox bound to selection; starts ticked when `preselected` is true
-- Inline-editable title (`TextField`), due date (`DatePicker`, with a "no date" toggle), priority picker, category tag picker (defaults to the email's category)
-- Second line: sender, evidence quote (truncated, full text on hover), and an ↗ button that opens the email via `message://%3C<message-id>%3E`
+- Borderless row: checkbox bound to selection; inline-editable title (plain `TextField`)
+- Due date, priority and category tag are compact tinted pills (`MetaPill`). The date pill opens a popover with a graphical date picker, an "Include time" toggle and **Remove Date**; with no date a muted **Add Date** pill appears on hover or keyboard focus (and is always exposed to VoiceOver). Priority and category pills open menus. Category defaults to the email's category
+- Evidence is an indented quote block with a 2 pt accent bar on the leading edge: sender in medium weight, the quote in secondary italic (truncated, full text on hover), and an ↗ button that opens the email via `message://%3C<message-id>%3E`, emphasised on hover and always reachable by keyboard and VoiceOver
 - Flags show as a ⚠︎ badge with a tooltip (for example "Payment request from a new sender")
 - Keyboard: ↑/↓ moves focus, space toggles, ⌘↩ adds selected, ⌫ dismisses the focused row
 
@@ -668,14 +701,14 @@ The review panel is a single SwiftUI window with three sections: headline, sugge
 | Full Disk Access unavailable | Show that Mail automation fallback is active, explain that FDA enables fast local reads, and provide a button to open System Settings > Privacy & Security > Full Disk Access |
 | Mail Automation permission denied | Banner with a button to open System Settings > Privacy & Security > Automation and enable Mail access for Mail Digest |
 | Reminders permission denied | Add button disabled, banner with Settings link |
-| No new mail | "Inbox zero for today" and last run time |
+| No new mail | Today shows "Inbox zero for today" and the last run time |
 | Partial failure | Digest shows; failed emails listed under Skipped with reason |
 
 **Menu bar (`MenuBarView`)**: icon with a badge count of pending suggestions; menu items: Open Review Panel, Run Now, Last run time, Settings, Quit. The Run Now row follows the current Daily job (Q52): Run Now with none; Resume for a paused Daily job (the menu's progress card then shows no second Resume); "Daily Digest Running…" or "Stopping…" (disabled) while it works; "Review Daily Job…" for a stopped one and "Review Daily Jobs…" for more than one (both open Settings > Jobs); "Retry Daily Job" for a failed one. A paused Backlog job leaves the row as Run Now.
 
 **Settings (`SettingsView`)**: run time (default 6:30), lookback cap, max emails per run, Ollama URL and model, Reminders list name (default "Mail Digest"), history retention (default 90 days), VIP senders, blocked senders, ignored senders, Trusted Newsletter senders, auto-file processed emails toggle (off by default), Daily mailboxes (default: all inboxes), power and quiet-hours rules for Backlog jobs, past jobs, launch at login toggle.
 
-Architecture: `ReviewViewModel` (`@Observable`, `@MainActor`) in the app target owns the loaded `Digest` and selection state. The selection and approval logic it calls (`ReviewActions`: select defaults, apply edits, split approved and dismissed) lives in core so it can be unit-tested on Linux.
+Architecture: the review data layer is cross-digest. Core holds the testable logic: `DigestArchive` (sidebar days and months, Today's sections, badges) and `ReviewSession` (session-wide selection, edits, approve/dismiss across digests built on `ReviewActions`). In the app target, `@Observable @MainActor` models own the sidebar summaries and load each canvas's content on demand; the latest digest remains available for Mail Cleanup, auto-file and the menu bar.
 
 ## Validation and writing approved items
 
@@ -725,7 +758,7 @@ The review panel gets a **Processed** tab listing emails that are fully handled,
 
 | Option | How it works | Pros | Cons | Verdict |
 | --- | --- | --- | --- | --- |
-| A. Review and trash in the app | Processed tab with checkboxes, summary beside each email, "Move to Trash" | Summary and email side by side; one click; nothing leaves the inbox until you decide | You review on the Mac | **Default** |
+| A. Review and trash in the app | Mail Cleanup view with checkboxes, summary beside each email, "Move to Trash" | Summary and email side by side; one click; nothing leaves the inbox until you decide | You review on the Mac | **Default** |
 | B. Auto-file into a Mail folder | App moves processed emails into a "Mail Digest" mailbox in the same account; you review and delete in Mail | Works from Mail on iPhone too (IMAP mailboxes sync) | Emails vanish from the inbox before you've looked; summary isn't next to them | Optional setting, off by default |
 
 Both options use the same Mail actions adapter. Neither permanently deletes anything: Trash keeps the email until Mail empties it on its normal schedule.
@@ -736,7 +769,7 @@ Both options use the same Mail actions adapter. Neither permanently deletes anyt
 - it has no suggestions, or every suggestion is `approved` or `dismissed` (none `pending` or `failed`)
 - `skip`-tier emails (blocked senders) also count, listed separately
 
-**Processed tab (UI, `ProcessedListView`)**
+**Mail Cleanup (UI, `ProcessedListView`, sidebar item "Mail Cleanup", Q55)**
 
 - One row per email: checkbox (ticked by default), sender, subject, received date, the one-line summary, and what came out of it ("2 reminders added", "info only")
 - Buttons: **Move to Trash** (⌘⌫), **Move to Mail Digest folder**, **Keep** (hides the row, leaves the email alone)
@@ -850,6 +883,11 @@ Work through these in order. Each task is done only when its acceptance criteria
 | T18 | `AppleScriptMailActions` + `MailActions.js`, `ProcessedListView` with Undo toast, optional auto-file setting | Mac-only | Selected emails move to Trash or the Mail Digest mailbox in their own account; Undo moves them back; nothing is permanently deleted |
 | T19 | Job setup and progress UI: `JobSetupView` (mailbox tree, date scope, preview with untick, confirm), `JobProgressView` (strip, now, recent, per-mailbox counts, paused-at, activity log, retry failed), past jobs, review batches of 50 with live per-email result updates, power/Low Power Mode/thermal auto-pause (IOKit, `ProcessInfo`), quiet hours, past-jobs list | Mac-only | Nothing is queued before Start; preview matches queued work; completed email results become reviewable as soon as persisted without waiting for a 50-email batch; pause/resume preserves the next email; a 3,000-email backlog runs over sessions; unplugging/serious thermal state pauses and restoring safe power/thermal state permits resume; Daily runs before Backlog |
 | T20 | Core for job setup and progress: `JobPlan`, `JobPreview` builder (per-mailbox totals, already-processed count, estimated tier split from headers, time estimate, exclusions), `JobProgress` with stage, current, last finished, next up and per-mailbox counts; activity feed from `job_item` | Linux | Preview built from the fake 3,000-message inbox matches what `start` later queues; excluded emails never get queued; progress after a pause reports the right last-finished and next-up items |
+| T21 | `Suggestion.decidedAt`, `suggestion_ref` index (GRDB v4 with back-fill), `digestSummaries()`, `actionableSuggestions(_:)`, `decidedSuggestions(limit:offset:)` in `DigestStore`, `InMemoryDigestStore` and `GRDBDigestStore` (Q56, Q57) | Linux + Mac | Migration keeps existing data; summary and paging queries never decode payloads outside the page; decidedAt set on approve/dismiss, cleared on failure |
+| T22 | Core cross-digest review: `DigestDay`, `DigestArchive` (months, days, Today sections, badges), `ReviewSession` (session selection, edits, approve/dismiss across digests) | Linux | Unit tests for day bucketing across midnight, carry-over excluding Backlog, merged days, cross-digest approve/dismiss |
+| T23 | App review data layer: sidebar summaries model and on-demand canvas loaders; latest digest kept for Mail Cleanup, auto-file and the badge | Mac-only | Builds; existing behaviour preserved |
+| T24 | Two-column review window: `NavigationSplitView`, `SidebarView`, canvases, job status pill and popover, floating triage bar and toast | Mac-only | Matches the Review panel UI section; HIG checks in MAC_TODO |
+| T25 | `SuggestionRow` pills, date popover and evidence quote block; `InfoCard` typography | Mac-only | Keyboard and VoiceOver reach every control |
 
 T17 and T20 are Linux-only logic and can be done right after T09, before the Mac checkpoint.
 

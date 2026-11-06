@@ -33,6 +33,18 @@ public protocol DigestStore: Sendable {
     /// Every retained digest, for the daily retention cleanup.
     func retainedDigests() async throws -> [Digest]
 
+    // MARK: Summaries and paging (Q56)
+
+    /// One lightweight summary per retained digest, newest first (ties: later save first). Never decodes
+    /// suggestion, info or evidence payloads. A digest without a job row counts as `.daily`.
+    func digestSummaries() async throws -> [DigestSummary]
+    /// Pending and failed suggestions, ordered by digest `createdAt` descending, then result ordinal, then
+    /// position in the result. `limit`/`offset` page the ordered list; only the returned page is decoded.
+    func actionableSuggestions(_ query: SuggestionQuery) async throws -> [SuggestionRecord]
+    /// Approved and dismissed suggestions ordered by `decidedAt` descending, using the owning digest's
+    /// `createdAt` where `decidedAt` is nil, then by digest recency, result ordinal and position.
+    func decidedSuggestions(limit: Int, offset: Int) async throws -> [SuggestionRecord]
+
     // MARK: Pinned info
 
     /// Sets the pinned flag of one email's info item and nothing else (no digest rewrite). A digest or

@@ -22,7 +22,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         writer = pool
     }
 
-    private init(writer: any DatabaseWriter) throws {
+    /// Wraps an already-open database (internal so migration tests can start from an older schema).
+    init(writer: any DatabaseWriter) throws {
         try Self.migrator.migrate(writer)
         self.writer = writer
     }
@@ -125,7 +126,48 @@ public final class GRDBDigestStore: DigestStore, Sendable {
                 )
                 """)
         }
+        // v4 (Q56, Q57): a lightweight per-suggestion index so counts and paging never decode result JSON.
+        // Back-filled from the stored results; `decided_at` stays NULL for history (never back-filled).
+        migrator.registerMigration("v4") { db in
+            try db.execute(sql: """
+                CREATE TABLE suggestion_ref (
+                    suggestion_id TEXT PRIMARY KEY NOT NULL,
+                    digest_id TEXT NOT NULL REFERENCES digest(id) ON DELETE CASCADE,
+                    email_id TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL,
+                    position INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    decided_at REAL
+                );
+                CREATE INDEX suggestion_ref_status_digest ON suggestion_ref (status, digest_id);
+                CREATE INDEX suggestion_ref_digest_email ON suggestion_ref (digest_id, email_id);
+                """)
+            let rows = try Row.fetchAll(db, sql: "SELECT digest_id, email_id, ordinal, suggestions FROM digest_email_result")
+            for row in rows {
+                // An undecodable payload is skipped rather than failing the migration; it already fails `digest(id:)`.
+                guard let list = try? JSON.decode([Suggestion].self, row["suggestions"] as String) else { continue }
+                try Self.writeRefs(db, digestID: row["digest_id"] as String, emailID: row["email_id"] as String,
+                                   ordinal: row["ordinal"] as Int, suggestions: list)
+            }
+        }
         return migrator
+    }
+
+    /// Replaces the index rows of one result with those of `suggestions`. Runs inside the caller's transaction.
+    private static func writeRefs(_ db: Database, digestID: String, emailID: String, ordinal: Int,
+                                  suggestions: [Suggestion]) throws {
+        try db.execute(sql: "DELETE FROM suggestion_ref WHERE digest_id = ? AND email_id = ?",
+                       arguments: [digestID, emailID])
+        for (position, s) in suggestions.enumerated() {
+            // OR REPLACE: a duplicated suggestion id in damaged data must not abort the write.
+            try db.execute(sql: """
+                INSERT OR REPLACE INTO suggestion_ref
+                    (suggestion_id, digest_id, email_id, ordinal, position, status, confidence, decided_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, arguments: [s.id.uuidString, digestID, emailID, ordinal, position, s.status.rawValue,
+                                 s.confidence, s.decidedAt?.timeIntervalSince1970])
+        }
     }
 
     // MARK: Runs and processed mail
@@ -158,7 +200,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
 
     public func save(_ digest: Digest) async throws {
         // Encode before opening the transaction so an encoding failure cannot leave a half-written digest.
-        let rows = try EmailResult.results(from: digest).map(ResultRow.init)
+        let results = EmailResult.results(from: digest)
+        let rows = try results.map(ResultRow.init)
         try await writer.write { db in
             // Upsert (not REPLACE) so the digest keeps its row and its children are not cascade-deleted.
             try db.execute(sql: """
@@ -166,8 +209,11 @@ public final class GRDBDigestStore: DigestStore, Sendable {
                 ON CONFLICT(id) DO UPDATE SET created_at = excluded.created_at, headline = excluded.headline
                 """, arguments: [digest.id.uuidString, digest.createdAt.timeIntervalSince1970, digest.headline])
             try db.execute(sql: "DELETE FROM digest_email_result WHERE digest_id = ?", arguments: [digest.id.uuidString])
+            try db.execute(sql: "DELETE FROM suggestion_ref WHERE digest_id = ?", arguments: [digest.id.uuidString])
             for (ordinal, row) in rows.enumerated() {
                 try row.insert(db, digestID: digest.id, ordinal: ordinal)
+                try Self.writeRefs(db, digestID: digest.id.uuidString, emailID: row.emailID, ordinal: ordinal,
+                                   suggestions: results[ordinal].suggestions)
             }
         }
     }
@@ -184,11 +230,15 @@ public final class GRDBDigestStore: DigestStore, Sendable {
                 try db.execute(sql: "DELETE FROM digest_email_result WHERE digest_id = ? AND email_id = ?",
                                arguments: [digestID.uuidString, result.emailID])
                 try row.insert(db, digestID: digestID, ordinal: ordinal)
+                try Self.writeRefs(db, digestID: digestID.uuidString, emailID: result.emailID, ordinal: ordinal,
+                                   suggestions: result.suggestions)
             } else {
                 let next = try Int.fetchOne(
                     db, sql: "SELECT COALESCE(MAX(ordinal), -1) + 1 FROM digest_email_result WHERE digest_id = ?",
                     arguments: [digestID.uuidString]) ?? 0
                 try row.insert(db, digestID: digestID, ordinal: next)
+                try Self.writeRefs(db, digestID: digestID.uuidString, emailID: result.emailID, ordinal: next,
+                                   suggestions: result.suggestions)
             }
         }
     }
@@ -197,6 +247,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         try await writer.write { db in
             for id in emailIDs {
                 try db.execute(sql: "DELETE FROM digest_email_result WHERE digest_id = ? AND email_id = ?",
+                               arguments: [digestID.uuidString, id])
+                try db.execute(sql: "DELETE FROM suggestion_ref WHERE digest_id = ? AND email_id = ?",
                                arguments: [digestID.uuidString, id])
             }
         }
@@ -263,6 +315,11 @@ public final class GRDBDigestStore: DigestStore, Sendable {
                 list[i] = suggestion
                 try db.execute(sql: "UPDATE digest_email_result SET suggestions = ? WHERE digest_id = ? AND email_id = ?",
                                arguments: [try JSON.encode(list), row["digest_id"] as String, row["email_id"] as String])
+                // Same transaction: only the changed suggestion's index row moves (status, confidence, decided_at).
+                try db.execute(sql: """
+                    UPDATE suggestion_ref SET status = ?, confidence = ?, decided_at = ? WHERE suggestion_id = ?
+                    """, arguments: [suggestion.status.rawValue, suggestion.confidence,
+                                     suggestion.decidedAt?.timeIntervalSince1970, idText])
                 return
             }
         }
@@ -272,6 +329,101 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         try await writer.read { db in
             try Row.fetchAll(db, sql: "SELECT * FROM digest ORDER BY created_at, rowid").map { try Self.aggregate(db, $0) }
         }
+    }
+
+    // MARK: Summaries and paging
+
+    public func digestSummaries() async throws -> [DigestSummary] {
+        try await writer.read { db in
+            // Counts come from the index and the result table; no JSON column is selected.
+            try Row.fetchAll(db, sql: """
+                SELECT d.id, d.created_at, COALESCE(j.kind, 'daily') AS kind,
+                    (SELECT COUNT(*) FROM digest_email_result r WHERE r.digest_id = d.id) AS emails,
+                    (SELECT COUNT(*) FROM suggestion_ref s WHERE s.digest_id = d.id AND s.status = 'pending') AS pending,
+                    (SELECT COUNT(*) FROM suggestion_ref s WHERE s.digest_id = d.id AND s.status = 'failed') AS failed
+                FROM digest d LEFT JOIN job j ON j.id = d.id
+                ORDER BY d.created_at DESC, d.rowid DESC
+                """).map { row in
+                DigestSummary(id: UUID(uuidString: row["id"]) ?? UUID(),
+                              createdAt: Date(timeIntervalSince1970: row["created_at"]),
+                              kind: JobKind(rawValue: row["kind"]) ?? .daily,
+                              emailCount: row["emails"], pendingCount: row["pending"], failedCount: row["failed"])
+            }
+        }
+    }
+
+    public func actionableSuggestions(_ query: SuggestionQuery) async throws -> [SuggestionRecord] {
+        guard query.limit > 0, query.kinds?.isEmpty != true else { return [] }
+        return try await writer.read { db in
+            var conditions = ["s.status IN ('pending', 'failed')"]
+            var arguments = StatementArguments()
+            if let kinds = query.kinds {
+                conditions.append("COALESCE(j.kind, 'daily') IN (\(kinds.map { _ in "?" }.joined(separator: ", ")))")
+                arguments += StatementArguments(kinds.map(\.rawValue))
+            }
+            if let before = query.digestsCreatedBefore {
+                conditions.append("d.created_at < ?")
+                arguments += [before.timeIntervalSince1970]
+            }
+            arguments += [query.limit, max(0, query.offset)]
+            return try Self.records(db, where: conditions.joined(separator: " AND "),
+                                    order: "d.created_at DESC, d.rowid DESC, s.ordinal, s.position",
+                                    arguments: arguments)
+        }
+    }
+
+    public func decidedSuggestions(limit: Int, offset: Int) async throws -> [SuggestionRecord] {
+        guard limit > 0 else { return [] }
+        return try await writer.read { db in
+            try Self.records(db, where: "s.status IN ('approved', 'dismissed')",
+                             order: "COALESCE(s.decided_at, d.created_at) DESC, d.rowid DESC, s.ordinal, s.position",
+                             arguments: [limit, max(0, offset)])
+        }
+    }
+
+    /// Picks one page of suggestion ids from the index, then decodes only the result rows that hold them
+    /// and reads each email's context from its `job_item`. `arguments` ends with limit and offset.
+    private static func records(_ db: Database, where condition: String, order: String,
+                                arguments: StatementArguments) throws -> [SuggestionRecord] {
+        let refs = try Row.fetchAll(db, sql: """
+            SELECT s.suggestion_id, s.digest_id, s.email_id, d.created_at, COALESCE(j.kind, 'daily') AS kind
+            FROM suggestion_ref s JOIN digest d ON d.id = s.digest_id LEFT JOIN job j ON j.id = d.id
+            WHERE \(condition) ORDER BY \(order) LIMIT ? OFFSET ?
+            """, arguments: arguments)
+
+        struct ResultKey: Hashable { var digestID: String; var emailID: String }
+        struct Detail { var suggestions: [Suggestion]; var category: EmailCategory?; var email: EmailContext? }
+        var details: [ResultKey: Detail] = [:]
+        var out: [SuggestionRecord] = []
+        for ref in refs {
+            let key = ResultKey(digestID: ref["digest_id"], emailID: ref["email_id"])
+            if details[key] == nil {
+                guard let r = try Row.fetchOne(db, sql: """
+                    SELECT info, suggestions FROM digest_email_result WHERE digest_id = ? AND email_id = ?
+                    """, arguments: [key.digestID, key.emailID]) else { continue }
+                let info = try (r["info"] as String?).map { try JSON.decode(InfoItem.self, $0) }
+                // The lowest-position item wins, as when the review window builds its lookup.
+                let email = try Row.fetchOne(db, sql: """
+                    SELECT sender, subject, mailbox, received_at, mail_store_row_id FROM job_item
+                    WHERE job_id = ? AND message_id = ? ORDER BY position LIMIT 1
+                    """, arguments: [key.digestID, key.emailID]).map { row in
+                    EmailContext(sender: row["sender"], subject: row["subject"],
+                                 mailbox: try JSON.decode(MailboxRef.self, row["mailbox"] as String),
+                                 receivedAt: Date(timeIntervalSince1970: row["received_at"]),
+                                 storeRowID: row["mail_store_row_id"])
+                }
+                details[key] = Detail(suggestions: try JSON.decode([Suggestion].self, r["suggestions"] as String),
+                                      category: info?.category, email: email)
+            }
+            guard let detail = details[key], let id = UUID(uuidString: ref["suggestion_id"]),
+                  let s = detail.suggestions.first(where: { $0.id == id }) else { continue }
+            out.append(SuggestionRecord(
+                suggestion: s, digestID: UUID(uuidString: key.digestID) ?? UUID(),
+                digestCreatedAt: Date(timeIntervalSince1970: ref["created_at"]),
+                kind: JobKind(rawValue: ref["kind"]) ?? .daily,
+                category: s.category ?? detail.category ?? .other, email: detail.email))
+        }
+        return out
     }
 
     // MARK: Pinned info

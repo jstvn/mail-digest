@@ -24,6 +24,12 @@ public struct EmailContext: Sendable, Equatable {
         self.receivedAt = receivedAt
         self.storeRowID = storeRowID
     }
+
+    /// The context a queue item supplies.
+    public init(item: JobItem) {
+        self.init(sender: item.sender, subject: item.subject, mailbox: item.mailbox,
+                  receivedAt: item.receivedAt, storeRowID: item.storeRowID)
+    }
 }
 
 /// What the review panel is showing: the digest plus the user's unsaved choices.
@@ -196,6 +202,7 @@ public enum ReviewActions {
             var failed: [Suggestion] = []
             for var s in suggestions {
                 s.status = .failed
+                s.decidedAt = nil
                 try? await store.update(s)
                 failed.append(s)
             }
@@ -208,6 +215,7 @@ public enum ReviewActions {
             do {
                 s.reminderID = try await writer.write(s, category: category(for: s, in: state), email: emails[s.emailID], toList: listID)
                 s.status = .approved
+                s.decidedAt = clock.now()
                 if let email = emails[s.emailID] {
                     let d = Decision(suggestionID: s.id, sender: MailFilter.address(from: email.sender),
                                      action: .approved, decidedAt: clock.now())
@@ -216,6 +224,7 @@ public enum ReviewActions {
                 }
             } catch {
                 s.status = .failed
+                s.decidedAt = nil
             }
             try? await store.update(s)
             results.append(s)
@@ -230,6 +239,7 @@ public enum ReviewActions {
         var decisions: [Decision] = []
         for var s in suggestions {
             s.status = .dismissed
+            s.decidedAt = clock.now()
             try await store.update(s)
             if let email = emails[s.emailID] {
                 let d = Decision(suggestionID: s.id, sender: MailFilter.address(from: email.sender),
