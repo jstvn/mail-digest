@@ -152,7 +152,8 @@ struct ProcessedActionBar: View {
     }
 }
 
-/// A non-modal toast for the latest move, with Undo. It stays until a newer move replaces it or Undo is used.
+/// A non-modal floating capsule for the latest move, with Undo. It stays until a newer move replaces it or
+/// Undo is used. Shown in an overlay (bottom-centred) so it never pushes content.
 struct UndoToast: View {
     let model: ProcessedMailModel
 
@@ -160,17 +161,17 @@ struct UndoToast: View {
         if let batch = model.lastBatch {
             HStack(spacing: 10) {
                 Image(systemName: "arrow.uturn.backward.circle").foregroundStyle(.secondary).accessibilityHidden(true)
-                Text(batch.summary).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
+                Text(batch.summary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 Button("Undo") { Task { await model.undo() } }
                     .disabled(model.isWorking)
                     .help("Move these emails back to where they were")
             }
-            .padding(10)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
             .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            .padding(.vertical, 10)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(.separator))
+            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .frame(maxWidth: 560)
             .accessibilityElement(children: .contain)
         }
     }

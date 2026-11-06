@@ -3,14 +3,13 @@ import MailDigestCore
 import Observation
 import OSLog
 
-/// Tracks Reminders permission, hands the EventKit writer to the review panel only when full access is
+/// Tracks Reminders permission, hands the EventKit writer to the review window only when full access is
 /// granted, and renames the app's list when the user changes its name in Settings.
 @MainActor @Observable
 final class RemindersAccessModel {
     private(set) var status: RemindersAuthorization
 
     @ObservationIgnored private let writer: EventKitReminderWriter?
-    @ObservationIgnored private weak var review: ReviewViewModel?
     @ObservationIgnored private weak var coordinator: ReviewCoordinator?
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "reminders")
 
@@ -25,13 +24,7 @@ final class RemindersAccessModel {
         self.status = status
     }
 
-    /// Connects the review panel and applies the current status to it.
-    func attach(review: ReviewViewModel) {
-        self.review = review
-        apply()
-    }
-
-    /// Connects the cross-digest coordinator, which writes approvals with the same writer.
+    /// Connects the cross-digest coordinator, which writes approvals, and applies the current status to it.
     func attach(coordinator: ReviewCoordinator) {
         self.coordinator = coordinator
         apply()
@@ -67,7 +60,6 @@ final class RemindersAccessModel {
 
     private func apply() {
         let granted: (any ReminderWriter)? = status == .granted ? writer : nil
-        review?.setReminderWriter(granted)
         coordinator?.setReminderWriter(granted)
     }
 }

@@ -4,9 +4,7 @@ import SwiftUI
 /// One suggested reminder: checkbox, editable title, priority, category, due date, and where it came from.
 /// Edits are committed through `onEdit`; if the model rejects one, the field reverts and says why.
 struct SuggestionRow: View {
-    let suggestion: Suggestion
-    let category: Category
-    let email: EmailContext?
+    let record: SuggestionRecord
     let isSelected: Bool
     let isFocused: Bool
     var onToggle: () -> Void = {}
@@ -36,19 +34,21 @@ struct SuggestionRow: View {
     @State private var errorText: String?
     @FocusState private var titleFocused: Bool
 
-    init(suggestion: Suggestion, category: Category, email: EmailContext?, isSelected: Bool, isFocused: Bool,
+    init(record: SuggestionRecord, isSelected: Bool, isFocused: Bool,
          onToggle: @escaping () -> Void = {}, onEdit: @escaping (SuggestionEdit) async throws -> Void = { _ in },
          onOpen: @escaping () -> Void = {}) {
-        self.suggestion = suggestion
-        self.category = category
-        self.email = email
+        self.record = record
         self.isSelected = isSelected
         self.isFocused = isFocused
         self.onToggle = onToggle
         self.onEdit = onEdit
         self.onOpen = onOpen
-        _draft = State(initialValue: Draft(suggestion, category: category))
+        _draft = State(initialValue: Draft(record.suggestion, category: record.category))
     }
+
+    private var suggestion: Suggestion { record.suggestion }
+    private var category: Category { record.category }
+    private var email: EmailContext? { record.email }
 
     private var isEditable: Bool { suggestion.status == .pending || suggestion.status == .failed }
 
@@ -223,11 +223,10 @@ extension Priority {
 
 #Preview("Suggestion rows") {
     let d = PreviewFixtures.digest
+    let records = SuggestionRecord.records(from: d, kind: .daily, emails: PreviewFixtures.emails)
     return VStack(spacing: 0) {
-        ForEach(d.suggestions) { s in
-            SuggestionRow(suggestion: s, category: s.category ?? .other,
-                          email: PreviewFixtures.emails[s.emailID],
-                          isSelected: s.preselected, isFocused: s.id == PreviewFixtures.ID.submitA2)
+        ForEach(records) { r in
+            SuggestionRow(record: r, isSelected: r.suggestion.preselected, isFocused: r.id == PreviewFixtures.ID.submitA2)
             Divider()
         }
     }

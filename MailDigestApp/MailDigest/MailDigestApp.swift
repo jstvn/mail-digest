@@ -1,7 +1,7 @@
 import MailDigestCore
 import SwiftUI
 
-/// Menu bar agent entry point: the menu bar window, the review panel, onboarding, Settings and Mail Access.
+/// Menu bar agent entry point: the menu bar window, the review window, onboarding, Settings and Mail Access.
 /// A morning scheduler starts the Daily run after launch.
 @main
 struct MailDigestApp: App {
@@ -27,9 +27,9 @@ struct MailDigestApp: App {
         .menuBarExtraStyle(.window)
 
         Window("Mail Digest", id: "review") {
-            ReviewPanelView(run: run, access: access)
+            ReviewWindow(run: run, access: access)
         }
-        .defaultSize(width: 720, height: 640)
+        .defaultSize(width: 980, height: 680)
 
         Window("Mail Access", id: "mail-access") {
             MailAccessView(model: access, run: run)

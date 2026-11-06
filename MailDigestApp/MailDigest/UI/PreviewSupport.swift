@@ -8,15 +8,15 @@ import SwiftUI
 enum PreviewSupport {
     static let sampleState = ReviewState(digest: PreviewFixtures.digest)
 
-    static func review(_ state: ReviewState? = sampleState, writer: (any ReminderWriter)? = RecordingReminderWriter()) -> ReviewViewModel {
-        ReviewViewModel(preview: state, emails: PreviewFixtures.emails, writer: writer)
+    static func review(_ state: ReviewState? = sampleState) -> ReviewViewModel {
+        ReviewViewModel(preview: state, emails: PreviewFixtures.emails)
     }
 
-    static func run(review: ReviewViewModel = review(), reminders: RemindersAuthorization = .granted, progress: JobProgress? = nil, banner: String? = nil,
+    static func run(review: ReviewViewModel = review(), coordinator: ReviewCoordinator? = nil, reminders: RemindersAuthorization = .granted, progress: JobProgress? = nil, banner: String? = nil,
                     failedJobID: UUID? = nil, foundNothing: Bool = false, jobs: [Job] = [],
                     scheduledRunWaiting: Bool = false) -> DigestRunModel {
         DigestRunModel(preview: SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
-                       review: review, reminders: RemindersAccessModel(preview: reminders), progress: progress, banner: banner, failedJobID: failedJobID,
+                       review: review, coordinator: coordinator, reminders: RemindersAccessModel(preview: reminders), progress: progress, banner: banner, failedJobID: failedJobID,
                        lastRunAt: PreviewFixtures.now, lastRunFoundNothing: foundNothing,
                        lastRunSummary: "Last run 6:45 AM · 4 suggestions · 23 emails",
                        jobs: jobs, scheduledRunWaiting: scheduledRunWaiting)
@@ -57,7 +57,21 @@ enum PreviewSupport {
     }
 
     /// A multi-day library: today, two earlier days (the older in another month) and one Backlog job.
-    static func library(backlogID: UUID = UUID(), backlogJob: Job? = nil) -> ReviewLibrary {
+    static let backlogID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!
+
+    /// The sample Backlog job behind the sidebar entry.
+    static var backlogJob: Job {
+        var j = job(.paused, kind: .backlog, id: backlogID)
+        j.mailboxes = [MailboxRef(account: "iCloud", name: "Inbox")]
+        return j
+    }
+
+    /// The day before the fixtures' "today", the sample Day selection.
+    static var yesterday: DigestDay {
+        DigestDay(PreviewFixtures.now.addingTimeInterval(-86_400), calendar: calendar)
+    }
+
+    static func library(backlogID: UUID = backlogID, backlogJob: Job? = backlogJob) -> ReviewLibrary {
         let summaries = [
             DigestSummary(id: UUID(), createdAt: PreviewFixtures.now, kind: .daily, emailCount: 23, pendingCount: 4, failedCount: 0),
             DigestSummary(id: UUID(), createdAt: PreviewFixtures.now.addingTimeInterval(-86_400), kind: .daily, emailCount: 12, pendingCount: 2, failedCount: 1),
@@ -66,6 +80,14 @@ enum PreviewSupport {
         ]
         let archive = DigestArchive(summaries: summaries, now: PreviewFixtures.now, calendar: calendar)
         return ReviewLibrary(preview: archive, calendar: calendar, backlogJobs: backlogJob.map { [$0] } ?? [])
+    }
+
+    /// Today with no digest and no carry-over, for the "Inbox zero" state.
+    static func emptyTodayCoordinator(review: ReviewViewModel) -> ReviewCoordinator {
+        let today = TodayCanvasModel(
+            preview: DayCanvasModel(preview: DayContent(digests: []), emails: [:]),
+            carryOver: PagedRecordsModel(preview: [], pageSize: 100))
+        return ReviewCoordinator(preview: library(), review: review, today: today)
     }
 
     /// A coordinator with multi-day fixtures and no store: Today (with carry-over), a Day, a Backlog batch,
@@ -118,50 +140,52 @@ enum PreviewSupport {
     static let automationDenied = MailAccessStatus(fullDiskAccess: .denied, automation: .denied)
 }
 
-@MainActor private func panel(_ run: DigestRunModel, status: MailAccessStatus = PreviewSupport.fastLocal) -> some View {
-    ReviewPanelView(run: run, access: MailAccessModel(preview: status))
-        .frame(width: 720, height: 640)
+/// The review window over multi-day fixtures, selecting one sidebar item.
+@MainActor private func window(_ selection: SidebarItem = .today, progress: JobProgress? = nil, banner: String? = nil,
+                               failedJobID: UUID? = nil, reminders: RemindersAuthorization = .granted,
+                               writer: (any ReminderWriter)? = RecordingReminderWriter(),
+                               status: MailAccessStatus = PreviewSupport.fastLocal,
+                               foundNothing: Bool = false, review: ReviewViewModel = PreviewSupport.review(),
+                               coordinator: ReviewCoordinator? = nil) -> some View {
+    let coordinator = coordinator ?? PreviewSupport.coordinator(selection: selection, review: review, writer: writer)
+    let run = PreviewSupport.run(review: review, coordinator: coordinator, reminders: reminders, progress: progress,
+                                 banner: banner, failedJobID: failedJobID, foundNothing: foundNothing)
+    return ReviewWindow(run: run, access: MailAccessModel(preview: status))
+        .frame(width: 980, height: 680)
 }
 
-#Preview("Panel · digest") { panel(PreviewSupport.run()) }
+#Preview("Window · Today with carry-over") { window() }
 
-#Preview("Panel · running") {
-    panel(PreviewSupport.run(progress: PreviewFixtures.runningProgress))
+#Preview("Window · Day") { window(.day(PreviewSupport.yesterday)) }
+
+#Preview("Window · Backlog") { window(.backlog(PreviewSupport.backlogID)) }
+
+#Preview("Window · Review Queue") { window(.reviewQueue) }
+
+#Preview("Window · Logbook") { window(.logbook) }
+
+#Preview("Window · Mail Cleanup") { window(.mailCleanup) }
+
+#Preview("Window · running job") { window(progress: PreviewFixtures.runningProgress) }
+
+#Preview("Window · paused job") { window(progress: PreviewFixtures.pausedProgress) }
+
+#Preview("Window · Ollama down") {
+    window(banner: "Ollama isn't running. Start Ollama, or run `ollama pull qwen3:4b`.", failedJobID: PreviewFixtures.jobID)
 }
 
-#Preview("Panel · paused") {
-    panel(PreviewSupport.run(progress: PreviewFixtures.pausedProgress))
-}
+#Preview("Window · Full Disk Access unavailable") { window(status: PreviewSupport.fallback) }
 
-#Preview("Panel · Ollama down") {
-    panel(PreviewSupport.run(banner: "Ollama isn't running. Start Ollama, or run `ollama pull qwen3:4b`.",
-                             failedJobID: PreviewFixtures.jobID))
-}
+#Preview("Window · Mail Automation denied") { window(status: PreviewSupport.automationDenied) }
 
-#Preview("Panel · Full Disk Access unavailable") {
-    panel(PreviewSupport.run(), status: PreviewSupport.fallback)
-}
+#Preview("Window · Reminders unavailable") { window(reminders: .unavailable, writer: nil) }
 
-#Preview("Panel · Mail Automation denied") {
-    panel(PreviewSupport.run(), status: PreviewSupport.automationDenied)
-}
+#Preview("Window · Reminders access needed") { window(reminders: .notDetermined, writer: nil) }
 
-#Preview("Panel · Reminders unavailable") {
-    panel(PreviewSupport.run(review: PreviewSupport.review(writer: nil), reminders: .unavailable))
-}
-
-#Preview("Panel · Reminders access needed") {
-    panel(PreviewSupport.run(review: PreviewSupport.review(writer: nil), reminders: .notDetermined))
-}
-
-#Preview("Panel · no new mail") {
+#Preview("Window · no new mail") {
     let review = PreviewSupport.review(ReviewState(digest: PreviewFixtures.emptyDigest))
-    return panel(PreviewSupport.run(review: review, foundNothing: true))
-}
-
-#Preview("Panel · partial failure") {
-    // The sample digest already lists a failed email under Skipped with its reason.
-    panel(PreviewSupport.run())
+    return window(foundNothing: true, review: review,
+                  coordinator: PreviewSupport.emptyTodayCoordinator(review: review))
 }
 
 @MainActor private func menu(_ run: DigestRunModel) -> some View {

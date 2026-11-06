@@ -24,7 +24,7 @@ final class DigestRunModel {
     private(set) var lastRunAt: Date?
     /// The last finished run found no new mail (Q24: such a job leaves no digest).
     private(set) var lastRunFoundNothing = false
-    /// The panel's digest and selection; refreshed while a job runs.
+    /// The latest digest, for Mail Cleanup and auto-file; refreshed while a job runs.
     let review: ReviewViewModel
     /// The sidebar summaries (Q56) and the cross-digest canvases and triage actions (Q54).
     let library: ReviewLibrary
@@ -81,7 +81,6 @@ final class DigestRunModel {
         self.coordinator = ReviewCoordinator(library: library, review: review)
         self.reminders = RemindersAccessModel()
         self.processed = ProcessedMailModel(review: review, settings: settings)
-        reminders.attach(review: review)
         reminders.attach(coordinator: coordinator)
         review.onSuggestionsSettled = { [processed] in await processed.refresh() }
         // Every existing `review.reload()` (job progress, run end, cleanup) also refreshes the sidebar and the shown canvas.

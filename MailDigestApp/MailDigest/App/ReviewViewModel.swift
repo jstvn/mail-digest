@@ -3,47 +3,19 @@ import MailDigestCore
 import Observation
 import OSLog
 
-/// What the review panel body shows (banners and the progress strip are layered on top of it).
-enum ReviewPanelState: Equatable {
-    case loading
-    /// No digest exists yet.
-    case neverRun
-    /// The last run found no new mail.
-    case noNewMail(lastRun: Date?)
-    case digest
-}
-
-/// Owns the digest being reviewed and the user's selection. Store work happens off the main actor;
-/// the pure decisions live in `ReviewActions` and `ReviewPresentation` (core).
+/// Owns the latest digest for the parts of the app that still work on it: Mail Cleanup, auto-file and the
+/// ignore-rule check on load. Reviewing, selecting and approving live in `ReviewCoordinator` (Q54). Store
+/// work happens off the main actor; the pure decisions live in `ReviewActions` and `ReviewPresentation`.
 @MainActor @Observable
 final class ReviewViewModel {
-    private(set) var state: ReviewState?
+    /// The latest digest, of any kind.
+    private(set) var digest: Digest?
     /// Sender, subject and mailbox per email id, from the job's `job_item` rows.
     private(set) var emails: [String: EmailContext] = [:]
     private(set) var jobKind: JobKind = .daily
-    private(set) var isLoaded = false
-    private(set) var isWorking = false
-    /// Latest user-facing problem from an approve, dismiss or edit; cleared by the next successful action.
-    private(set) var message: String?
-    /// Daily shows the top 25 first (Q16); this reveals the rest.
-    var showAllSuggestions = false
-    /// Backlog digests are reviewed in batches of 50 source emails (Q16); nil for a Daily digest.
-    private(set) var batching: BacklogBatching?
-    /// The batch on screen, zero-based.
-    private(set) var batchIndex = 0
-    /// The email a "Recent" row asked to show; the panel scrolls to it.
-    private(set) var revealedEmailID: String?
-    /// Nil unless Reminders access is fully granted; "Add selected" stays disabled until then.
-    private(set) var reminderWriter: (any ReminderWriter)?
-    /// Pinned info from earlier digests, newest first; the current digest's own pins stay in its categories.
-    private(set) var carriedPins: [PinnedInfo] = []
     /// Shared with the cross-digest coordinator: "Save to Notes" progress and the ignore-rule notice.
     @ObservationIgnored let notes: NotesSaver
     @ObservationIgnored let ignore: IgnoreSuggestionModel
-    /// "Save to Notes" progress per info id.
-    var notesStates: [String: NotesSaveState] { notes.states }
-    /// A sender the user keeps dismissing, offered as an Ignored sender. One at a time.
-    var ignoreSuggestion: IgnoreSuggestion? { ignore.suggestion }
     /// Set by `DigestRunModel`; the ignore-rule notice reads and writes the sender lists here.
     var settingsStore: SettingsStore? {
         get { ignore.settingsStore }
@@ -56,9 +28,6 @@ final class ReviewViewModel {
     @ObservationIgnored var onSuggestionsSettled: (@MainActor () async -> Void)?
 
     @ObservationIgnored private var store: (any DigestStore)?
-    @ObservationIgnored private let clock = SystemClock()
-    /// Bumped by every local change so a slow reload can't overwrite newer edits.
-    @ObservationIgnored private var generation = 0
     @ObservationIgnored private var isReloading = false
     @ObservationIgnored private var needsReload = false
     /// The digest whose senders were last checked for ignore suggestions on load.
@@ -72,70 +41,14 @@ final class ReviewViewModel {
         ignore = IgnoreSuggestionModel()
     }
 
-    /// Previews and tests: shows a fixed state without a store.
+    /// Previews and tests: shows a fixed digest without a store.
     init(preview state: ReviewState?, emails: [String: EmailContext] = [:], jobKind: JobKind = .daily,
-         writer: (any ReminderWriter)? = nil, carriedPins: [PinnedInfo] = [],
          ignoreSuggestion: IgnoreSuggestion? = nil) {
-        self.carriedPins = carriedPins
         self.ignore = IgnoreSuggestionModel(suggestion: ignoreSuggestion)
         self.notes = NotesSaver(preview: RecordingNotesWriter())
-        self.state = state
+        self.digest = state?.digest
         self.emails = emails
         self.jobKind = jobKind
-        self.reminderWriter = writer
-        self.isLoaded = true
-    }
-
-    // MARK: Derived
-
-    var digest: Digest? { state?.digest }
-    /// What the panel lists: the whole Daily digest, or the current batch of a Backlog digest.
-    var shownDigest: Digest? {
-        guard let digest else { return nil }
-        return batching.map { $0.digest(digest, batch: batchIndex) } ?? digest
-    }
-    var actionable: [Suggestion] { ReviewPresentation.actionable(shownDigest?.suggestions ?? []) }
-
-    /// The state "Select all", "Add selected" and "Dismiss unselected" act on: the shown batch only, so
-    /// nothing the user can't see is approved or dismissed.
-    private var scopedState: ReviewState? {
-        guard let state, batching != nil, let shown = shownDigest else { return state }
-        var scoped = ReviewState(digest: shown)
-        scoped.selection = state.selection.intersection(Set(shown.suggestions.map(\.id)))
-        return scoped
-    }
-
-    var batchTitle: String? { batching.map { $0.title(batch: batchIndex) } }
-    var hasBatches: Bool { (batching?.batchCount ?? 0) > 1 }
-    var canGoToPreviousBatch: Bool { batchIndex > 0 }
-    var canGoToNextBatch: Bool { batching.map { batchIndex < $0.batchCount - 1 } ?? false }
-    func nextBatch() { if canGoToNextBatch { batchIndex += 1; showAllSuggestions = false } }
-    func previousBatch() { if canGoToPreviousBatch { batchIndex -= 1; showAllSuggestions = false } }
-
-    /// Jumps to the batch holding this email and asks the panel to scroll to it.
-    func reveal(emailID: String) {
-        guard let batching, let position = batching.emailIDs.firstIndex(of: emailID) else {
-            revealedEmailID = emailID
-            return
-        }
-        batchIndex = position / batching.size
-        revealedEmailID = emailID
-    }
-    func clearReveal() { revealedEmailID = nil }
-    var pendingCount: Int { ReviewPresentation.pendingCount(state?.digest) }
-    var selectedCount: Int {
-        guard let scopedState else { return 0 }
-        return ReviewActions.split(scopedState).approve.count
-    }
-    var unselectedCount: Int {
-        guard let scopedState else { return 0 }
-        return ReviewActions.split(scopedState).dismiss.count
-    }
-    var canAddSelected: Bool { reminderWriter != nil && selectedCount > 0 && !isWorking }
-
-    /// Q16: Daily shows 25 first; a Backlog has no digest-wide cap.
-    var page: SuggestionPage {
-        ReviewPresentation.page(actionable, limit: jobKind == .daily ? 25 : nil, showAll: showAllSuggestions)
     }
 
     /// Mailbox and Mail row id per email id, from the owning job's items (Q18), for mail actions.
@@ -147,13 +60,6 @@ final class ReviewViewModel {
         return out
     }
 
-    func category(for suggestion: Suggestion) -> Category {
-        state.map { ReviewActions.category(for: suggestion, in: $0) } ?? .other
-    }
-
-    /// `RemindersAccessModel` sets the EventKit writer here when access is granted, and clears it otherwise.
-    func setReminderWriter(_ writer: (any ReminderWriter)?) { reminderWriter = writer }
-
     // MARK: Loading
 
     /// Connects the store and loads the latest digest.
@@ -163,66 +69,35 @@ final class ReviewViewModel {
     }
 
     /// Loads the latest digest. Safe to call often (a running job calls it as results arrive): overlapping
-    /// calls coalesce, and a result that raced with a local edit is discarded and reloaded.
-    /// `notifying: false` skips `onReloaded`, for callers that refresh the cross-digest views themselves.
+    /// calls coalesce. `notifying: false` skips `onReloaded`, for callers that refresh the cross-digest views
+    /// themselves.
     func reload(notifying: Bool = true) async {
         guard let store else { return }
         if isReloading { needsReload = true; return }
         isReloading = true
         repeat {
             needsReload = false
-            let startedAt = generation
-            let previousDigestID = state?.digest.id
             do {
                 let latest = try await store.latestDigest()
                 var kind = jobKind
                 var context = emails
-                var newBatching: BacklogBatching?
                 if let latest {
                     let ids = Set(latest.info.map(\.emailID) + latest.suggestions.map(\.emailID))
                     if let job = try await store.jobs().first(where: { $0.id == latest.id }) { kind = job.kind }
-                    if kind == .backlog {
-                        // Batches follow the job's own order; results appear as each email is persisted.
-                        let items = try await store.items(job: latest.id)
-                        Self.merge(items, into: &context)
-                        let resultIDs = ids.union(latest.skipped.map(\.id))
-                        newBatching = BacklogBatching(jobOrder: items.sorted { $0.position < $1.position }.map(\.messageID),
-                                                      resultIDs: resultIDs)
-                    } else if !ids.isSubset(of: context.keys) {
+                    // A Backlog digest grows as results arrive, so its items are always re-read (Q18).
+                    if kind == .backlog || !ids.isSubset(of: context.keys) {
                         Self.merge(try await store.items(job: latest.id), into: &context)
                     }
                 }
-                // Pins from other digests; an email already in the current digest shows there instead.
-                let currentEmails = Set(latest?.info.map(\.emailID) ?? [])
-                let carried = try await store.pinnedInfo().filter {
-                    $0.digestID != latest?.id && !currentEmails.contains($0.item.emailID)
-                }
-                // Sender and subject for carried items come from their own job's items (Q18).
-                for digestID in Set(carried.filter({ context[$0.item.emailID] == nil }).map(\.digestID)) {
-                    Self.merge(try await store.items(job: digestID), into: &context)
-                }
-                guard startedAt == generation else { needsReload = true; continue }
-                if let latest {
-                    state = state.map { $0.digest.id == latest.id ? $0.refreshed(with: latest) : ReviewState(digest: latest) }
-                        ?? ReviewState(digest: latest)
-                } else {
-                    state = nil
-                }
-                if state?.digest.id != previousDigestID { batchIndex = 0 }
-                batching = newBatching
-                batchIndex = newBatching?.clamped(batchIndex) ?? 0
+                digest = latest
                 emails = context
-                carriedPins = carried
                 jobKind = kind
-                isLoaded = true
                 if let latest, evaluatedDigestID != latest.id {
                     evaluatedDigestID = latest.id
                     await ignore.evaluate(senders: Set(latest.suggestions.compactMap { context[$0.emailID]?.sender }), store: store)
                 }
             } catch {
                 Self.log.error("could not load digest: \(String(describing: error), privacy: .public)")
-                message = "Could not load the latest digest."
-                isLoaded = true
             }
         } while needsReload
         // Cleared before the hook so a reload requested from inside it is not lost.
@@ -236,156 +111,4 @@ final class ReviewViewModel {
             context[item.messageID] = EmailContext(item: item)
         }
     }
-
-    // MARK: Selection
-
-    func toggle(_ id: UUID) { mutate { ReviewActions.toggle(id, in: $0) } }
-    func selectAll() {
-        mutate { full in
-            guard batching != nil, let shown = shownDigest else { return ReviewActions.selectAll(full) }
-            var next = full
-            let shownIDs = Set(shown.suggestions.map(\.id))
-            next.selection = full.selection.subtracting(shownIDs)
-                .union(shown.suggestions.filter { $0.status == .pending }.map(\.id))
-            return next
-        }
-    }
-    func selectNone() {
-        mutate { full in
-            guard batching != nil, let shown = shownDigest else { return ReviewActions.selectNone(full) }
-            var next = full
-            next.selection.subtract(shown.suggestions.map(\.id))
-            return next
-        }
-    }
-
-    private func mutate(_ change: (ReviewState) -> ReviewState) {
-        guard let state else { return }
-        self.state = change(state)
-        generation += 1
-    }
-
-    // MARK: Editing
-
-    /// Applies and persists an edit (title, due, priority, category). Throws `ReviewError` for a bad edit,
-    /// in which case nothing changes and the caller reverts its field.
-    func edit(_ edit: SuggestionEdit, id: UUID) async throws {
-        guard let state, let store else { throw ReviewError.unknownSuggestion }
-        generation += 1
-        let updated = try await ReviewActions.edit(edit, id: id, state: state, store: store)
-        // Keep selection changes made while the write was in flight.
-        guard var current = self.state else { return }
-        if let sug = updated.digest.suggestions.first(where: { $0.id == id }),
-           let i = current.digest.suggestions.firstIndex(where: { $0.id == id }) {
-            current.digest.suggestions[i] = sug
-        }
-        self.state = current
-        generation += 1
-        message = nil
-    }
-
-    // MARK: Approve and dismiss
-
-    /// "Add selected": writes the selected suggestions to Reminders. Does nothing without a writer.
-    func addSelected() async {
-        guard let state, let scopedState, let store, let writer = reminderWriter, !isWorking else { return }
-        let toAdd = ReviewActions.split(scopedState).approve
-        guard !toAdd.isEmpty else { return }
-        isWorking = true
-        defer { isWorking = false }
-        let outcome = await ReviewActions.approve(
-            toAdd, state: state, emails: emails, writer: writer, store: store, listName: listName(),
-            storedListID: UserDefaults.standard.string(forKey: Self.listIDKey), clock: clock)
-        if let id = outcome.listID { UserDefaults.standard.set(id, forKey: Self.listIDKey) }
-        apply(outcome)
-        let failed = outcome.results.filter { $0.status == .failed }.count
-        message = failed == 0 ? nil : "\(failed) \(failed == 1 ? "reminder" : "reminders") couldn't be added. They stay selected so you can try again."
-        await onSuggestionsSettled?()
-    }
-
-    /// "Dismiss unselected".
-    func dismissUnselected() async {
-        guard let scopedState else { return }
-        await dismiss(ReviewActions.split(scopedState).dismiss)
-    }
-
-    /// ⌫ on a focused row.
-    func dismiss(id: UUID) async {
-        guard let sug = state?.digest.suggestions.first(where: { $0.id == id }), sug.status == .pending else { return }
-        await dismiss([sug])
-    }
-
-    private func dismiss(_ suggestions: [Suggestion]) async {
-        guard let state, let store, !suggestions.isEmpty, !isWorking else { return }
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            apply(try await ReviewActions.dismiss(suggestions, state: state, emails: emails, store: store, clock: clock))
-            message = nil
-            await ignore.evaluate(senders: Set(suggestions.compactMap { emails[$0.emailID]?.sender }), store: store)
-            await onSuggestionsSettled?()
-        } catch {
-            message = "Could not dismiss those suggestions."
-            await reload()
-        }
-    }
-
-    private func apply(_ outcome: ApprovalOutcome) {
-        guard let current = state else { return }
-        state = ReviewActions.merge(outcome.results, into: current)
-        generation += 1
-    }
-
-    // MARK: Pinned info and Notes
-
-    /// Pins or unpins one info item and saves it. Unpinning an item carried over from an older digest removes it
-    /// from the panel.
-    func setPinned(_ pinned: Bool, item: InfoItem) async {
-        guard let store, let digestID = owningDigestID(of: item) else { return }
-        generation += 1
-        do {
-            try await store.setPinned(pinned, infoID: item.id, digestID: digestID)
-        } catch {
-            Self.log.error("could not save pin: \(String(describing: error), privacy: .public)")
-            message = "Could not save the pin."
-            return
-        }
-        generation += 1
-        if state?.digest.id == digestID, let i = state?.digest.info.firstIndex(where: { $0.id == item.id }) {
-            state?.digest.info[i].pinned = pinned
-        } else if let i = carriedPins.firstIndex(where: { $0.digestID == digestID && $0.item.id == item.id }) {
-            if pinned { carriedPins[i].item.pinned = true } else { carriedPins.remove(at: i) }
-        }
-        message = nil
-    }
-
-    private func owningDigestID(of item: InfoItem) -> UUID? {
-        if let state, state.digest.info.contains(where: { $0.id == item.id }) { return state.digest.id }
-        return carriedPins.first { $0.item.id == item.id }?.digestID
-    }
-
-    /// "Save to Notes": runs only from a click.
-    func saveToNotes(_ item: InfoItem) async {
-        let date: Date
-        if let state, state.digest.info.contains(where: { $0.id == item.id }) {
-            date = state.digest.createdAt
-        } else {
-            date = carriedPins.first { $0.item.id == item.id }?.digestCreatedAt ?? clock.now()
-        }
-        await notes.save(item, email: emails[item.emailID], date: date)
-    }
-
-    // MARK: Learned ignore rules
-
-    /// A name for the suggested sender: the display name when this digest knows one, otherwise the address.
-    var ignoreSuggestionName: String? { ignore.displayName }
-
-    /// "Ignore Sender": the only path that adds to the Ignored list.
-    func acceptIgnoreSuggestion() { ignore.accept() }
-
-    /// "Not Now": hides the notice until the app is relaunched.
-    func snoozeIgnoreSuggestion() { ignore.snooze() }
-
-    /// "Don't Ask Again": remembers the sender so it is never suggested again.
-    func declineIgnoreSuggestion() { ignore.decline() }
 }
