@@ -29,6 +29,7 @@ If running in a Linux container without `swift`, install a Swift 6 toolchain fir
 8. Don't add features that aren't in the spec. Put ambiguities in `docs/QUESTIONS.md` instead of guessing.
 9. Add short, clear English comments where they help: a `///` doc comment on public types and functions, and a brief comment above non-obvious logic explaining why, not what. Don't comment the obvious.
 10. Use short **Conventional Commits** messages (under 50 chars, lowercase, imperative), scoping by task ID or module—for example `feat(T10): add macOS app target` or `fix(core): shadow ObjectiveC.Category`.
+11. **Default delivery includes a commit.** For every requested development task (implementation, bug fix, refactor, tests, or project documentation/configuration), complete verification and create a commit without asking whether to commit. The commit includes all non-ignored project changes present in the working tree at delivery, including pre-existing changes made by the user or other tools—not only files edited by Claude. Inspect the full status and diff first; do not discard or silently omit existing work. Never commit secrets, credentials, private email/message data, local databases, build products, or other sensitive/generated local state. Do not push. See the commit workflow below.
 
 ## Agent orchestration and model routing
 
@@ -38,11 +39,11 @@ Use the project subagents in `.claude/agents/` for repeatable delegated work. Th
 
 | Agent | Model | Delegate when |
 | --- | --- | --- |
-| `fast-recon` | Haiku | Exploring the codebase, locating spec requirements, checking Git/environment state, investigating test output, or running local Ollama preflight checks. Read-only. |
+| `fast-recon` | Haiku | Initial reconnaissance for non-trivial work and first-pass diagnosis of bugs, regressions, failing tests/builds, runtime hangs, logs, stack traces, and performance issues; also locating spec requirements, checking Git/environment state, and local Ollama preflight checks. Read-only. |
 | `docs-and-boilerplate` | Haiku | Updating `docs/MAC_TODO.md` or recording already-approved decisions in `docs/QUESTIONS.md`; creating straightforward plist, entitlements, LaunchAgent, standalone JXA, or simple boilerplate adapter files. |
-| `swift-implementer` | Sonnet | Implementing one T-numbered task involving Swift 6, strict concurrency, GRDB, Mail/EventKit bridges, or non-trivial SwiftUI. |
+| `swift-implementer` | Sonnet | Implementing any non-trivial code change in this project—not only T-numbered tasks. This includes features, bug fixes, regressions found during debugging, refactors, performance work, tests, Swift 6/concurrency, GRDB, Mail/EventKit bridges, JXA and non-trivial SwiftUI. Assign a bounded task or workstream, whether or not it has a T-number. |
 
-Delegate proactively when the work is substantial or self-contained, but do not spawn an agent for a trivial lookup or one-line command. Give each worker a bounded task with its task ID (when applicable), relevant spec sections and question decisions, allowed files, acceptance criteria, and explicit out-of-scope items. Do not have multiple agents edit the same files concurrently. Independent tasks may use isolated worktrees; dependent tasks must be sequenced.
+Delegate proactively rather than doing substantial work in the primary session. Do not spawn an agent for a trivial lookup or one-line edit. Give each worker a bounded task or named workstream (a T-number is optional), relevant spec sections and question decisions, allowed files, acceptance criteria, and explicit out-of-scope items. Do not have multiple agents edit the same files concurrently. Independent tasks may use isolated worktrees; dependent tasks must be sequenced.
 
 When a task must run on Haiku, invoke `fast-recon` or `docs-and-boilerplate` explicitly by name. Do not assume the built-in `Explore` agent uses Haiku: current Claude Code versions make it inherit the main session's model unless a project/user agent named `Explore` overrides it.
 
@@ -52,6 +53,14 @@ The primary session must:
 - Review the complete diff from every worker, not only its summary. Verify requirements, error handling, Swift 6 concurrency, tests, and HIG/accessibility where UI is involved.
 - Run final verification itself after integration. A worker's successful test report is not a substitute for the final suite and app build required by the task.
 - Own all commits. Subagents must not commit, amend commits, push, or alter branches unless explicitly instructed by the primary session.
+
+### Debugging and regression workflow
+
+For a non-trivial bug report, regression, test/build failure, runtime hang, crash, or performance issue, **invoke `fast-recon` by name as the first investigation step**. Do not keep the initial diagnosis entirely in the Opus context or substitute the built-in `Explore` agent. Give `fast-recon` the observed symptoms, reproduction steps, relevant logs/test output and a read-only scope. Ask it to trace the execution path, run safe focused diagnostics/reproduction commands, identify likely root cause(s), distinguish verified facts from hypotheses, and report exact files/symbols plus the narrowest useful regression test.
+
+The primary session evaluates the evidence and owns the diagnosis and any product/architecture decision. If a code change is needed, delegate the bounded fix and regression tests to `swift-implementer` (Sonnet), even when the fix is not associated with a T-number. The primary session reviews the full diff and independently runs final verification. Keep trivial, immediately evident fixes in the primary session; do not force a delegation for a one-line typo. If `fast-recon` cannot reproduce an issue because it requires interactive UI or external device/system state, have it complete the code-path and diagnostic review, then state precisely what must be reproduced manually rather than claiming a root cause.
+
+For failing tests or builds, first delegate log/output triage to `fast-recon` (Haiku); once the failing area and likely cause are isolated, delegate the implementation to `swift-implementer` as needed. For a production bug with independent layers, parallelise only the read-only investigations; keep edits to overlapping files sequential.
 
 ### Decision and specification precedence
 
@@ -75,10 +84,20 @@ The primary session must:
 
 ## Delegating implementation
 
-Implementation of a single T-numbered Swift task goes to `swift-implementer` (`.claude/agents/swift-implementer.md`, Sonnet). Use `docs-and-boilerplate` (Haiku) for approved documentation updates and simple mechanical scaffolding, and `fast-recon` (Haiku) for investigation and preflight checks. Keep complex Swift 6 and SwiftUI implementation with Sonnet.
+Any non-trivial implementation work goes to `swift-implementer` (`.claude/agents/swift-implementer.md`, Sonnet), whether it is a T-numbered task, a bug fix, a feature request, a refactor, a performance improvement, or regression coverage. A task ID is not required: define a clear, bounded workstream instead. Use `docs-and-boilerplate` (Haiku) for approved documentation updates and simple mechanical scaffolding, and `fast-recon` (Haiku) for initial investigation, debugging triage and preflight checks. Keep complex Swift 6, persistence and SwiftUI implementation with Sonnet.
 
-- One task ID per sub-agent. The prompt names the task ID, the spec sections it needs, the files it may create or change, and the acceptance criteria.
+- One bounded task/workstream per implementation sub-agent. Name the T-number when one exists; otherwise use a concise workstream title. The prompt identifies the relevant spec sections and approved decisions, files it may create or change, acceptance criteria, tests, and explicit out-of-scope items.
 - The sub-agent runs `swift build` and `swift test` (or `xcodebuild` for app tasks) before reporting back.
 - Independent tasks can run in parallel with `isolation: "worktree"`. After T03, tasks T04 to T07 don't depend on each other; T08 waits for all of them.
 - If a sub-agent fails the same task twice, the main session takes it over or reports back (see the two-attempts rule above).
 - Never delegate spec changes or architecture decisions.
+
+### Default commit workflow
+
+The primary session creates the delivery commit after implementation, review and verification. **Do not ask the user whether to commit** for a completed development task. Subagents never create commits.
+
+1. At task start, inspect `git status --short --branch` and the current diff. Record which changes already existed before work; preserve them and do not treat them as disposable merely because Claude did not create them.
+2. Before committing, inspect the complete tracked and untracked working-tree changes, including pre-existing user/tool edits and automatic project-file changes from Xcode. Check for secrets, credentials, private email/message data, local databases, derived data, build products, and unrelated machine-local state; never stage those sensitive or generated files.
+3. By default, stage all remaining non-ignored project changes (`git add -A`) and commit them together in a short Conventional Commit message under 50 characters. This intentionally includes pre-existing, user-authored project changes in the delivery commit. Do not selectively omit them just because they were not authored in the current task.
+4. Do not discard, reset, stash, or revert pre-existing changes. Do not amend an earlier commit. Do not push.
+5. After committing, verify the commit contents and `git status --short --branch`; report the hash, verification results, and any excluded sensitive/generated files. If a sensitive or otherwise unsafe file is present and cannot be safely excluded without ambiguity, stop before committing and explain the blocker.
