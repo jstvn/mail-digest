@@ -10,14 +10,18 @@ struct InfoCard: View {
     var onTogglePin: () -> Void = {}
     var onSaveToNotes: () -> Void = {}
 
+    @State private var hovering = false
+
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(item.summary)
+                    .font(.body)
+                    .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
                 ForEach(item.keyFacts, id: \.self) { fact in
                     Label {
-                        Text(fact).font(.caption)
+                        Text(fact).font(.callout)
                     } icon: {
                         Image(systemName: "circle.fill").font(.system(size: 4))
                             .accessibilityHidden(true)
@@ -69,8 +73,11 @@ struct InfoCard: View {
                 .accessibilityLabel("Open email in Mail")
             }
             .buttonStyle(.borderless)
+            // Quiet until the pointer is over the card.
+            .foregroundStyle(hovering ? .primary : .secondary)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
+        .onHover { hovering = $0 }
         .accessibilityElement(children: .contain)
     }
 

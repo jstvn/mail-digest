@@ -65,20 +65,24 @@ struct SettledRecordRow: View {
     private var isApproved: Bool { record.suggestion.status == .approved }
     private var outcome: String { isApproved ? "Added" : "Dismissed" }
 
+    @State private var hovering = false
+
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: isApproved ? "checkmark.circle.fill" : "xmark.circle")
                 .foregroundStyle(isApproved ? Color.green : Color.secondary)
+                .padding(.top, 2)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(record.suggestion.title).lineLimit(2)
-                Text(source)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            VStack(alignment: .leading, spacing: 4) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { titleText; StaticSuggestionPills(suggestion: record.suggestion, category: record.category) }
+                    VStack(alignment: .leading, spacing: 4) { titleText; StaticSuggestionPills(suggestion: record.suggestion, category: record.category) }
+                }
+                EvidenceQuote(sender: email.map { ReviewPresentation.senderName($0.sender) } ?? "Unknown sender",
+                              evidence: record.suggestion.evidence, emphasised: hovering) {
+                    NSWorkspace.shared.open(ReviewActions.messageURL(for: record.suggestion.emailID))
+                }
             }
-            Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 Text(outcome).font(.callout).foregroundStyle(.secondary)
                 if showsDecisionDate, let decided = record.suggestion.decidedAt {
@@ -86,21 +90,21 @@ struct SettledRecordRow: View {
                         .font(.caption).foregroundStyle(.tertiary)
                 }
             }
-            Button {
-                NSWorkspace.shared.open(ReviewActions.messageURL(for: record.suggestion.emailID))
-            } label: { Image(systemName: "arrow.up.forward.square") }
-                .buttonStyle(.borderless)
-                .help("Open this email in Mail")
-                .accessibilityLabel("Open email in Mail")
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
+        .background {
+            if hovering { RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.5)) }
+        }
+        .onHover { hovering = $0 }
         .accessibilityElement(children: .contain)
     }
 
-    private var source: String {
-        guard let email = record.email else { return "Unknown sender" }
-        return "\(ReviewPresentation.senderName(email.sender)) · \(email.subject)"
+    private var email: EmailContext? { record.email }
+
+    private var titleText: some View {
+        Text(record.suggestion.title).font(.body.weight(.medium)).lineLimit(2)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

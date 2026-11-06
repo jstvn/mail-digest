@@ -169,3 +169,6 @@ Each item says what the spec leaves open and the interim choice the build uses, 
      - Set it when a suggestion becomes approved or dismissed; nil while pending or failed, and cleared on any return to those states.
      - Logbook sorts by `decidedAt` descending, falling back to the digest's `createdAt` for historical records without one.
      - Never fabricate historical timestamps; the migration preserves existing data.
+58. **Do triage actions include suggestions hidden by the Daily 25-limit?** The old panel's Add Selected and Dismiss Unselected acted on the whole digest, including preselected or unselected suggestions hidden beyond the first 25 (Q16). In the new window, each canvas acts only on the actionable suggestions it shows.
+   - *Interim:* follow SPEC "Selection and triage" ("each canvas acts on the suggestions it shows"). Suggestions hidden by Q16 are neither added nor dismissed until the user chooses Show All. A Backlog canvas still acts on the current 50-email batch (Q47). The Review Queue acts on the loaded pages.
+   - Also interim: Logbook is a flat list, newest decision first, with each decision's date and time. Review Queue groups by digest date. Past Day and Backlog canvases list settled suggestions read-only in a "Reviewed" section. Today adds a "No digest yet today" empty state. Banner copy says "Add to Reminders".

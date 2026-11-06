@@ -126,7 +126,7 @@ Verified on this Mac from Terminal (a harness that compiles the real adapter sou
 
 - Reminders writer (T14). The panel's approve path is wired to `ReviewActions.approve`; T14 only calls `ReviewViewModel.setReminderWriter(_:)`. Until then Add Selected is disabled and the Reminders banner shows.
 - Settings that are stored but not used yet: run time (scheduler, T15), Reminders list name (T14), retention (cleanup, T15), Trusted Newsletter senders (the validator and extraction do not read them yet). Launch at login and auto-file (T18) are in Settings; power and quiet-hours rules and Past Jobs are in Settings too (T19).
-- Pin and Save to Notes on info cards, learned rules (T16; done). Processed tab and mail actions (T18; code done, see T18 status).
+- Pin and Save to Notes on info cards, learned rules (T16; done). Mail Cleanup (formerly the Processed tab) and mail actions (T18; code done, see T18 status).
 - Job setup window, full progress view, backlog batches of 50, power and thermal auto-pause, menu bar ring and pause badge, Past Jobs: done in T19 (see T19 status).
 - Q16 Trusted Newsletter senders (8 suggestions instead of 3) are not read by `SuggestionValidator` or the runner yet; the setting is only stored. This gap predates T13.
 - The paused strip now shows the auto-pause reason (`JobProgress.pauseReason`, T19).
@@ -205,21 +205,21 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 
 **Manual checks (Mac, signed app; use a few throwaway emails first):**
 
-1. **Trash:** tick one or two rows in Processed, Move to Trash (also with ⌘⌫). They land in that account's Trash (the toast says "Moved N emails to Trash."), not another account's. Nothing is deleted permanently, and Trash is never emptied.
+1. **Trash:** tick one or two rows in Mail Cleanup, Move to Trash (also with ⌘⌫). They land in that account's Trash (the toast says "Moved N emails to Trash."), not another account's. Nothing is deleted permanently, and Trash is never emptied.
 2. **Undo:** click Undo in the toast. The emails return to the mailbox they came from (the app keeps the original mailbox in memory, so Undo works until quit; after relaunch there is no Undo). Check it also works when Mail was slow to sync a move on IMAP (Undo reports "not found" if the message has not appeared in Trash yet; click Undo again).
 3. **Move to Mail Digest Folder:** a "Mail Digest" mailbox is created in the email's own account the first time, and reused after. Check it with two accounts (each email goes to its own account's folder, never across) and that Mail shows the new mailbox in the sidebar. Creating the mailbox with `Mail.make({new: 'mailbox', at: account})` has not been run against real Mail.
 4. **Resent-Message-ID message:** process one (the spike found 8 in the iCloud inbox) and move it; it must be found through its stored row id (Q29), and must never move the wrong message.
-5. **Ambiguous and missing:** an email already moved or deleted in Mail reports "Not found in Mail" inline and nothing else is touched; two copies of one Message-ID in the same mailbox report "ambiguous" and neither moves. Failures show inline in the Processed tab, and the rest of the batch still moves.
+5. **Ambiguous and missing:** an email already moved or deleted in Mail reports "Not found in Mail" inline and nothing else is touched; two copies of one Message-ID in the same mailbox report "ambiguous" and neither moves. Failures show inline in Mail Cleanup, and the rest of the batch still moves.
 6. **On My Mac:** a local-account email can be moved to a local "Mail Digest" folder. Trash for local mail has no clear target on this Mac (no local Trash was reported), so it fails with "no Trash mailbox for this account" by design.
 7. **Keep:** hides the ticked rows and leaves the mail alone (no toast). Rows return after a relaunch (Keep is not stored).
 8. **Select All Newsletters** ticks only newsletter rows (it unticks the others); Select All / Select None reset the ticks. Actions only touch ticked rows.
 9. **Auto-file on/off** (Settings > General > Mail cleanup): with it off, no email moves by itself. With it on, after a run finishes and after approving or dismissing suggestions, newly processed emails (including blocked-sender ones) move to "Mail Digest" in their own account, never to Trash, with an Undo toast. Undo them and confirm they are not filed again until relaunch. Pending or failed-suggestion emails never move.
-10. **Automation denied / Mail not running:** turn Mail off for Mail Digest in Privacy & Security > Automation, then try Move to Trash. The Processed tab lists the failure with an "Open Automation Settings…" button. Quit Mail and repeat ("Mail isn't running").
-11. **Accessibility:** Tab and VoiceOver reach the segmented Review/Processed control, each row's checkbox ("Select <subject>"), the three buttons and the toast's Undo. ⌘⌫ is active only while the Processed tab is showing.
+10. **Automation denied / Mail not running:** turn Mail off for Mail Digest in Privacy & Security > Automation, then try Move to Trash. Mail Cleanup lists the failure with an "Open Automation Settings…" button. Quit Mail and repeat ("Mail isn't running").
+11. **Accessibility:** Tab and VoiceOver reach the Mail Cleanup sidebar item, each row's checkbox ("Select <subject>"), the three buttons and the toast's Undo. ⌘⌫ is active only while Mail Cleanup is showing.
 
 **Known limits:**
 
-- Undo history, Keep and "already moved" are kept in memory only. After a relaunch, emails moved earlier by this app still appear in the Processed list (they are no longer where the job item says), and moving them reports "not found".
+- Undo history, Keep and "already moved" are kept in memory only. After a relaunch, emails moved earlier by this app still appear in the Mail Cleanup list (they are no longer where the job item says), and moving them reports "not found".
 - If `osascript` hits the 120 s hard timeout mid-batch, moves already made are not reported and cannot be undone from the app; the script stops starting new messages after 100 s to make that unlikely.
 - Mailbox names containing a literal "/" are split on it when addressing a mailbox (same as `FetchMail.js`).
 
@@ -268,9 +268,9 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 2. **Trusted Newsletter:** add a newsletter sender you receive (one with `List-Unsubscribe`) to Settings > Senders > Trusted newsletter senders, then Run Now. Its email shows a summary and can show reminder suggestions; another newsletter still shows summary only. Adding the same address to Blocked skips it.
 3. **Resume refresh (Daily):** *(now also covers Backlog and new mail; see Q53 checks below)* start a Daily run with a few new emails, pause after the first, then in Mail delete one queued email and move another to a mailbox outside the Daily mailboxes. Resume: both show "skipped: no longer in mailbox" in the Activity log, nothing is counted as failed, and the rest are processed. Quit Mail before resuming: Resume shows "Could not read Mail…" and the job stays paused with its queue intact.
 4. **Blocked Start/Resume (Q43):** on battery with "Pause on battery power" on, start a Backlog job: it appears paused with "battery power" and no email is read; plug in and it starts by itself. Pause a job, unplug, click Resume: the banner explains why and the job stays paused. Repeat with Low Power Mode (also blocks Daily) and the run window.
-5. **Moved/Kept after relaunch (Q39):** in Processed, move a few emails to the Mail Digest folder and Keep a few others; quit and relaunch: they stay hidden. Undo a move before quitting: the restored emails reappear in Processed and are not auto-filed again.
+5. **Moved/Kept after relaunch (Q39):** in Mail Cleanup, move a few emails to the Mail Digest folder and Keep a few others; quit and relaunch: they stay hidden. Undo a move before quitting: the restored emails reappear in Mail Cleanup and are not auto-filed again.
 6. **Incremental auto-file (Q42):** turn on "File processed emails automatically", then run a job with info-only emails: each one moves to "Mail Digest" in its own account shortly after it finishes, while the job is still running. Emails with pending suggestions stay until you decide them. Emails processed before the switch was turned on are not moved. Relaunch: nothing is moved twice. Make a move fail (for example On My Mac mail): it is reported once and not retried.
-7. **Delete All History Now:** pin an info item and leave a Backlog job paused, then Settings > General > History > Delete All History Now… > Delete All History. The pinned item and the paused job (with its results) remain, other digests and finished jobs disappear from the panel, Processed and Settings > Jobs, and nothing changes in Mail or Reminders. Previously processed mail is still not reprocessed on the next run.
+7. **Delete All History Now:** pin an info item and leave a Backlog job paused, then Settings > General > History > Delete All History Now… > Delete All History. The pinned item and the paused job (with its results) remain, other digests and finished jobs disappear from the window, Mail Cleanup and Settings > Jobs, and nothing changes in Mail or Reminders. Previously processed mail is still not reprocessed on the next run.
 
 ## Menu alignment, status item highlight, Settings hang (2026-11-06)
 
@@ -295,7 +295,7 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 
 **Still to check by hand:**
 
-1. **Paused Daily:** Run Now, pause after the first email. The lower row reads Resume and the card shows only Stop (no second Resume). Click Resume: the same job continues (Settings > Jobs still lists one Daily job; no email repeats in the Activity log). When it finishes the row is Run Now again. The Review Panel's strip still has its own Resume while paused.
+1. **Paused Daily:** Run Now, pause after the first email. The lower row reads Resume and the card shows only Stop (no second Resume). Click Resume: the same job continues (Settings > Jobs still lists one Daily job; no email repeats in the Activity log). When it finishes the row is Run Now again. The review window's job status popover still has its own Resume while paused.
 2. **Relaunch:** pause a Daily job, quit, relaunch: the row reads Resume straight away and the card is the paused Daily job.
 3. **Stop on a paused card:** pause, then Stop in the card: the job shows as Stopped in Settings > Jobs and the row reads "Review Daily Job…", which opens Settings on the Jobs tab. Resume it there; the row returns to Run Now when it finishes.
 4. **Failed Daily:** quit Ollama during a Daily run. The banner shows the error without its own Retry; the row reads "Retry Daily Job". Start Ollama and click it: the same job finishes.
@@ -316,3 +316,26 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 3. **Cap:** set "Max emails per run" to a small number (e.g. 3), Run Now with more new mail than that, pause after one, then Resume: open plus newly added emails never exceed 3 in that run.
 4. **Backlog Resume:** pause a Backlog job, delete one queued email in Mail and move another to a different selected mailbox, send yourself a new email into a selected mailbox. Resume: the deleted one is "skipped: no longer in mailbox", the moved one is processed from its new mailbox, the new email is not added, and the job's scope in Settings > Jobs is unchanged. Large Backlog scopes are re-listed on every Resume, so expect a short listing pause first.
 5. **Failure:** quit Mail (or deny Automation) with a Daily job paused and new mail waiting, then Resume: "Could not read Mail…", the job stays paused, its item count and scope don't change. Fix it and Resume again: no email appears twice.
+
+## Two-column review window, T21–T25 (2026-11-07)
+
+**Not yet verified on the Mac.** The two-column window (`NavigationSplitView`) replaces the single-column review panel. Check each item below by hand, with a signed app and a real database.
+
+1. **Window size:** the window opens at about 980×680 and cannot shrink below 760×520. The sidebar is 200–260 pt wide and uses the system sidebar material with no custom tint. The window title follows the selection.
+2. **Toolbar:** Run Now is disabled while a Daily job is unresolved, Mail is unavailable or a Daily run is in progress. The Settings button opens Settings.
+3. **Badges:** the Today and Review Queue badges hide at 0. The menu bar badge counts pending suggestions across all digests.
+4. **Recent Digests:** the current month is expanded and the other months are collapsed. Rows read like "Thu 5 Nov" with the email count and an actionable badge. Several runs on one day show as one row. Dates follow the locale and the settings time zone.
+5. **Backlog Jobs:** each job shows its title and pending badge. New Backlog Job… is disabled while a job runs or when Mail is unavailable. Check that the plain button row looks right in the sidebar.
+6. **Job status pill:** shown only while a job is listing, running, pausing, paused or stopping. Its popover has the progress strip (Pause / Pause Now / Resume / Stop), Recent, mailboxes and the Activity log. A Recent row closes the popover and jumps to the email (Today, Day or Backlog batch). The popover closes when the job ends. Its 440×480 size is acceptable.
+7. **Live updates:** with a job running, the sidebar counts and the shown canvas update live. A large Backlog canvas refreshes fast enough on every progress tick.
+8. **Today:** "Unreviewed from Earlier" shows only for Daily digests and links to Review Queue when there are more. Today's suggestions show the 25-limit and Show All / Show Top 25. Info cards are pinned first, with newsletters collapsed. Skipped mail appears. Check the empty states: never run, no digest yet today, and inbox zero. Past days show settled rows read-only under "Reviewed". The Backlog canvas has the batch bar.
+9. **Review Queue and Logbook:** check grouping, Load More and the empty states. Logbook lists the newest decision first.
+10. **Midnight rollover:** with the app open across midnight, Today moves to the new day.
+11. **Floating triage bar:** a bottom-centred capsule that does not cover the last row. It shows the selected count. Dismiss Unselected is disabled when nothing would be dismissed. ⌘↩ adds. Help text appears when Reminders access is missing. Reduce Motion and Reduce Transparency are respected.
+12. **Selection:** Select All / Select None affect only their own section. Ticks survive switching views. Approve and dismiss work across digests. Afterwards Mail Cleanup and auto-file see the new statuses.
+13. **Mail Cleanup:** check the list, the action bar, ⌘⌫ and the floating Undo capsule toast (no layout shift). Check the layout at the minimum width (760 pt).
+14. **Suggestion row:** the date, priority and category pills open their popovers or menus. Add Date appears on hover or focus. The evidence quote block shows the accent bar, and ↗ is emphasised on hover. Every control is reachable by keyboard and VoiceOver. ↑/↓, space, ⌫ and ⌘↩ work, and are ignored while editing a title.
+15. **VoiceOver:** check the section headers, sidebar day rows, the job pill's label and value, the triage group and the pill labels.
+16. **Entry points:** "Open Review Panel" in the menu bar and a clicked notification both open the window on Today.
+17. **Previews:** the Xcode previews for `ReviewWindow`, `SuggestionRow` and `InfoCard` render.
+18. **Migration (v4):** on the real database, all existing digests and suggestions are kept, and the sidebar counts match what the digests show.
