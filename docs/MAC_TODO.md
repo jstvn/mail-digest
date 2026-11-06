@@ -30,7 +30,7 @@ Things the cloud agent could not verify; check on the Mac.
 - **T13/T14 review panel.** Use `ReviewActions` for selection, edits, approve and dismiss; `ReviewActions.reminderNotes` and `messageURL` build the EventKit notes and `message://` link. Category edits are persisted on `Suggestion.category` (QUESTIONS 19).
 - **T14 tags.** EventKit has no public API for Reminders tags, so the category is written as `#category` at the end of the notes. Check how this shows in Reminders on macOS 26 and iOS (does it become a real tag or stay searchable text?).
 - **T15 scheduler** (done, see T15 status): `DigestRunModel.runIfDue()` asks `MorningSchedule.isDue` and runs the Daily job; `recoverOnLaunch()` runs when the first runner is built.
-- **T19 job setup.** Pass a plan with a fixed `to` date to `JobRunner.preview(_:)`, then pass the same plan (plus unticked ids in `excludedMessageIDs`) to `start(_:)`; `JobPreviewBuilder.startTitle` and `ActivityFeed` produce the strings in the spec.
+- **T19 job setup** (code done, see T19 status): `JobSetupModel` passes a plan with a fixed `to` date to `JobRunner.preview(_:)`, then the same plan plus unticked ids in `excludedMessageIDs` to `start(_:)`; `JobPreviewBuilder.startTitle` and `ActivityFeed` produce the strings in the spec.
 
 ## T10 status
 
@@ -125,12 +125,12 @@ Verified on this Mac from Terminal (a harness that compiles the real adapter sou
 **Deferred (not part of T13):**
 
 - Reminders writer (T14). The panel's approve path is wired to `ReviewActions.approve`; T14 only calls `ReviewViewModel.setReminderWriter(_:)`. Until then Add Selected is disabled and the Reminders banner shows.
-- Settings that are stored but not used yet: run time (scheduler, T15), Reminders list name (T14), retention (cleanup, T15), Trusted Newsletter senders (the validator and extraction do not read them yet). Launch at login and auto-file (T18) are in Settings; power and quiet-hours rules, and past jobs are not in Settings (T19).
+- Settings that are stored but not used yet: run time (scheduler, T15), Reminders list name (T14), retention (cleanup, T15), Trusted Newsletter senders (the validator and extraction do not read them yet). Launch at login and auto-file (T18) are in Settings; power and quiet-hours rules and Past Jobs are in Settings too (T19).
 - Pin and Save to Notes on info cards, learned rules (T16; done). Processed tab and mail actions (T18; code done, see T18 status).
-- Job setup sheet, full progress view (Recent, Per-mailbox, activity log), backlog batches of 50, power and thermal auto-pause, menu bar progress ring and pause badge, past jobs (T19).
+- Job setup window, full progress view, backlog batches of 50, power and thermal auto-pause, menu bar ring and pause badge, Past Jobs: done in T19 (see T19 status).
 - Q16 Trusted Newsletter senders (8 suggestions instead of 3) are not read by `SuggestionValidator` or the runner yet; the setting is only stored. This gap predates T13.
-- The paused strip cannot show an auto-pause reason: `JobProgress` has no reason field yet. `ReviewPresentation.pausedText` already accepts one.
-- A job left paused by a previous session has no strip after relaunch (the runner only publishes progress once it runs); it is resumable from the job list in T19.
+- The paused strip now shows the auto-pause reason (`JobProgress.pauseReason`, T19).
+- A job left paused by a previous session now gets its strip back after relaunch (`JobProgressSnapshot`, T19).
 
 ## T14 status
 
@@ -222,3 +222,31 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 - Undo history, Keep and "already moved" are kept in memory only. After a relaunch, emails moved earlier by this app still appear in the Processed list (they are no longer where the job item says), and moving them reports "not found".
 - If `osascript` hits the 120 s hard timeout mid-batch, moves already made are not reported and cannot be undone from the app; the script stops starting new messages after 100 s to make that unlikely.
 - Mailbox names containing a literal "/" are split on it when addressing a mailbox (same as `FetchMail.js`).
+
+## T19 status
+
+**Code done (verified here: `swift test` in both packages, `xcodebuild` Debug build; nothing run against real Mail or Ollama):**
+
+- Core: `ResourcePolicy`/`QuietHours` (Brisbane time, windows may cross midnight), `PauseReason` persisted on `Job` (new migration `v2`, column `pause_reason`), `JobState.stopped` (Q15; Stop now persists `.stopped`), `JobRunner.autoPause/autoResume/applyResourceRules`, `BacklogBatching` (50 per batch), `JobProgressSnapshot` (strip for a job paused in an earlier session), `MailboxTree`, `JobSummaryText`.
+- App: `JobSetupView` (window "New Processing Job", from the review panel and the menu bar), `JobProgressView` (strip, Recent, Mailboxes, Activity log, Retry Failed), Settings > Jobs, Settings > General > Backlog jobs, `ResourceMonitor` (IOKit power source, Low Power Mode, thermal state, quiet-hour timer), menu bar progress ring and pause badge (template image).
+
+**Manual checks (Mac; use a throwaway mailbox or a small date range first. Never start a big job by accident):**
+
+1. **Setup window:** open it from the review panel ("New Backlog Job…") and the menu bar. The tree lists each account with message counts matching Mail's sidebar, nested folders indented, On My Mac included. All inboxes are ticked by default; "All Inboxes" ticks and unticks every inbox. Sent, Drafts, Junk and Trash appear only with "Show all mailboxes".
+2. **Date range:** Last 30 days, Last 90 days, Everything and a custom range. After changing anything the preview is cleared and must be listed again.
+3. **Preview numbers:** per-mailbox totals, date range found, already processed or queued, tier estimate (labelled an estimate) and time estimate. Untick a few emails (and use "Untick All from sender" in the context menu): the Start button text changes ("Process N emails from ... (about X)"). Start, then compare the strip total and the Activity log with the preview: unticked emails must not appear.
+4. **Nothing queued before Start:** open the setup, go through Preview, then Cancel or close the window. Settings > Jobs must show no new job and Mail Digest must not have processed anything.
+5. **Live per-email results and batches:** with a Backlog job running, suggestions and info for finished emails appear in the panel while it runs. After 50 results "Batch 1 of 2" appears with Previous/Next Batch; "Select All", "Add Selected" and "Dismiss Unselected" only touch the batch on screen. Clicking a Recent row jumps to that email's batch and scrolls to it.
+6. **Pause and resume:** Pause (after this email) and Pause Now (menu on the Pause button) show "Paused after #N ... Next: #N+1 ...". Resume continues from #N+1 with no email repeated. Stop moves the job to Settings > Jobs as "Stopped" with Resume (never resumed automatically).
+7. **3,000-email backlog across sessions:** quit mid-job, relaunch: the paused strip returns with Resume (and Settings > Jobs lists it). Resume finishes the queue over several sessions with no repeats.
+8. **Unplug and replug (MacBook):** unplug during a Backlog job: it pauses after the current email with "battery power"; replug: it resumes by itself. A job you paused or stopped yourself does not resume on replug. Turn off "Pause on battery power": unplugging does nothing.
+9. **Low Power Mode:** turn it on (System Settings > Battery): both Backlog and Daily jobs pause with "Low Power Mode"; turn it off: they resume.
+10. **Thermal:** hard to trigger on purpose. Run a heavy workload (for example `yes > /dev/null` on all cores) until `pmset -g therm` or Activity Monitor reports a serious thermal state, and watch for "Mac is hot". Without that, treat it as unverified; the policy is covered by unit tests.
+11. **Quiet hours across midnight:** Settings > General > Backlog jobs: tick "Only run during quiet hours" and set a window that crosses midnight and excludes the current time (for example From 10:00 pm Until 7:00 am when it is daytime). A running Backlog job pauses with "quiet hours"; moving the start time to a few minutes ahead makes it resume at that time. Times are Brisbane time.
+12. **Daily preempts Backlog:** set the run time a few minutes ahead while a Backlog job runs: the Backlog pauses ("Daily job running"), Daily runs, then the Backlog resumes by itself. A Backlog job you paused yourself is not resumed after Daily.
+13. **Retry Failed:** after a job with failed emails, "Retry Failed" (Activity log and Settings > Jobs) requeues them and resumes; it is disabled while any job runs.
+14. **Past Jobs after relaunch:** Settings > Jobs lists mailboxes, scope, totals, processing time and state; Resume works on a job paused in a previous session.
+15. **Menu bar icon:** while a job runs the icon shows a small progress ring that fills; paused shows a pause badge; the pending count still shows; the icon stays highlighted while the menu window is open (T-UI fix) and follows light/dark appearance (it is a template image). VoiceOver reads "Mail Digest, processing, N percent" or "job paused".
+16. **HIG/accessibility pass:** Tab order and VoiceOver through the setup window (step labels, checkboxes, Start), the progress view and Settings > Jobs; Return starts the default action, Escape cancels the setup window.
+
+**Known limits:** the resource rules act when a condition changes (and once when a job starts), so a job you resume by hand while still on battery keeps running until the next change. The runner is rebuilt when settings change while idle; an auto-pause made earlier in the session is then not auto-resumed (resume by hand).

@@ -29,7 +29,7 @@ import Testing
         #expect(due(date(2026, 11, 6, 6, 31)))
     }
 
-    @Test(arguments: [JobState.finished, .paused, .running, .listing, .pausing, .stopping, .idle])
+    @Test(arguments: [JobState.finished, .paused, .running, .listing, .pausing, .stopping, .stopped, .idle])
     func notDueWhenTodaysJobExists(state: JobState) {
         let now = date(2026, 11, 6, 9, 0)
         #expect(!due(now, jobs: [job(state, at: date(2026, 11, 6, 6, 31))]))

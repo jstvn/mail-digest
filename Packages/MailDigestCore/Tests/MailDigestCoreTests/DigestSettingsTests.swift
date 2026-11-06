@@ -75,4 +75,23 @@ import Testing
         s.ollamaURL = "http://192.168.1.5:11434"; s.ollamaModel = "llama3"
         #expect(s.resolvedOllamaURL.host == "192.168.1.5" && s.resolvedModel == "llama3")
     }
+
+    @Test func resourceRulesDefaultAndDecodeTolerantly() throws {
+        let d = DigestSettings()
+        #expect(d.pauseBacklogOnBattery && !d.quietHoursEnabled)
+        #expect(d.quietHoursStartMinute == 22 * 60 && d.quietHoursEndMinute == 7 * 60)
+        #expect(d.resourcePolicy().quietHours == nil)
+        // An older blob keeps its values and gets the new defaults.
+        let old = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"runHour":8}"#.utf8))
+        #expect(old.runHour == 8 && old.pauseBacklogOnBattery && !old.quietHoursEnabled)
+        var s = DigestSettings()
+        s.pauseBacklogOnBattery = false
+        s.quietHoursEnabled = true
+        s.quietHoursStartMinute = 23 * 60
+        let round = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s))
+        #expect(round == s)
+        let policy = round.resourcePolicy()
+        #expect(!policy.pauseBacklogOnBattery && policy.quietHours == QuietHours(startMinute: 23 * 60, endMinute: 7 * 60))
+        #expect(policy.timeZone.identifier == "Australia/Brisbane")
+    }
 }

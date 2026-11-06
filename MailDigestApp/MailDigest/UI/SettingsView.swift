@@ -13,6 +13,8 @@ struct SettingsView: View {
                 .tabItem { Label("Model & Reminders", systemImage: "sparkles") }
             SendersSettingsTab(store: run.settings)
                 .tabItem { Label("Senders", systemImage: "person.2") }
+            PastJobsView(run: run)
+                .tabItem { Label("Jobs", systemImage: "list.bullet.rectangle") }
         }
         .frame(width: 520, height: 520)
     }
@@ -51,6 +53,7 @@ private struct GeneralSettingsTab: View {
             } footer: {
                 Text("Moves emails you have fully handled into a \"Mail Digest\" mailbox in the same account, so you can review and delete them in Mail. Nothing is moved to Trash or deleted permanently. You can still undo from the Processed tab until you quit.")
             }
+            BacklogPowerSection(store: store)
             Section("History") {
                 Picker("Keep history for", selection: $store.settings.retention) {
                     Text("30 days").tag(HistoryRetention.thirtyDays)
@@ -67,6 +70,40 @@ private struct GeneralSettingsTab: View {
     private var limitEnabled: Binding<Bool> {
         Binding(get: { run.settings.settings.maxEmailsPerRun != nil },
                 set: { run.settings.settings.maxEmailsPerRun = $0 ? 100 : nil })
+    }
+}
+
+/// Power and quiet-hours rules for Backlog jobs. Low Power Mode and serious heat always pause them, so
+/// they have no switch here.
+private struct BacklogPowerSection: View {
+    @Bindable var store: SettingsStore
+
+    var body: some View {
+        Section {
+            Toggle("Pause on battery power", isOn: $store.settings.pauseBacklogOnBattery)
+            Toggle("Only run during quiet hours", isOn: $store.settings.quietHoursEnabled)
+            if store.settings.quietHoursEnabled {
+                DatePicker("From", selection: minuteBinding(\.quietHoursStartMinute), displayedComponents: .hourAndMinute)
+                DatePicker("Until", selection: minuteBinding(\.quietHoursEndMinute), displayedComponents: .hourAndMinute)
+            }
+        } header: {
+            Text("Backlog jobs")
+        } footer: {
+            Text("Backlog jobs also pause in Low Power Mode and when the Mac gets hot, and resume by themselves when it is safe. The Daily digest only pauses in Low Power Mode. Quiet hours use Brisbane time.")
+        }
+    }
+
+    /// A time-of-day picker over stored minutes after midnight.
+    private func minuteBinding(_ keyPath: WritableKeyPath<DigestSettings, Int>) -> Binding<Date> {
+        Binding(
+            get: {
+                let minutes = store.settings[keyPath: keyPath]
+                return Calendar.current.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: .now) ?? .now
+            },
+            set: { date in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                store.settings[keyPath: keyPath] = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+            })
     }
 }
 

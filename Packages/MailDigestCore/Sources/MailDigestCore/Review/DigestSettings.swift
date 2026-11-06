@@ -24,6 +24,13 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public var dailyMailboxes: [MailboxRef]
     /// Move processed emails into a "Mail Digest" mailbox in the same account automatically. Off by default.
     public var autoFileProcessed: Bool
+    /// Backlog jobs pause on battery power and resume when plugged in (default on).
+    public var pauseBacklogOnBattery: Bool
+    /// Backlog jobs only run inside the quiet-hours window (default off).
+    public var quietHoursEnabled: Bool
+    /// The allowed window, minutes after midnight in the app's time zone (default 10pm to 7am).
+    public var quietHoursStartMinute: Int
+    public var quietHoursEndMinute: Int
 
     public static let defaultOllamaURL = "http://localhost:11434"
     public static let defaultModel = "qwen3:4b"
@@ -35,7 +42,13 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 retention: HistoryRetention = .default, vipSenders: [String] = [], blockedSenders: [String] = [],
                 ignoredSenders: [String] = [], trustedNewsletterSenders: [String] = [],
                 declinedIgnoreSuggestions: [String] = [], dailyMailboxes: [MailboxRef] = [],
-                autoFileProcessed: Bool = false) {
+                autoFileProcessed: Bool = false, pauseBacklogOnBattery: Bool = true,
+                quietHoursEnabled: Bool = false, quietHoursStartMinute: Int = 22 * 60,
+                quietHoursEndMinute: Int = 7 * 60) {
+        self.pauseBacklogOnBattery = pauseBacklogOnBattery
+        self.quietHoursEnabled = quietHoursEnabled
+        self.quietHoursStartMinute = quietHoursStartMinute
+        self.quietHoursEndMinute = quietHoursEndMinute
         self.autoFileProcessed = autoFileProcessed
         self.runHour = runHour
         self.runMinute = runMinute
@@ -57,6 +70,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         case runHour, runMinute, lookbackHours, maxEmailsPerRun, ollamaURL, ollamaModel, remindersListName
         case retention, vipSenders, blockedSenders, ignoredSenders, trustedNewsletterSenders, declinedIgnoreSuggestions
         case dailyMailboxes, autoFileProcessed
+        case pauseBacklogOnBattery, quietHoursEnabled, quietHoursStartMinute, quietHoursEndMinute
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
@@ -77,7 +91,22 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   trustedNewsletterSenders: try c.decodeIfPresent([String].self, forKey: .trustedNewsletterSenders) ?? [],
                   declinedIgnoreSuggestions: try c.decodeIfPresent([String].self, forKey: .declinedIgnoreSuggestions) ?? [],
                   dailyMailboxes: try c.decodeIfPresent([MailboxRef].self, forKey: .dailyMailboxes) ?? [],
-                  autoFileProcessed: try c.decodeIfPresent(Bool.self, forKey: .autoFileProcessed) ?? d.autoFileProcessed)
+                  autoFileProcessed: try c.decodeIfPresent(Bool.self, forKey: .autoFileProcessed) ?? d.autoFileProcessed,
+                  pauseBacklogOnBattery: try c.decodeIfPresent(Bool.self, forKey: .pauseBacklogOnBattery)
+                      ?? d.pauseBacklogOnBattery,
+                  quietHoursEnabled: try c.decodeIfPresent(Bool.self, forKey: .quietHoursEnabled) ?? d.quietHoursEnabled,
+                  quietHoursStartMinute: try c.decodeIfPresent(Int.self, forKey: .quietHoursStartMinute)
+                      ?? d.quietHoursStartMinute,
+                  quietHoursEndMinute: try c.decodeIfPresent(Int.self, forKey: .quietHoursEndMinute)
+                      ?? d.quietHoursEndMinute)
+    }
+
+    /// The resource rules these settings describe. Low Power Mode and serious heat always pause Backlog.
+    public func resourcePolicy(timeZone: TimeZone? = nil) -> ResourcePolicy {
+        ResourcePolicy(pauseBacklogOnBattery: pauseBacklogOnBattery,
+                       quietHours: quietHoursEnabled
+                           ? QuietHours(startMinute: quietHoursStartMinute, endMinute: quietHoursEndMinute) : nil,
+                       timeZone: timeZone ?? RunnerSettings().timeZone)
     }
 
     /// The Ollama endpoint, or the default when the text isn't a usable http(s) URL.

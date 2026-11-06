@@ -53,7 +53,7 @@ private func job(age: TimeInterval, state: JobState = .finished) -> Job {
     }
 
     @Test func onlyFinishedOrFailedJobs() {
-        let states: [JobState] = [.idle, .listing, .running, .pausing, .paused, .stopping, .finished, .failed]
+        let states: [JobState] = [.idle, .listing, .running, .pausing, .paused, .stopping, .stopped, .finished, .failed]
         let jobs = states.map { job(age: 500 * day, state: $0) }
         let expected = jobs.filter { $0.state == .finished || $0.state == .failed }.map(\.id)
         #expect(policy.plan(retention: .thirtyDays, now: now, digests: [], jobs: jobs).jobIDs == expected)

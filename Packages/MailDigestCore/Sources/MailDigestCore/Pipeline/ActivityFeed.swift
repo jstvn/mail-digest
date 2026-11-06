@@ -11,6 +11,19 @@ public struct ActivityRow: Sendable, Equatable, Identifiable {
     public var outcome: String?
     public var seconds: Double?
     public var finishedAt: Date?
+
+    public init(id: UUID, position: Int, sender: String, subject: String, mailbox: MailboxRef,
+                state: JobItemState, outcome: String?, seconds: Double?, finishedAt: Date?) {
+        self.id = id
+        self.position = position
+        self.sender = sender
+        self.subject = subject
+        self.mailbox = mailbox
+        self.state = state
+        self.outcome = outcome
+        self.seconds = seconds
+        self.finishedAt = finishedAt
+    }
 }
 
 /// Turns job items and progress into the text and rows the progress UI shows.

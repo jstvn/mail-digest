@@ -94,6 +94,17 @@ final class ModelCodableTests: XCTestCase {
         try roundTrip(JobTotals(queued: 1, done: 2, failed: 3, skipped: 4))
         try roundTrip(Job(id: uuid1, kind: .daily, mailboxes: [box], scopeFrom: d1, scopeTo: d2, state: .paused,
                           createdAt: d1, totals: JobTotals(queued: 1, done: 2, failed: 3, skipped: 4), autoPaused: true))
+        try roundTrip(Job(id: uuid1, kind: .backlog, mailboxes: [box], scopeFrom: d1, scopeTo: d2, state: .paused,
+                          createdAt: d1, totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0),
+                          autoPaused: true, pauseReason: .quietHours))
+        // A job stored before `pauseReason` existed still decodes.
+        let oldJob = try JSONEncoder().encode(Job(id: uuid1, kind: .daily, mailboxes: [box], scopeFrom: d1, scopeTo: d2,
+                                                  state: .paused, createdAt: d1,
+                                                  totals: JobTotals(queued: 0, done: 0, failed: 0, skipped: 0), autoPaused: false))
+        var obj = try XCTUnwrap(JSONSerialization.jsonObject(with: oldJob) as? [String: Any])
+        obj.removeValue(forKey: "pauseReason")
+        let decoded = try JSONDecoder().decode(Job.self, from: JSONSerialization.data(withJSONObject: obj))
+        XCTAssertNil(decoded.pauseReason)
         try roundTrip(item)
         try roundTrip(summary)
         try roundTrip(MailboxProgress(done: 1, total: 5))
@@ -101,7 +112,8 @@ final class ModelCodableTests: XCTestCase {
                                   avgSecondsPerEmail: 12.5, eta: 60, stage: .summarising, current: summary,
                                   lastFinished: summary, nextUp: nil,
                                   countsByMailbox: [box: MailboxProgress(done: 4, total: 9)]))
-        for s in [JobState.idle, .listing, .running, .pausing, .paused, .stopping, .finished, .failed] { try roundTrip(s) }
+        for s in [JobState.idle, .listing, .running, .pausing, .paused, .stopping, .stopped, .finished, .failed] { try roundTrip(s) }
+        for r in PauseReason.allCases { try roundTrip(r) }
         for s in [JobStage.listing, .fetching, .summarising, .validating, .saving] { try roundTrip(s) }
         for s in [JobItemState.queued, .processing, .done, .failed, .skipped] { try roundTrip(s) }
     }

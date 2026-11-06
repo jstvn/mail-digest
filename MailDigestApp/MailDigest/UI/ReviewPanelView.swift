@@ -41,6 +41,7 @@ struct ReviewPanelView: View {
             header
             tabPicker
             Divider()
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(PanelAlert.current(run: run, access: access, reminders: run.reminders.status)) { alert in
@@ -48,10 +49,10 @@ struct ReviewPanelView: View {
                                     onRequestReminders: { Task { await run.reminders.request() } })
                     }
                     if let progress = run.activeProgress {
-                        ProgressStripView(progress: progress,
-                                          onPause: run.pause,
-                                          onResume: { Task { await run.resume() } },
-                                          onStop: run.stop)
+                        JobProgressView(run: run, progress: progress) { emailID in
+                            tab = .review
+                            review.reveal(emailID: emailID)
+                        }
                     }
                     if let message = review.message {
                         Label(message, systemImage: "exclamationmark.circle")
@@ -70,6 +71,15 @@ struct ReviewPanelView: View {
                     }
                 }
                 .padding(16)
+            }
+            // A Recent row asked to show an email: scroll to its first suggestion or info card.
+            .onChange(of: review.revealedEmailID) { _, emailID in
+                guard let emailID else { return }
+                let target: AnyHashable? = review.shownDigest?.suggestions.first { $0.emailID == emailID }?.id
+                    ?? review.shownDigest?.info.first { $0.emailID == emailID }?.id
+                if let target { withAnimation { proxy.scrollTo(target, anchor: .top) } }
+                review.clearReveal()
+            }
             }
             if tab == .processed && panelState == .digest {
                 Divider()
@@ -98,8 +108,14 @@ struct ReviewPanelView: View {
                 }
             }
             Spacer()
+            Button("New Backlog Job…") {
+                openWindow(id: "job-setup")
+                NSApp.activate()
+            }
+            .disabled(run.isRunning || access.status?.mode == .unavailable)
+            .help("Process older mail in the mailboxes you choose")
             Button("Run Now") { Task { await run.runNow() } }
-                .disabled(run.isRunning || run.activeProgress != nil || access.status?.mode == .unavailable)
+                .disabled(run.isRunning || access.status?.mode == .unavailable)
             Button {
                 NSApp.activate()
                 openSettings()
@@ -155,9 +171,29 @@ struct ReviewPanelView: View {
 
     // MARK: Suggestions
 
+    /// Backlog digests are reviewed 50 source emails at a time.
+    @ViewBuilder private var batchBar: some View {
+        if review.hasBatches, let title = review.batchTitle {
+            HStack {
+                Text(title).font(.callout.weight(.medium))
+                Spacer()
+                Button { review.previousBatch() } label: { Label("Previous Batch", systemImage: "chevron.left") }
+                    .disabled(!review.canGoToPreviousBatch)
+                Button { review.nextBatch() } label: { Label("Next Batch", systemImage: "chevron.right") }
+                    .labelStyle(.titleAndIcon)
+                    .disabled(!review.canGoToNextBatch)
+            }
+            .controlSize(.small)
+            .padding(8)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+            .accessibilityElement(children: .contain)
+        }
+    }
+
     private var suggestionsSection: some View {
         let page = review.page
         return VStack(alignment: .leading, spacing: 8) {
+            batchBar
             HStack {
                 Text("SUGGESTED REMINDERS (\(review.actionable.count))")
                     .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
@@ -183,6 +219,7 @@ struct ReviewPanelView: View {
                         .focusable()
                         .focusEffectDisabled()
                         .focused($focusedID, equals: s.id)
+                        .id(s.id)
                         Divider()
                     }
                 }
@@ -243,7 +280,7 @@ struct ReviewPanelView: View {
     // MARK: Info
 
     private var infoSection: some View {
-        let groups = ReviewPresentation.infoGroups(review.digest?.info ?? [])
+        let groups = ReviewPresentation.infoGroups(review.shownDigest?.info ?? [])
         let pinned = review.carriedPins.map(\.item)
         return VStack(alignment: .leading, spacing: 8) {
             if !groups.isEmpty || !pinned.isEmpty {
@@ -282,6 +319,7 @@ struct ReviewPanelView: View {
                          onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: item.emailID)) },
                          onTogglePin: { Task { await review.setPinned(!item.pinned, item: item) } },
                          onSaveToNotes: { Task { await review.saveToNotes(item) } })
+                .id(item.id)
                 if item.id != items.last?.id { Divider() }
             }
         }
@@ -291,7 +329,7 @@ struct ReviewPanelView: View {
     // MARK: Skipped
 
     @ViewBuilder private var skippedSection: some View {
-        if let skipped = review.digest?.skipped, !skipped.isEmpty {
+        if let skipped = review.shownDigest?.skipped, !skipped.isEmpty {
             DisclosureGroup(isExpanded: $skippedExpanded) {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(skipped) { item in

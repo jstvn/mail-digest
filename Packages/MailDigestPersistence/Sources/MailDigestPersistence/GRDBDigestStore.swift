@@ -108,6 +108,10 @@ public final class GRDBDigestStore: DigestStore, Sendable {
                 );
                 """)
         }
+        // v2 (T19): why the app auto-paused a job. Nullable, so jobs stored by v1 simply have none.
+        migrator.registerMigration("v2") { db in
+            try db.execute(sql: "ALTER TABLE job ADD COLUMN pause_reason TEXT")
+        }
         return migrator
     }
 
@@ -325,8 +329,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         try await writer.write { db in
             try db.execute(sql: """
                 INSERT INTO job (id, kind, mailboxes, scope_from, scope_to, state, created_at,
-                                 queued, done, failed, skipped, auto_paused, last_error)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 queued, done, failed, skipped, auto_paused, last_error, pause_reason)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, arguments: Self.jobArguments(job, mailboxes: mailboxes))
         }
     }
@@ -338,7 +342,7 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             try db.execute(sql: """
                 UPDATE job SET kind = ?2, mailboxes = ?3, scope_from = ?4, scope_to = ?5, state = ?6,
                     created_at = ?7, queued = ?8, done = ?9, failed = ?10, skipped = ?11, auto_paused = ?12,
-                    last_error = ?13
+                    last_error = ?13, pause_reason = ?14
                 WHERE id = ?1
                 """, arguments: Self.jobArguments(job, mailboxes: mailboxes))
         }
@@ -347,7 +351,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
     private static func jobArguments(_ job: Job, mailboxes: String) -> StatementArguments {
         [job.id.uuidString, job.kind.rawValue, mailboxes, job.scopeFrom.timeIntervalSince1970,
          job.scopeTo.timeIntervalSince1970, job.state.rawValue, job.createdAt.timeIntervalSince1970,
-         job.totals.queued, job.totals.done, job.totals.failed, job.totals.skipped, job.autoPaused, job.lastError]
+         job.totals.queued, job.totals.done, job.totals.failed, job.totals.skipped, job.autoPaused, job.lastError,
+         job.pauseReason?.rawValue]
     }
 
     public func jobs() async throws -> [Job] {
@@ -366,7 +371,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             state: JobState(rawValue: row["state"]) ?? .failed,
             createdAt: Date(timeIntervalSince1970: row["created_at"]),
             totals: JobTotals(queued: row["queued"], done: row["done"], failed: row["failed"], skipped: row["skipped"]),
-            autoPaused: row["auto_paused"], lastError: row["last_error"])
+            autoPaused: row["auto_paused"], lastError: row["last_error"],
+            pauseReason: (row["pause_reason"] as String?).flatMap(PauseReason.init(rawValue:)))
     }
 
     // MARK: Queue

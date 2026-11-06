@@ -33,6 +33,12 @@ final class ReviewViewModel {
     private(set) var message: String?
     /// Daily shows the top 25 first (Q16); this reveals the rest.
     var showAllSuggestions = false
+    /// Backlog digests are reviewed in batches of 50 source emails (Q16); nil for a Daily digest.
+    private(set) var batching: BacklogBatching?
+    /// The batch on screen, zero-based.
+    private(set) var batchIndex = 0
+    /// The email a "Recent" row asked to show; the panel scrolls to it.
+    private(set) var revealedEmailID: String?
     /// Nil unless Reminders access is fully granted; "Add selected" stays disabled until then.
     private(set) var reminderWriter: (any ReminderWriter)?
     /// Pinned info from earlier digests, newest first; the current digest's own pins stay in its categories.
@@ -80,15 +86,47 @@ final class ReviewViewModel {
     // MARK: Derived
 
     var digest: Digest? { state?.digest }
-    var actionable: [Suggestion] { ReviewPresentation.actionable(state?.digest.suggestions ?? []) }
+    /// What the panel lists: the whole Daily digest, or the current batch of a Backlog digest.
+    var shownDigest: Digest? {
+        guard let digest else { return nil }
+        return batching.map { $0.digest(digest, batch: batchIndex) } ?? digest
+    }
+    var actionable: [Suggestion] { ReviewPresentation.actionable(shownDigest?.suggestions ?? []) }
+
+    /// The state "Select all", "Add selected" and "Dismiss unselected" act on: the shown batch only, so
+    /// nothing the user can't see is approved or dismissed.
+    private var scopedState: ReviewState? {
+        guard let state, batching != nil, let shown = shownDigest else { return state }
+        var scoped = ReviewState(digest: shown)
+        scoped.selection = state.selection.intersection(Set(shown.suggestions.map(\.id)))
+        return scoped
+    }
+
+    var batchTitle: String? { batching.map { $0.title(batch: batchIndex) } }
+    var hasBatches: Bool { (batching?.batchCount ?? 0) > 1 }
+    var canGoToPreviousBatch: Bool { batchIndex > 0 }
+    var canGoToNextBatch: Bool { batching.map { batchIndex < $0.batchCount - 1 } ?? false }
+    func nextBatch() { if canGoToNextBatch { batchIndex += 1; showAllSuggestions = false } }
+    func previousBatch() { if canGoToPreviousBatch { batchIndex -= 1; showAllSuggestions = false } }
+
+    /// Jumps to the batch holding this email and asks the panel to scroll to it.
+    func reveal(emailID: String) {
+        guard let batching, let position = batching.emailIDs.firstIndex(of: emailID) else {
+            revealedEmailID = emailID
+            return
+        }
+        batchIndex = position / batching.size
+        revealedEmailID = emailID
+    }
+    func clearReveal() { revealedEmailID = nil }
     var pendingCount: Int { ReviewPresentation.pendingCount(state?.digest) }
     var selectedCount: Int {
-        guard let state else { return 0 }
-        return ReviewActions.split(state).approve.count
+        guard let scopedState else { return 0 }
+        return ReviewActions.split(scopedState).approve.count
     }
     var unselectedCount: Int {
-        guard let state else { return 0 }
-        return ReviewActions.split(state).dismiss.count
+        guard let scopedState else { return 0 }
+        return ReviewActions.split(scopedState).dismiss.count
     }
     var canAddSelected: Bool { reminderWriter != nil && selectedCount > 0 && !isWorking }
 
@@ -131,16 +169,25 @@ final class ReviewViewModel {
         repeat {
             needsReload = false
             let startedAt = generation
+            let previousDigestID = state?.digest.id
             do {
                 let latest = try await store.latestDigest()
                 var kind = jobKind
                 var context = emails
+                var newBatching: BacklogBatching?
                 if let latest {
                     let ids = Set(latest.info.map(\.emailID) + latest.suggestions.map(\.emailID))
-                    if !ids.isSubset(of: context.keys) {
+                    if let job = try await store.jobs().first(where: { $0.id == latest.id }) { kind = job.kind }
+                    if kind == .backlog {
+                        // Batches follow the job's own order; results appear as each email is persisted.
+                        let items = try await store.items(job: latest.id)
+                        Self.merge(items, into: &context)
+                        let resultIDs = ids.union(latest.skipped.map(\.id))
+                        newBatching = BacklogBatching(jobOrder: items.sorted { $0.position < $1.position }.map(\.messageID),
+                                                      resultIDs: resultIDs)
+                    } else if !ids.isSubset(of: context.keys) {
                         Self.merge(try await store.items(job: latest.id), into: &context)
                     }
-                    if let job = try await store.jobs().first(where: { $0.id == latest.id }) { kind = job.kind }
                 }
                 // Pins from other digests; an email already in the current digest shows there instead.
                 let currentEmails = Set(latest?.info.map(\.emailID) ?? [])
@@ -158,6 +205,9 @@ final class ReviewViewModel {
                 } else {
                     state = nil
                 }
+                if state?.digest.id != previousDigestID { batchIndex = 0 }
+                batching = newBatching
+                batchIndex = newBatching?.clamped(batchIndex) ?? 0
                 emails = context
                 carriedPins = carried
                 jobKind = kind
@@ -185,8 +235,24 @@ final class ReviewViewModel {
     // MARK: Selection
 
     func toggle(_ id: UUID) { mutate { ReviewActions.toggle(id, in: $0) } }
-    func selectAll() { mutate { ReviewActions.selectAll($0) } }
-    func selectNone() { mutate { ReviewActions.selectNone($0) } }
+    func selectAll() {
+        mutate { full in
+            guard batching != nil, let shown = shownDigest else { return ReviewActions.selectAll(full) }
+            var next = full
+            let shownIDs = Set(shown.suggestions.map(\.id))
+            next.selection = full.selection.subtracting(shownIDs)
+                .union(shown.suggestions.filter { $0.status == .pending }.map(\.id))
+            return next
+        }
+    }
+    func selectNone() {
+        mutate { full in
+            guard batching != nil, let shown = shownDigest else { return ReviewActions.selectNone(full) }
+            var next = full
+            next.selection.subtract(shown.suggestions.map(\.id))
+            return next
+        }
+    }
 
     private func mutate(_ change: (ReviewState) -> ReviewState) {
         guard let state else { return }
@@ -217,8 +283,8 @@ final class ReviewViewModel {
 
     /// "Add selected": writes the selected suggestions to Reminders. Does nothing without a writer.
     func addSelected() async {
-        guard let state, let store, let writer = reminderWriter, !isWorking else { return }
-        let toAdd = ReviewActions.split(state).approve
+        guard let state, let scopedState, let store, let writer = reminderWriter, !isWorking else { return }
+        let toAdd = ReviewActions.split(scopedState).approve
         guard !toAdd.isEmpty else { return }
         isWorking = true
         defer { isWorking = false }
@@ -234,8 +300,8 @@ final class ReviewViewModel {
 
     /// "Dismiss unselected".
     func dismissUnselected() async {
-        guard let state else { return }
-        await dismiss(ReviewActions.split(state).dismiss)
+        guard let scopedState else { return }
+        await dismiss(ReviewActions.split(scopedState).dismiss)
     }
 
     /// ⌫ on a focused row.

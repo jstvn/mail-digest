@@ -8,9 +8,11 @@ final class SettingsStore {
     private static let key = "digestSettings"
 
     var settings: DigestSettings {
-        didSet { if settings != oldValue { save() } }
+        didSet { if settings != oldValue { save(); onChange?() } }
     }
 
+    /// Called after every change, so the run model can re-check the power rules.
+    @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {

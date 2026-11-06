@@ -36,6 +36,11 @@ struct MailDigestApp: App {
         .defaultSize(width: 480, height: 560)
         .windowResizability(.contentMinSize)
 
+        Window("New Processing Job", id: "job-setup") {
+            JobSetupView(run: run)
+        }
+        .defaultSize(width: 680, height: 640)
+
         Window("Welcome to Mail Digest", id: "onboarding") {
             OnboardingView(run: run, access: access)
         }
@@ -46,15 +51,24 @@ struct MailDigestApp: App {
         }
     }
 
-    /// The icon, plus the number of pending suggestions when there are any.
+    /// The icon (with a progress ring or pause badge while a job is active), plus the number of pending
+    /// suggestions when there are any. The icon is a template image, so the status item keeps its native
+    /// look and highlight.
     private var menuBarLabel: some View {
         let count = run.review.pendingCount
+        let icon = run.menuBarIcon
+        var label = count > 0 ? "Mail Digest, \(count) pending suggestions" : "Mail Digest"
+        if let extra = icon.accessibilityText { label += ", \(extra)" }
         return HStack(spacing: 2) {
-            Image(systemName: "envelope.badge")
+            if let image = MenuBarIconRenderer.image(for: icon) {
+                Image(nsImage: image).renderingMode(.template)
+            } else {
+                Image(systemName: "envelope.badge")
+            }
             if count > 0 { Text("\(count)").monospacedDigit() }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(count > 0 ? "Mail Digest, \(count) pending suggestions" : "Mail Digest")
+        .accessibilityLabel(label)
     }
 
     /// Opens the database, probes Mail once (never prompting for Automation), shows onboarding on first

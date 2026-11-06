@@ -79,6 +79,9 @@ public actor JobRunner {
     private var pauseRequested = false
     private var stopRequested = false
     private var autoPauseRequested = false
+    private var autoPauseReason: PauseReason?
+    /// Jobs this runner auto-paused for a resource reason in this session; only these are auto-resumed.
+    private var autoPausedThisSession: Set<UUID> = []
     private var cancelRequested = false
     private var itemActive = false
     private var inFlight: Task<EmailOutcome, Error>?
@@ -153,6 +156,7 @@ public actor JobRunner {
             guard loopTask != nil, let run, run.job.kind == .backlog else { throw JobRunnerError.alreadyRunning }
             backlogToResume = run.job.id
             autoPauseRequested = true
+            autoPauseReason = .dailyJob
             pauseRequested = true
             run.job.state = .pausing
             emit(force: true)
@@ -242,7 +246,7 @@ public actor JobRunner {
         // and keeps the digest's email count consistent.
         try await store.deleteEmailResults(Set(requeued.map(\.messageID)), from: jobID)
         job.state = .paused
-        job.autoPaused = false
+        job.clearPause()
         job.totals.failed = max(0, job.totals.failed - requeued.count)
         job.totals.queued += requeued.count
         try await store.updateJob(job)
@@ -269,8 +273,44 @@ public actor JobRunner {
         emit(force: true)
     }
 
-    /// Cancels the in-flight email and ends the run. `JobState` has no "stopped" case, so the job is left
-    /// `.paused` with `autoPaused == false`; the user can resume it later from the job list.
+    /// Pauses the active job after the current email because of a resource rule (battery, Low Power Mode,
+    /// heat, quiet hours), recording the reason. Does nothing when no job runs or one is already pausing.
+    public func autoPause(_ reason: PauseReason) {
+        guard let run, loopTask != nil, !pauseRequested, !stopRequested else { return }
+        autoPauseRequested = true
+        autoPauseReason = reason
+        pauseRequested = true
+        run.job.state = .pausing
+        emit(force: true)
+    }
+
+    /// Resumes the newest job this runner auto-paused for a resource reason that has cleared (its kind is
+    /// not in `blocked`). A job the user paused or stopped, one paused for a Daily job, or one auto-paused
+    /// in an earlier session is never resumed here. Returns the resumed job id.
+    @discardableResult
+    public func autoResume(blocked: [JobKind: PauseReason]) async throws -> UUID? {
+        guard !busy else { return nil }
+        let candidate = try await store.jobs().first {
+            autoPausedThisSession.contains($0.id) && $0.state == .paused && $0.pauseReason != nil
+                && blocked[$0.kind] == nil
+        }
+        guard let candidate else { return nil }
+        try await resume(jobID: candidate.id)
+        return candidate.id
+    }
+
+    /// Applies the current resource rules: pauses the active job if its kind is blocked, otherwise
+    /// auto-resumes a job paused for a reason that has cleared.
+    public func applyResourceRules(_ blocked: [JobKind: PauseReason]) async throws {
+        if let run, loopTask != nil {
+            if let reason = blocked[run.job.kind] { autoPause(reason) }
+            return
+        }
+        try await autoResume(blocked: blocked)
+    }
+
+    /// Cancels the in-flight email (it returns to `queued`) and ends the run. The job is persisted as
+    /// `.stopped` (Q15): resumable by hand from Past Jobs with `resume(jobID:)`, never automatically.
     public func stop() {
         guard let run, loopTask != nil else { return }
         stopRequested = true
@@ -289,6 +329,7 @@ public actor JobRunner {
                 // The loop hasn't paused yet, so just withdraw the request.
                 pauseRequested = false
                 autoPauseRequested = false
+                autoPauseReason = nil
                 cancelRequested = false
                 run.job.state = .running
                 emit(force: true)
@@ -305,7 +346,7 @@ public actor JobRunner {
             let job: Job?
             if let jobID {
                 guard let found = all.first(where: { $0.id == jobID }) else { throw JobRunnerError.jobNotFound }
-                job = (found.state == .paused || found.state == .failed) ? found : nil
+                job = [.paused, .failed, .stopped].contains(found.state) ? found : nil
             } else {
                 job = all.first { $0.state == .paused }
             }
@@ -313,8 +354,9 @@ public actor JobRunner {
             // Re-check the provider before resuming (Q25), so a still-down Ollama fails fast.
             try await preflight()
             job.state = .running
-            job.autoPaused = false
+            job.clearPause()
             job.lastError = nil
+            autoPausedThisSession.remove(job.id)
             try await store.updateJob(job)
             resetFlags()
             resumeAfter = nil
@@ -331,7 +373,8 @@ public actor JobRunner {
     public func recoverOnLaunch() async throws {
         _ = try await store.requeueInterrupted()
         for var job in try await store.jobs() where [.running, .pausing, .listing, .stopping].contains(job.state) {
-            job.state = .paused
+            // An interrupted Stop stays a Stop (Q15); everything else was never asked to stop, so it is paused.
+            job.state = job.state == .stopping ? .stopped : .paused
             try await store.updateJob(job)
         }
     }
@@ -352,6 +395,7 @@ public actor JobRunner {
         pauseRequested = false
         stopRequested = false
         autoPauseRequested = false
+        autoPauseReason = nil
         cancelRequested = false
         itemActive = false
     }
@@ -446,7 +490,7 @@ public actor JobRunner {
             do {
                 guard var job = try await store.jobs().first(where: { $0.id == next }), job.state == .paused else { break }
                 job.state = .running
-                job.autoPaused = false
+                job.clearPause()
                 try await store.updateJob(job)
                 resetFlags()
                 run = try await loadRun(job)
@@ -639,13 +683,17 @@ public actor JobRunner {
     private func commitPause(_ run: RunState) async throws -> LoopOutcome {
         // No await before this flag, so `resume()` sees a consistent "pause is happening" state.
         run.committed = true
-        let auto = autoPauseRequested
+        let stopped = stopRequested
+        let reason = (autoPauseRequested && !stopped) ? autoPauseReason : nil
         pauseRequested = false
         stopRequested = false
         autoPauseRequested = false
+        autoPauseReason = nil
         cancelRequested = false
-        run.job.state = .paused
-        run.job.autoPaused = auto
+        run.job.state = stopped ? .stopped : .paused
+        run.job.autoPaused = reason != nil
+        run.job.pauseReason = reason
+        if let reason, reason != .dailyJob { autoPausedThisSession.insert(run.job.id) }
         run.current = nil
         run.queueHead = []
         if let next = try await store.nextQueued(job: run.job.id, limit: 1).first {
@@ -776,6 +824,6 @@ public actor JobRunner {
             avgSecondsPerEmail: avg, eta: avg.map { $0 * Double(t.queued) },
             stage: run.stage, current: run.current, lastFinished: run.lastFinished,
             nextUp: run.queueHead.first.map { summary($0, outcome: nil) } ?? run.nextUp,
-            countsByMailbox: run.counts, error: run.job.lastError))
+            countsByMailbox: run.counts, error: run.job.lastError, pauseReason: run.job.pauseReason))
     }
 }

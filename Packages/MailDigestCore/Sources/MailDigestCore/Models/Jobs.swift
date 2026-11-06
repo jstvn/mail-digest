@@ -3,7 +3,24 @@ import Foundation
 public enum JobKind: String, Codable, Sendable, Equatable { case daily, backlog }
 
 public enum JobState: String, Codable, Sendable, Equatable {
-    case idle, listing, running, pausing, paused, stopping, finished, failed
+    /// `stopped` is an explicit user Stop (Q15): resumable by hand from Past Jobs, never automatically.
+    case idle, listing, running, pausing, paused, stopping, stopped, finished, failed
+}
+
+/// Why a job was paused by the app rather than by the user.
+public enum PauseReason: String, Codable, Sendable, Equatable, CaseIterable {
+    case battery, lowPowerMode, heat, quietHours, dailyJob
+
+    /// Short text for "Paused after #412 … (battery power)".
+    public var displayText: String {
+        switch self {
+        case .battery: return "battery power"
+        case .lowPowerMode: return "Low Power Mode"
+        case .heat: return "Mac is hot"
+        case .quietHours: return "quiet hours"
+        case .dailyJob: return "Daily job running"
+        }
+    }
 }
 
 public enum JobStage: String, Codable, Sendable, Equatable {
@@ -56,12 +73,17 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
     public var createdAt: Date
     public var totals: JobTotals
     public var autoPaused: Bool
+    /// Why the app auto-paused the job; nil when the user paused it or it isn't paused. Older stored jobs
+    /// have none.
+    public var pauseReason: PauseReason?
     /// Why the job stopped as `.failed` (for example "Ollama is not reachable…"). Safe to show; never
     /// contains email content. Cleared when the job is resumed.
     public var lastError: String?
 
     public init(id: UUID, kind: JobKind, mailboxes: [MailboxRef], scopeFrom: Date, scopeTo: Date,
-                state: JobState, createdAt: Date, totals: JobTotals, autoPaused: Bool, lastError: String? = nil) {
+                state: JobState, createdAt: Date, totals: JobTotals, autoPaused: Bool, lastError: String? = nil,
+                pauseReason: PauseReason? = nil) {
+        self.pauseReason = pauseReason
         self.lastError = lastError
         self.id = id
         self.kind = kind
@@ -72,6 +94,12 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
         self.createdAt = createdAt
         self.totals = totals
         self.autoPaused = autoPaused
+    }
+
+    /// Clears the pause markers when a job starts running again.
+    mutating func clearPause() {
+        autoPaused = false
+        pauseReason = nil
     }
 }
 
@@ -190,11 +218,15 @@ public struct JobProgress: Codable, Sendable, Equatable {
     public var countsByMailbox: [MailboxRef: MailboxProgress] // done/total per mailbox
     /// The job's `lastError` when it stopped as `.failed` (for example a provider outage).
     public var error: String?
+    /// Why the app auto-paused the job, when it did.
+    public var pauseReason: PauseReason?
 
     public init(jobID: UUID, kind: JobKind, state: JobState, done: Int, total: Int, failed: Int,
                 avgSecondsPerEmail: Double?, eta: TimeInterval?, stage: JobStage,
                 current: JobItemSummary?, lastFinished: JobItemSummary?, nextUp: JobItemSummary?,
-                countsByMailbox: [MailboxRef: MailboxProgress], error: String? = nil) {
+                countsByMailbox: [MailboxRef: MailboxProgress], error: String? = nil,
+                pauseReason: PauseReason? = nil) {
+        self.pauseReason = pauseReason
         self.error = error
         self.jobID = jobID
         self.kind = kind

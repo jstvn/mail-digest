@@ -529,11 +529,12 @@ private actor Counter {
         let stuck = try #require(await h.store.allItems().first { $0.messageID == "old-1@fixture" })
         #expect(stuck.state == .queued && stuck.lastError == nil)
         let job = try await h.job()
-        #expect(job.state == .paused && job.autoPaused == false)
+        // Q15: Pause now leaves the job paused; Stop records an explicit `.stopped`.
+        #expect(job.state == (usePauseNow ? .paused : .stopped) && job.autoPaused == false && job.pauseReason == nil)
         #expect(await h.store.processedIDs() == ["old-0@fixture"])
         #expect(job.totals == JobTotals(queued: 2, done: 1, failed: 0, skipped: 0))
 
-        try await h.runner.resume()
+        try await h.runner.resume(jobID: job.id)
         await h.runner.waitUntilIdle()
         let items = await h.store.allItems()
         #expect(items.allSatisfy { $0.state == .done })
@@ -564,6 +565,7 @@ private actor Counter {
             } else if !email.id.hasPrefix("old-"), backlogWasAutoPaused.value == nil {
                 let backlog = try await store.jobs().first { $0.kind == .backlog }
                 backlogWasAutoPaused.value = backlog?.state == .paused && backlog?.autoPaused == true
+                    && backlog?.pauseReason == .dailyJob
             }
         }
 
@@ -573,6 +575,7 @@ private actor Counter {
         await h.runner.waitUntilIdle()
 
         #expect(backlogWasAutoPaused.value == true)
+        #expect(try await store.jobs().first { $0.kind == .backlog }?.pauseReason == nil)
         let order = await llm.extractCalls.map(\.id)
         let old = (0..<12).map { "old-\($0)@fixture" }
         #expect(order.prefix(5) == old.prefix(5))
@@ -641,5 +644,125 @@ private actor Counter {
         #expect(running.eta == 6) // 3 left at 2 s each
         #expect(running.lastFinished?.position == 3)
         #expect(running.nextUp?.messageID == "old-3@fixture")
+    }
+}
+
+
+// MARK: T19 resource pauses and stop
+
+@Suite struct JobRunnerResourceTests {
+    private func harness(_ count: Int = 6) -> Harness {
+        Harness(source: FixtureMailSource(messages: oldMessages(count)), llm: StubLLMClient())
+    }
+
+    @Test func autoPauseRecordsReasonAndAutoResumeWaitsForItToClear() async throws {
+        let h = harness()
+        await h.collector.attach(h.runner.progress)
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-2@fixture" { await runner.autoPause(.battery) }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+
+        let paused = try await h.job()
+        #expect(paused.state == .paused && paused.autoPaused && paused.pauseReason == .battery)
+        #expect(paused.totals.done == 3 && paused.totals.queued == 3)
+        #expect(await eventually { await h.collector.events.last?.pauseReason == .battery })
+
+        // Still on battery: nothing resumes.
+        #expect(try await h.runner.autoResume(blocked: [.backlog: .battery]) == nil)
+        #expect(try await h.job().state == .paused)
+        // A different kind being blocked doesn't matter for a Backlog job.
+        let resumed = try await h.runner.autoResume(blocked: [.daily: .lowPowerMode])
+        #expect(resumed == paused.id)
+        await h.runner.waitUntilIdle()
+        let done = try await h.job()
+        #expect(done.state == .finished && done.pauseReason == nil && done.totals.done == 6)
+        // Each email was processed exactly once.
+        #expect(await h.llm.extractCalls.map(\.id).count == 6)
+    }
+
+    @Test func userPausedJobIsNeverAutoResumed() async throws {
+        let h = harness(4)
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-1@fixture" { await runner.pause() }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        let paused = try await h.job()
+        #expect(paused.state == .paused && paused.pauseReason == nil)
+        #expect(try await h.runner.autoResume(blocked: [:]) == nil)
+        #expect(try await h.job().state == .paused)
+    }
+
+    @Test func stoppedJobIsNeverAutoResumedAndNeedsAnExplicitResume() async throws {
+        let h = harness(4)
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-1@fixture" { await runner.stop() }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        let stopped = try await h.job()
+        #expect(stopped.state == .stopped)
+        #expect(try await h.runner.autoResume(blocked: [:]) == nil)
+        // Resuming "the most recent paused job" ignores stopped ones.
+        try await h.runner.resume()
+        await h.runner.waitUntilIdle()
+        #expect(try await h.job().state == .stopped)
+
+        await h.llm.setOnExtract { _ in }
+        try await h.runner.resume(jobID: stopped.id)
+        await h.runner.waitUntilIdle()
+        let finished = try await h.job()
+        #expect(finished.state == .finished && finished.totals.done == 4)
+    }
+
+    @Test func dailyJobPauseAndEarlierSessionPausesAreNotAutoResumed() async throws {
+        let h = harness(2)
+        var job = Job(id: UUID(), kind: .backlog, mailboxes: [icloud], scopeFrom: today, scopeTo: today,
+                      state: .paused, createdAt: today,
+                      totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0), autoPaused: true,
+                      pauseReason: .dailyJob)
+        try await h.store.createJob(job)
+        #expect(try await h.runner.autoResume(blocked: [:]) == nil)
+        // Paused for battery in a previous session: this runner didn't pause it, so it waits for the user.
+        job.pauseReason = .battery
+        try await h.store.updateJob(job)
+        #expect(try await h.runner.autoResume(blocked: [:]) == nil)
+    }
+
+    @Test func interruptedStopRecoversAsStopped() async throws {
+        let h = harness(2)
+        let stopping = Job(id: UUID(), kind: .backlog, mailboxes: [icloud], scopeFrom: today, scopeTo: today,
+                           state: .stopping, createdAt: today,
+                           totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        let running = Job(id: UUID(), kind: .backlog, mailboxes: [icloud], scopeFrom: today, scopeTo: today,
+                          state: .running, createdAt: today.addingTimeInterval(1),
+                          totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        try await h.store.createJob(stopping)
+        try await h.store.createJob(running)
+        try await h.runner.recoverOnLaunch()
+        let jobs = try await h.store.jobs()
+        #expect(jobs.first { $0.id == stopping.id }?.state == .stopped)
+        #expect(jobs.first { $0.id == running.id }?.state == .paused)
+    }
+
+    @Test func applyResourceRulesPausesTheActiveBacklogJob() async throws {
+        let h = harness(5)
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-1@fixture" {
+                // A blocked Daily kind must not touch a Backlog job; a blocked Backlog kind pauses it.
+                try await runner.applyResourceRules([.daily: .lowPowerMode])
+                try await runner.applyResourceRules([.backlog: .heat])
+            }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        let job = try await h.job()
+        #expect(job.state == .paused && job.pauseReason == .heat && job.totals.done == 2)
     }
 }

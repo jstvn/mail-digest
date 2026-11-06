@@ -12,7 +12,10 @@ final class DigestRunModel {
     private(set) var isLoadingMailboxes = false
     private(set) var mailboxError: String?
 
-    private(set) var isRunning = false
+    /// True while the app is starting or waiting on a job, or while the runner reports an active job (which
+    /// also covers a job the resource monitor auto-resumed).
+    var isRunning: Bool { busyFlag || Self.isActive(progress?.state, includePaused: false) }
+    private var busyFlag = false
     private(set) var progressText: String?
     private(set) var lastRunSummary: String?
     /// Latest runner update. Applied always, so a job paused earlier still shows its strip.
@@ -30,6 +33,16 @@ final class DigestRunModel {
     private(set) var banner: String?
     /// A job stopped by a provider outage (Q25); Retry resumes this same job and its queue.
     private(set) var failedJobID: UUID?
+    /// A paused job loaded from the store, for example one left paused by a previous session, so its strip
+    /// and Resume button show without the runner having published anything.
+    private(set) var restoredProgress: JobProgress?
+    /// Items of the job shown in the progress view (recent results and the activity log); sender and subject only.
+    private(set) var activityItems: [JobItem] = []
+    /// Every job, newest first, for Settings > Jobs.
+    private(set) var pastJobs: [PastJobRow] = []
+    /// Watches power, Low Power Mode, heat and quiet hours (Mac-only adapter).
+    @ObservationIgnored let monitor = ResourceMonitor()
+    @ObservationIgnored private var lastBlocked: [JobKind: PauseReason] = [:]
 
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "run")
 
@@ -60,6 +73,7 @@ final class DigestRunModel {
         review.onSuggestionsSettled = { [processed] in await processed.autoFileIfEnabled() }
         review.listName = { [settings] in settings.settings.resolvedListName }
         review.settingsStore = settings
+        settings.onChange = { [weak self] in self?.evaluateResources() }
     }
 
     /// Previews: fixed run state, no store or Mail access.
@@ -79,12 +93,37 @@ final class DigestRunModel {
         self.lastRunSummary = lastRunSummary
     }
 
-    /// The runner's progress while a job is active (listing, running, pausing, paused or stopping).
+    /// The runner's progress while a job is active (listing, running, pausing, paused or stopping), or a
+    /// paused job restored from the store. A stopped job has no strip; it is resumed from Past Jobs.
     var activeProgress: JobProgress? {
-        guard let progress else { return nil }
-        switch progress.state {
-        case .listing, .running, .pausing, .paused, .stopping: return progress
-        case .idle, .finished, .failed: return nil
+        if let progress, Self.isActive(progress.state, includePaused: true) { return progress }
+        return restoredProgress
+    }
+
+    private static func isActive(_ state: JobState?, includePaused: Bool) -> Bool {
+        switch state {
+        case .listing, .running, .pausing, .stopping: return true
+        case .paused: return includePaused
+        case .idle, .finished, .failed, .stopped, .none: return false
+        }
+    }
+
+    /// Whether a Daily run may start now: nothing is running, or only a running Backlog job, which the
+    /// runner pauses first (Daily goes before Backlog). A paused or stopped job never blocks it.
+    var canStartDaily: Bool {
+        if !isRunning { return true }
+        return progress?.kind == .backlog && progress?.state == .running
+    }
+
+    /// What the menu bar icon shows. Progress is bucketed to 5% so the icon is rarely redrawn.
+    var menuBarIcon: MenuBarIconState {
+        guard let p = activeProgress else { return .idle }
+        switch p.state {
+        case .paused: return .paused
+        case .listing: return .listing
+        default:
+            guard p.total > 0 else { return .listing }
+            return .progress(step: Int((Double(min(p.done, p.total)) / Double(p.total) * 20).rounded(.down)))
         }
     }
 
@@ -123,6 +162,11 @@ final class DigestRunModel {
     func loadLastRun() async {
         guard let store = await openStore() else { return }
         await review.attach(store: store)
+        // Building the runner puts jobs interrupted by a quit or crash back to paused, so it comes before
+        // loading the resumable job.
+        _ = await ensureRunner()
+        await refreshJobLists()
+        startResourceMonitor()
         guard let digest = try? await store.latestDigest() else { return }
         lastRunSummary = Self.summary(for: digest)
         lastRunAt = digest.createdAt
@@ -159,7 +203,7 @@ final class DigestRunModel {
     /// Called by the scheduler: starts the Daily job only when the core rule says the morning run is due
     /// and nothing is running. Failures before a job exists (Ollama down) leave no job, so the next check retries.
     func runIfDue() async {
-        guard !isRunning, activeProgress == nil, let store = await openStore() else { return }
+        guard canStartDaily, let store = await openStore() else { return }
         guard let jobs = try? await store.jobs() else { return }
         let s = settings.settings
         guard MorningSchedule.isDue(now: clock.now(), hour: s.runHour, minute: s.runMinute, jobs: jobs) else {
@@ -195,12 +239,16 @@ final class DigestRunModel {
     }
 
     func runDaily(trigger: RunTrigger) async {
-        guard !isRunning else { return }
+        guard canStartDaily else { return }
+        // A Daily run that preempts a running Backlog job leaves that run's own bookkeeping alone.
+        let preempting = isRunning
         Self.log.notice("daily run starting: trigger=\(trigger == .scheduled ? "scheduled" : "manual", privacy: .public)")
-        isRunning = true
+        if !preempting {
+            busyFlag = true
+            progressText = "Starting…"
+        }
         banner = nil
-        progressText = "Starting…"
-        defer { isRunning = false; progressText = nil }
+        defer { if !preempting { busyFlag = false; progressText = nil } }
 
         guard let store = await openStore() else { return }
 
@@ -230,6 +278,7 @@ final class DigestRunModel {
         let startedAt = clock.now()
         do {
             try await runner.startDaily()
+            evaluateResources(force: true)
             await runner.waitUntilIdle()
         } catch {
             banner = Self.message(for: error)
@@ -246,24 +295,30 @@ final class DigestRunModel {
 
     /// Resume button: continues the paused job from the next email.
     func resume() async {
-        guard let progress, progress.state == .paused else { return }
-        await resumeJob(progress.jobID)
+        guard let paused = activeProgress, paused.state == .paused else { return }
+        await resumeJob(paused.jobID)
     }
 
     /// Pause after the email in flight (takes effect between emails).
     func pause() { Task { await runner?.pause() } }
 
+    /// Cancel the email in flight and pause; that email is requeued.
+    func pauseNow() { Task { await runner?.pauseNow() } }
+
     /// Stop the job; finished items stay done and the rest can be resumed later.
     func stop() { Task { await runner?.stop() } }
 
-    private func resumeJob(_ jobID: UUID) async {
-        guard !isRunning, let runner, store != nil else { return }
-        isRunning = true
+    /// Resumes a paused, stopped or failed job by id, including one from a previous session.
+    func resumeJob(_ jobID: UUID) async {
+        guard !isRunning else { return }
+        busyFlag = true
         banner = nil
         progressText = "Starting…"
-        defer { isRunning = false; progressText = nil }
+        defer { busyFlag = false; progressText = nil }
+        guard let runner = await ensureRunner() else { return }
         do {
             try await runner.resume(jobID: jobID)
+            restoredProgress = nil
             await runner.waitUntilIdle()
         } catch {
             banner = Self.message(for: error)
@@ -272,9 +327,62 @@ final class DigestRunModel {
         await finishRun()
     }
 
+    /// Retry failed (Q28): requeues the job's failed emails and resumes it. Rejected while any job runs.
+    func retryFailedItems(of jobID: UUID) async {
+        guard !isRunning else { return }
+        busyFlag = true
+        banner = nil
+        progressText = "Starting…"
+        defer { busyFlag = false; progressText = nil }
+        guard let runner = await ensureRunner() else { return }
+        do {
+            try await runner.retryFailed(jobID: jobID)
+            restoredProgress = nil
+            await runner.waitUntilIdle()
+        } catch {
+            banner = Self.message(for: error)
+            return
+        }
+        await finishRun()
+    }
+
+    /// Job setup: lists headers for the plan and reports what Start would queue. Nothing is queued.
+    func previewJob(_ plan: JobPlan) async throws -> JobPreview {
+        guard let runner = await ensureRunner() else { throw JobSetupError.databaseUnavailable }
+        return try await runner.preview(plan)
+    }
+
+    /// Job setup: queues exactly the confirmed plan and starts it in the background. Returns once the job is
+    /// queued; progress then arrives through the progress strip. Returns an error message on failure.
+    func startBacklog(_ plan: JobPlan) async -> String? {
+        guard !isRunning else { return "Another job is already running." }
+        busyFlag = true
+        banner = nil
+        progressText = "Starting…"
+        guard let runner = await ensureRunner() else {
+            busyFlag = false; progressText = nil
+            return banner ?? "Could not open the Mail Digest database."
+        }
+        do {
+            try await runner.start(plan)
+        } catch {
+            busyFlag = false; progressText = nil
+            return Self.message(for: error)
+        }
+        evaluateResources(force: true)
+        Task {
+            await runner.waitUntilIdle()
+            busyFlag = false
+            progressText = nil
+            await finishRun()
+        }
+        return nil
+    }
+
     /// Shows the outage banner if the job stopped as failed; otherwise summarises it.
     private func finishRun(startedAt: Date? = nil) async {
         guard let store else { return }
+        defer { Task { await refreshJobLists() } }
         let job = try? await store.jobs().first
         if let job, job.state == .failed {
             failedJobID = job.id
@@ -298,11 +406,87 @@ final class DigestRunModel {
         await processed.autoFileIfEnabled()
     }
 
+    // MARK: Job lists, activity and resources
+
+    /// The runner for the current settings, created on demand (for example to resume an old job at launch).
+    private func ensureRunner() async -> JobRunner? {
+        guard let store = await openStore() else { return nil }
+        return await runner(for: mailboxes.filter { $0.kind == .inbox }.map(\.ref), store: store)
+    }
+
+    /// Reloads Past Jobs and the paused-job strip from the store.
+    func refreshJobLists() async {
+        await refreshPastJobs()
+        await restoreResumableJob()
+    }
+
+    func refreshPastJobs() async {
+        guard let store, let jobs = try? await store.jobs() else { return }
+        var rows: [PastJobRow] = []
+        for job in jobs {
+            let items = (try? await store.items(job: job.id)) ?? []
+            rows.append(PastJobRow(job: job, processingSeconds: items.compactMap(\.seconds).reduce(0, +)))
+        }
+        pastJobs = rows
+    }
+
+    /// Shows the newest paused job's strip when the runner has nothing active (after a relaunch, or after
+    /// a Daily run that preempted nothing). The runner only publishes progress while it works on a job.
+    private func restoreResumableJob() async {
+        guard let store else { return }
+        guard !Self.isActive(progress?.state, includePaused: false),
+              let job = (try? await store.jobs())?.first(where: { $0.state == .paused }),
+              let items = try? await store.items(job: job.id) else {
+            if !Self.isActive(progress?.state, includePaused: true) { restoredProgress = nil }
+            return
+        }
+        // The runner's own paused progress for this job is just as good; only restore what it doesn't hold.
+        if progress?.jobID == job.id, progress?.state == .paused { restoredProgress = nil; return }
+        restoredProgress = JobProgressSnapshot.progress(job: job, items: items)
+        activityItems = items
+        activityJobID = job.id
+    }
+
+    /// Recent results and the activity log for the job the progress view shows.
+    func refreshActivity(jobID: UUID) async {
+        guard let store, let items = try? await store.items(job: jobID) else { return }
+        activityItems = items
+        activityJobID = jobID
+    }
+
+    private(set) var activityJobID: UUID?
+
+    private func startResourceMonitor() {
+        monitor.onChange = { [weak self] in self?.evaluateResources() }
+        monitor.start()
+        evaluateResources()
+    }
+
+    /// Applies the core resource policy. Normally it acts only when the set of blocking reasons changes, so a
+    /// job the user resumed by hand on battery keeps running until the next change; `force` (a job just
+    /// started) applies the current rules once.
+    func evaluateResources(force: Bool = false) {
+        let policy = settings.settings.resourcePolicy()
+        let now = clock.now()
+        monitor.scheduleBoundary(at: policy.quietHours?.nextBoundary(after: now, in: policy.timeZone))
+        let blocked = policy.blocked(conditions: monitor.conditions, now: now)
+        guard force || blocked != lastBlocked else { return }
+        lastBlocked = blocked
+        guard let runner else { return }
+        Task {
+            do { try await runner.applyResourceRules(blocked) } catch {
+                Self.log.error("resource rules failed: \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
     // MARK: Helpers
 
     /// Creates the runner once and only recreates it when the inbox set changes. The first runner puts jobs
     /// interrupted by a quit or crash back into a resumable state.
     private func runner(for inboxes: [MailboxRef], store: GRDBDigestStore) async -> JobRunner {
+        // Never swap the runner under a job that is running; the next idle moment picks up new settings.
+        if let runner, Self.isActive(progress?.state, includePaused: false) { return runner }
         // Settings that don't affect the runner are cleared so editing them doesn't rebuild it.
         var relevant = settings.settings
         relevant.retention = .default
@@ -311,6 +495,8 @@ final class DigestRunModel {
         relevant.trustedNewsletterSenders = []
         relevant.declinedIgnoreSuggestions = []
         relevant.autoFileProcessed = false
+        relevant.pauseBacklogOnBattery = true
+        relevant.quietHoursEnabled = false
         let key = RunnerKey(settings: relevant, inboxes: Set(inboxes))
         if let runner, key == runnerKey { return runner }
         progressTask?.cancel()
@@ -337,9 +523,16 @@ final class DigestRunModel {
         // Show finished results while the job runs. The runner already throttles updates to 2 a second.
         if update.state == .running, update.done != lastRefreshedDone {
             lastRefreshedDone = update.done
-            Task { await review.reload() }
+            Task {
+                await review.reload()
+                await refreshActivity(jobID: update.jobID)
+            }
         }
-        guard isRunning else { return }
+        // A job the resource monitor resumed has no caller waiting on it, so settle it here.
+        if !busyFlag, [.finished, .failed, .paused, .stopped].contains(update.state) {
+            Task { await finishRun() }
+        }
+        guard busyFlag else { return }
         switch update.state {
         case .listing:
             progressText = "Looking for new mail…"
@@ -385,3 +578,15 @@ final class DigestRunModel {
         return "Could not read Mail. Open Mail Access to check permissions."
     }
 }
+
+
+/// A job as Settings > Jobs lists it.
+struct PastJobRow: Identifiable, Equatable, Sendable {
+    var job: Job
+    /// Sum of the seconds the model spent on its emails.
+    var processingSeconds: Double
+
+    var id: UUID { job.id }
+}
+
+enum JobSetupError: Error { case databaseUnavailable }

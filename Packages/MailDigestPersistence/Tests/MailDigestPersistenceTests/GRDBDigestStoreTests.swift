@@ -125,6 +125,7 @@ import MailDigestCore
         var older = makeJob(at: t0.addingTimeInterval(-100))
         older.lastError = "Ollama is not reachable"
         older.autoPaused = true
+        older.pauseReason = .quietHours
         let newer = makeJob(kind: .daily, at: t0)
         try await store.createJob(older)
         try await store.createJob(newer)
@@ -133,6 +134,7 @@ import MailDigestCore
         changed.state = .failed
         changed.totals = JobTotals(queued: 1, done: 2, failed: 3, skipped: 4)
         changed.lastError = nil
+        changed.pauseReason = nil
         try await store.updateJob(changed)
         #expect(try await store.jobs().last == changed)
         try await store.updateJob(makeJob()) // unknown id: ignored
@@ -337,7 +339,45 @@ import MailDigestCore
         #expect(try reopened.setting("k") == "v")
         #expect(try await reopened.isProcessed("m"))
         let applied = try await reopened.writer.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations") }
-        #expect(applied == ["v1"])
+        #expect(applied == ["v1", "v2"])
+    }
+
+    @Test func stoppedStateAndPauseReasonSurviveReopen() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanUp() }
+        var paused = makeJob(state: .paused, at: t0)
+        paused.autoPaused = true
+        paused.pauseReason = .battery
+        let stopped = makeJob(state: .stopped, at: t0.addingTimeInterval(-10))
+        do {
+            let store = try GRDBDigestStore(path: dir.databasePath)
+            try await store.createJob(paused)
+            try await store.createJob(stopped)
+        }
+        let reopened = try GRDBDigestStore(path: dir.databasePath)
+        #expect(try await reopened.jobs() == [paused, stopped])
+    }
+
+    @Test func v1DatabaseUpgradesAndOldJobsHaveNoPauseReason() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanUp() }
+        try FileManager.default.createDirectory(at: URL(fileURLWithPath: dir.databasePath).deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        // Build a database as v1 left it: apply only the first migration, then insert a job the old way.
+        let queue = try DatabaseQueue(path: dir.databasePath)
+        try GRDBDigestStore.migrator.migrate(queue, upTo: "v1")
+        let old = makeJob(state: .paused)
+        try await queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO job (id, kind, mailboxes, scope_from, scope_to, state, created_at, queued, done, failed,
+                                 skipped, auto_paused, last_error)
+                VALUES (?, 'backlog', '[]', 0, 0, 'paused', 0, 1, 0, 0, 0, 1, NULL)
+                """, arguments: [old.id.uuidString])
+        }
+        try queue.close()
+        let store = try GRDBDigestStore(path: dir.databasePath)
+        let job = try #require(try await store.jobs().first)
+        #expect(job.state == .paused && job.autoPaused && job.pauseReason == nil)
     }
 
     // MARK: Pinned info

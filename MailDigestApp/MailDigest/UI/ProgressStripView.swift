@@ -7,6 +7,8 @@ struct ProgressStripView: View {
     let progress: JobProgress
     var pauseReason: String?
     var onPause: () -> Void = {}
+    /// When set, Pause becomes a menu button with "Pause Now" (cancels the email in flight).
+    var onPauseNow: (() -> Void)?
     var onResume: () -> Void = {}
     var onStop: () -> Void = {}
 
@@ -51,7 +53,8 @@ struct ProgressStripView: View {
     private var primaryText: String {
         switch progress.state {
         case .listing: return "Looking for new mail…"
-        case .paused: return ReviewPresentation.pausedText(progress, reason: pauseReason)
+        case .paused:
+            return ReviewPresentation.pausedText(progress, reason: pauseReason ?? progress.pauseReason?.displayText)
         case .pausing: return "Pausing after this email · " + ReviewPresentation.counts(progress)
         case .stopping: return "Stopping…"
         default: return ReviewPresentation.counts(progress)
@@ -65,7 +68,16 @@ struct ProgressStripView: View {
                 Button("Resume", action: onResume)
                 Button("Stop", role: .destructive, action: onStop)
             case .running, .listing:
-                Button("Pause", action: onPause)
+                if let onPauseNow {
+                    Menu("Pause") {
+                        Button("Pause Now", action: onPauseNow)
+                    } primaryAction: {
+                        onPause()
+                    }
+                    .help("Pause after this email. Choose Pause Now to cancel the email in progress.")
+                } else {
+                    Button("Pause", action: onPause)
+                }
                 Button("Stop", role: .destructive, action: onStop)
             case .pausing:
                 Button("Stop", role: .destructive, action: onStop)

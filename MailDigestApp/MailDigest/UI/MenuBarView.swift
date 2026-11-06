@@ -15,6 +15,7 @@ struct MenuBarView: View {
             if let progress = run.activeProgress {
                 ProgressStripView(progress: progress,
                                   onPause: run.pause,
+                                  onPauseNow: run.pauseNow,
                                   onResume: { Task { await run.resume() } },
                                   onStop: run.stop)
             } else if let summary = run.lastRunSummary {
@@ -32,7 +33,9 @@ struct MenuBarView: View {
             Divider()
             row("Open Review Panel", symbol: "tray.full") { show("review") }
             row("Run Now", symbol: "play") { Task { await run.runNow() } }
-                .disabled(run.isRunning || run.activeProgress != nil || access.status?.mode == .unavailable)
+                .disabled(run.isRunning || access.status?.mode == .unavailable)
+            row("New Backlog Job…", symbol: "tray.and.arrow.down") { show("job-setup") }
+                .disabled(run.isRunning || access.status?.mode == .unavailable)
             row("Mail Access…", symbol: "lock.shield") { show("mail-access") }
             row("Settings…", symbol: "gearshape", shortcut: ",") {
                 NSApp.activate()
