@@ -87,4 +87,44 @@ private func locations(_ n: Int, account: String = "iCloud") -> [String: Mailbox
         #expect(await rec.calls.isEmpty)
         #expect(await rec.restored.isEmpty)
     }
+
+    @Test func batchSummaryCountsSuccessAndFailure() async throws {
+        let rec = RecordingMailActions(locations: locations(3), missingIDs: ["m1"])
+        let cleanup = MailCleanup(actions: rec)
+        #expect(try await cleanup.perform(.trash, ids: ["m0", "m1", "m2"]).summary
+                == "Moved 2 emails to Trash. 1 couldn't be moved.")
+        #expect(try await cleanup.perform(.moveToFolder("Mail Digest"), ids: ["m0"]).summary
+                == "Moved 1 email to Mail Digest.")
+    }
+
+    @Test func undoKeepsGoingAndReportsEveryFailure() async throws {
+        let actions = FlakyRestoreActions(failing: ["m1", "m27"])
+        let ids = (0..<30).map { "m\($0)" }
+        let results = ids.map { MailActionResult(messageID: $0, account: "a", originalMailbox: "Inbox", succeeded: true, error: nil) }
+        let batch = CleanupBatch(id: UUID(), action: .trash, results: results)
+        do {
+            try await MailCleanup(actions: actions).undo(batch)
+            Issue.record("expected restoreFailed")
+        } catch MailActionError.restoreFailed(let failures) {
+            #expect(failures.map(\.messageID) == ["m1", "m27"])
+        }
+        // Both chunks were attempted even though the first reported a failure.
+        #expect(await actions.restoredCount == 28)
+    }
+}
+
+/// Restores everything except the failing ids, which it reports the way the real adapter does.
+private actor FlakyRestoreActions: MailActions {
+    let failing: Set<String>
+    private(set) var restoredCount = 0
+    init(failing: Set<String>) { self.failing = failing }
+    func moveToTrash(messageIDs: [String]) async throws -> [MailActionResult] { [] }
+    func move(messageIDs: [String], toMailboxNamed name: String, createIfMissing: Bool) async throws -> [MailActionResult] { [] }
+    func restore(_ results: [MailActionResult]) async throws {
+        let bad = results.filter { failing.contains($0.messageID) }
+        restoredCount += results.count - bad.count
+        if !bad.isEmpty {
+            throw MailActionError.restoreFailed(bad.map { RestoreFailure(messageID: $0.messageID, reason: MailActionFailure.notFound) })
+        }
+    }
 }

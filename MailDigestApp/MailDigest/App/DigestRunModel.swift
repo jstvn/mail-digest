@@ -25,6 +25,8 @@ final class DigestRunModel {
     let review: ReviewViewModel
     let settings: SettingsStore
     let reminders: RemindersAccessModel
+    /// The Processed tab: cleanup, Undo history and auto-file.
+    let processed: ProcessedMailModel
     private(set) var banner: String?
     /// A job stopped by a provider outage (Q25); Retry resumes this same job and its queue.
     private(set) var failedJobID: UUID?
@@ -53,7 +55,9 @@ final class DigestRunModel {
         self.settings = settings
         self.review = ReviewViewModel()
         self.reminders = RemindersAccessModel()
+        self.processed = ProcessedMailModel(review: review, settings: settings)
         reminders.attach(review: review)
+        review.onSuggestionsSettled = { [processed] in await processed.autoFileIfEnabled() }
         review.listName = { [settings] in settings.settings.resolvedListName }
         review.settingsStore = settings
     }
@@ -66,6 +70,7 @@ final class DigestRunModel {
         self.settings = preview
         self.review = review
         self.reminders = reminders
+        self.processed = ProcessedMailModel(review: review, settings: preview, actions: RecordingMailActions(locations: [:]))
         self.progress = progress
         self.banner = banner
         self.failedJobID = failedJobID
@@ -290,6 +295,7 @@ final class DigestRunModel {
             lastRunFoundNothing = false
         }
         if !lastRunFoundNothing, let created = review.digest?.createdAt { lastRunAt = created }
+        await processed.autoFileIfEnabled()
     }
 
     // MARK: Helpers
@@ -304,6 +310,7 @@ final class DigestRunModel {
         relevant.runHour = 6; relevant.runMinute = 30
         relevant.trustedNewsletterSenders = []
         relevant.declinedIgnoreSuggestions = []
+        relevant.autoFileProcessed = false
         let key = RunnerKey(settings: relevant, inboxes: Set(inboxes))
         if let runner, key == runnerKey { return runner }
         progressTask?.cancel()

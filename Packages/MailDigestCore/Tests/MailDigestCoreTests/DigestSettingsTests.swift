@@ -29,6 +29,16 @@ import Testing
         #expect(partial.runHour == 8 && partial.runMinute == 30 && partial.ollamaModel == "qwen3:4b")
     }
 
+    @Test func autoFileIsOffByDefaultAndDecodesTolerantly() throws {
+        #expect(DigestSettings().autoFileProcessed == false)
+        let old = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"runHour":7}"#.utf8))
+        #expect(old.autoFileProcessed == false && old.runHour == 7)
+        var on = DigestSettings()
+        on.autoFileProcessed = true
+        let round = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(on))
+        #expect(round.autoFileProcessed)
+    }
+
     @Test func olderSavedSettingsDecodeWithoutDeclinedSuggestions() throws {
         // A blob saved before T16 has no `declinedIgnoreSuggestions` key but keeps every other value.
         let old = #"{"runHour":7,"ignoredSenders":["a@b.com"],"vipSenders":["v@b.com"]}"#

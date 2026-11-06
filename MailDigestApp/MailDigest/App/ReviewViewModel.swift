@@ -44,6 +44,8 @@ final class ReviewViewModel {
     /// Set by `DigestRunModel`; the ignore-rule notice reads and writes the sender lists here.
     @ObservationIgnored var settingsStore: SettingsStore?
     @ObservationIgnored var notesWriter: any NotesWriter = AppleScriptNotesWriter()
+    /// Called after approve or dismiss changed what is pending; auto-file uses it to move newly processed mail.
+    @ObservationIgnored var onSuggestionsSettled: (@MainActor () async -> Void)?
 
     @ObservationIgnored private var store: (any DigestStore)?
     @ObservationIgnored private let clock = SystemClock()
@@ -93,6 +95,15 @@ final class ReviewViewModel {
     /// Q16: Daily shows 25 first; a Backlog has no digest-wide cap.
     var page: SuggestionPage {
         ReviewPresentation.page(actionable, limit: jobKind == .daily ? 25 : nil, showAll: showAllSuggestions)
+    }
+
+    /// Mailbox and Mail row id per email id, from the owning job's items (Q18), for mail actions.
+    func locations(for ids: [String]) -> [String: MailLocation] {
+        var out: [String: MailLocation] = [:]
+        for id in ids {
+            if let email = emails[id] { out[id] = MailLocation(mailbox: email.mailbox, storeRowID: email.storeRowID) }
+        }
+        return out
     }
 
     func category(for suggestion: Suggestion) -> Category {
@@ -166,7 +177,8 @@ final class ReviewViewModel {
     /// Adds job items' sender/subject/mailbox to the lookup; the first item for an email wins.
     private static func merge(_ items: [JobItem], into context: inout [String: EmailContext]) {
         for item in items where context[item.messageID] == nil {
-            context[item.messageID] = EmailContext(sender: item.sender, subject: item.subject, mailbox: item.mailbox)
+            context[item.messageID] = EmailContext(sender: item.sender, subject: item.subject, mailbox: item.mailbox,
+                                                   receivedAt: item.receivedAt, storeRowID: item.storeRowID)
         }
     }
 
@@ -217,6 +229,7 @@ final class ReviewViewModel {
         apply(outcome)
         let failed = outcome.results.filter { $0.status == .failed }.count
         message = failed == 0 ? nil : "\(failed) \(failed == 1 ? "reminder" : "reminders") couldn't be added. They stay selected so you can try again."
+        await onSuggestionsSettled?()
     }
 
     /// "Dismiss unselected".
@@ -239,6 +252,7 @@ final class ReviewViewModel {
             apply(try await ReviewActions.dismiss(suggestions, state: state, emails: emails, store: store, clock: clock))
             message = nil
             await evaluateIgnoreSuggestions(senders: Set(suggestions.compactMap { emails[$0.emailID]?.sender }))
+            await onSuggestionsSettled?()
         } catch {
             message = "Could not dismiss those suggestions."
             await reload()

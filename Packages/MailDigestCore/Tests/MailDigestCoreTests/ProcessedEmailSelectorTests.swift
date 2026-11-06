@@ -91,4 +91,15 @@ private func all(_ ids: String...) -> [String: EmailContext] { Dictionary(unique
         let h = sel.entries(digest: d, emails: all("e1", "e2", "e3")).handled
         #expect(sel.newsletterIDs(h) == ["e1", "e3"])
     }
+
+    @Test func autoFileIDsCoverOnlyEligibleAndUnhandledEmails() {
+        let d = digest([sug("e1", .approved), sug("e2", .pending), sug("e3", .failed), sug("e5", .dismissed)],
+                       info: [info("e1"), info("e2"), info("e3"), info("e4"), info("e5"), info("e6")],
+                       skipped: [skip("b1", "blocked sender"), skip("f1", "failed: x")])
+        let ids = all("e1", "e2", "e3", "e4", "e5", "e6", "b1", "f1")
+        // e5 was moved, e6 kept (or an earlier attempt failed): both come in through `excluding`.
+        let processed = sel.entries(digest: d, emails: ids, excluding: ["e5", "e6"])
+        // Pending e2, failed e3 and failed f1 stay in the inbox; blocked mail is filed too.
+        #expect(sel.autoFileIDs(processed) == ["e1", "e4", "b1"])
+    }
 }

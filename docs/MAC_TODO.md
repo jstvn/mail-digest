@@ -125,8 +125,8 @@ Verified on this Mac from Terminal (a harness that compiles the real adapter sou
 **Deferred (not part of T13):**
 
 - Reminders writer (T14). The panel's approve path is wired to `ReviewActions.approve`; T14 only calls `ReviewViewModel.setReminderWriter(_:)`. Until then Add Selected is disabled and the Reminders banner shows.
-- Settings that are stored but not used yet: run time (scheduler, T15), Reminders list name (T14), retention (cleanup, T15), Trusted Newsletter senders (the validator and extraction do not read them yet). Launch at login, auto-file, power and quiet-hours rules, and past jobs are not in Settings (T15, T18, T19).
-- Pin and Save to Notes on info cards, learned rules (T16). Processed tab and mail actions (T18).
+- Settings that are stored but not used yet: run time (scheduler, T15), Reminders list name (T14), retention (cleanup, T15), Trusted Newsletter senders (the validator and extraction do not read them yet). Launch at login and auto-file (T18) are in Settings; power and quiet-hours rules, and past jobs are not in Settings (T19).
+- Pin and Save to Notes on info cards, learned rules (T16; done). Processed tab and mail actions (T18; code done, see T18 status).
 - Job setup sheet, full progress view (Recent, Per-mailbox, activity log), backlog batches of 50, power and thermal auto-pause, menu bar progress ring and pause badge, past jobs (T19).
 - Q16 Trusted Newsletter senders (8 suggestions instead of 3) are not read by `SuggestionValidator` or the runner yet; the setting is only stored. This gap predates T13.
 - The paused strip cannot show an auto-pause reason: `JobProgress` has no reason field yet. `ReviewPresentation.pausedText` already accepts one.
@@ -196,3 +196,29 @@ Please check on the Mac:
 
 - **Menu bar highlight.** `StatusItemHighlight` highlights the app's `NSStatusBarButton` while the `.window`-style panel is open (SwiftUI does not do this for window-style extras). Seen once in the running app: the highlight capsule appeared on click. Still to check by hand: hover highlight, highlight stays while the panel is open, clears when it closes (click outside, Esc, clicking the icon again, opening a window from the panel), and works with the pending-count label and while a job runs.
 - **Mail Access window.** No longer sized to the full mailbox list: default 480 × 560, minimum 440 × 360, resizable, and the grouped form scrolls. Check with many mailboxes that every section (permissions, mailboxes, Refresh, Check Again) is reachable by scrolling and the window opens at the default size.
+
+## T18 status
+
+**T18 code done (2026-11-06); no mutation (move, trash, undo) has been run against real Mail.** Built: `AppleScriptMailActions` (actor) + `Resources/MailActions.js`, `ProcessedMailModel`, `ProcessedListView` (tab in the review panel, action bar, Undo toast) and the auto-file setting (Settings > General > Mail cleanup, off by default). Core and Persistence tests pass; `xcodebuild` build passes; `MailActions.js` is in the app bundle and compiles with `osacompile`.
+
+Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` + header verification found a real iCloud inbox message; a wrong row id with the right Message-ID was still found (via the `whose` fallback, about 6 s); a Resent-Message-ID message without a row id was reported `not found`, and with its row id was found; an unknown id and an unknown mailbox were reported failed. Mail's `trashMailbox.mailboxes()` returned one Trash per account (`Deleted Messages`, `Deleted Items`) and no local Trash.
+
+**Manual checks (Mac, signed app; use a few throwaway emails first):**
+
+1. **Trash:** tick one or two rows in Processed, Move to Trash (also with ⌘⌫). They land in that account's Trash (the toast says "Moved N emails to Trash."), not another account's. Nothing is deleted permanently, and Trash is never emptied.
+2. **Undo:** click Undo in the toast. The emails return to the mailbox they came from (the app keeps the original mailbox in memory, so Undo works until quit; after relaunch there is no Undo). Check it also works when Mail was slow to sync a move on IMAP (Undo reports "not found" if the message has not appeared in Trash yet; click Undo again).
+3. **Move to Mail Digest Folder:** a "Mail Digest" mailbox is created in the email's own account the first time, and reused after. Check it with two accounts (each email goes to its own account's folder, never across) and that Mail shows the new mailbox in the sidebar. Creating the mailbox with `Mail.make({new: 'mailbox', at: account})` has not been run against real Mail.
+4. **Resent-Message-ID message:** process one (the spike found 8 in the iCloud inbox) and move it; it must be found through its stored row id (Q29), and must never move the wrong message.
+5. **Ambiguous and missing:** an email already moved or deleted in Mail reports "Not found in Mail" inline and nothing else is touched; two copies of one Message-ID in the same mailbox report "ambiguous" and neither moves. Failures show inline in the Processed tab, and the rest of the batch still moves.
+6. **On My Mac:** a local-account email can be moved to a local "Mail Digest" folder. Trash for local mail has no clear target on this Mac (no local Trash was reported), so it fails with "no Trash mailbox for this account" by design.
+7. **Keep:** hides the ticked rows and leaves the mail alone (no toast). Rows return after a relaunch (Keep is not stored).
+8. **Select All Newsletters** ticks only newsletter rows (it unticks the others); Select All / Select None reset the ticks. Actions only touch ticked rows.
+9. **Auto-file on/off** (Settings > General > Mail cleanup): with it off, no email moves by itself. With it on, after a run finishes and after approving or dismissing suggestions, newly processed emails (including blocked-sender ones) move to "Mail Digest" in their own account, never to Trash, with an Undo toast. Undo them and confirm they are not filed again until relaunch. Pending or failed-suggestion emails never move.
+10. **Automation denied / Mail not running:** turn Mail off for Mail Digest in Privacy & Security > Automation, then try Move to Trash. The Processed tab lists the failure with an "Open Automation Settings…" button. Quit Mail and repeat ("Mail isn't running").
+11. **Accessibility:** Tab and VoiceOver reach the segmented Review/Processed control, each row's checkbox ("Select <subject>"), the three buttons and the toast's Undo. ⌘⌫ is active only while the Processed tab is showing.
+
+**Known limits:**
+
+- Undo history, Keep and "already moved" are kept in memory only. After a relaunch, emails moved earlier by this app still appear in the Processed list (they are no longer where the job item says), and moving them reports "not found".
+- If `osascript` hits the 120 s hard timeout mid-batch, moves already made are not reported and cannot be undone from the app; the script stops starting new messages after 100 s to make that unlikely.
+- Mailbox names containing a literal "/" are split on it when addressing a mailbox (same as `FetchMail.js`).

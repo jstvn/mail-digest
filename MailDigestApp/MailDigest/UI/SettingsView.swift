@@ -44,6 +44,13 @@ private struct GeneralSettingsTab: View {
             Section("Startup") {
                 LaunchAtLoginToggle()
             }
+            Section {
+                Toggle("File processed emails automatically", isOn: $store.settings.autoFileProcessed)
+            } header: {
+                Text("Mail cleanup")
+            } footer: {
+                Text("Moves emails you have fully handled into a \"Mail Digest\" mailbox in the same account, so you can review and delete them in Mail. Nothing is moved to Trash or deleted permanently. You can still undo from the Processed tab until you quit.")
+            }
             Section("History") {
                 Picker("Keep history for", selection: $store.settings.retention) {
                     Text("30 days").tag(HistoryRetention.thirtyDays)

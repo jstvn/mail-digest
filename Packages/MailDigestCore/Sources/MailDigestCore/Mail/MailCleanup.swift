@@ -19,6 +19,23 @@ public struct CleanupBatch: Sendable, Equatable, Identifiable {
     }
 }
 
+extension CleanupBatch {
+    /// Toast text, e.g. "Moved 12 emails to Trash. 2 couldn't be moved."
+    public var summary: String {
+        let done = results.filter(\.succeeded).count
+        let failed = results.count - done
+        let noun = done == 1 ? "email" : "emails"
+        let place: String
+        switch action {
+        case .trash: place = "Trash"
+        case .moveToFolder(let name): place = name
+        }
+        var text = "Moved \(done) \(noun) to \(place)."
+        if failed > 0 { text += " \(failed) couldn't be moved." }
+        return text
+    }
+}
+
 /// In-memory undo history; undo lasts until the app quits.
 public actor UndoLedger {
     private var batches: [CleanupBatch] = []
@@ -53,6 +70,9 @@ public actor UndoLedger {
 /// Only moves are possible: `MailActions` has no API to empty Trash or delete
 /// permanently, and this type never needs one.
 public struct MailCleanup: Sendable {
+    /// The mailbox "Move to Mail Digest folder" and auto-file use, in the message's own account.
+    public static let digestFolderName = "Mail Digest"
+
     private let actions: MailActions
     private let batchSize: Int
     private let makeID: @Sendable () -> UUID
@@ -78,10 +98,18 @@ public struct MailCleanup: Sendable {
     }
 
     /// Puts the succeeded emails back in their original mailbox; failed ones were never moved.
+    /// Throws `MailActionError.restoreFailed` after trying every chunk if some emails could not be restored.
     public func undo(_ batch: CleanupBatch) async throws {
+        var failures: [RestoreFailure] = []
         for chunk in chunks(batch.results.filter(\.succeeded)) {
-            try await actions.restore(chunk)
+            do {
+                try await actions.restore(chunk)
+            } catch MailActionError.restoreFailed(let failed) {
+                // Keep going: one missing email must not strand the rest of the batch.
+                failures += failed
+            }
         }
+        if !failures.isEmpty { throw MailActionError.restoreFailed(failures) }
     }
 
     private func chunks<T>(_ items: [T]) -> [[T]] {

@@ -88,6 +88,12 @@ public struct ProcessedEmailSelector: Sendable {
             .sorted { $0.account.localizedCaseInsensitiveCompare($1.account) == .orderedAscending }
     }
 
+    /// Ids auto-file moves: every eligible email, handled and blocked, in list order. Pass the moved,
+    /// kept and already-tried ids as `excluding` to `entries` first, so nothing is moved twice.
+    public func autoFileIDs(_ processed: ProcessedEmails) -> [String] {
+        (processed.handled + processed.blocked).map(\.emailID)
+    }
+
     /// Ids for the "Select all newsletters" shortcut.
     public func newsletterIDs(_ entries: [ProcessedEntry]) -> Set<String> {
         Set(entries.filter { $0.category == .newsletters }.map(\.id))

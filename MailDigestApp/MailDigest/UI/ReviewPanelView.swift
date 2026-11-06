@@ -2,6 +2,11 @@ import AppKit
 import MailDigestCore
 import SwiftUI
 
+/// Which tab of the review window is showing.
+private enum PanelTab: Hashable {
+    case review, processed
+}
+
 /// The review window: headline, suggested reminders, info summaries and skipped mail.
 /// Nothing reaches Reminders until the user clicks "Add selected".
 struct ReviewPanelView: View {
@@ -16,6 +21,9 @@ struct ReviewPanelView: View {
     @State private var collapsedGroups: Set<Category> = [.newsletters]
     @State private var skippedExpanded = false
     @State private var pinnedExpanded = true
+    @State private var tab: PanelTab = .review
+
+    private var processed: ProcessedMailModel { run.processed }
 
     /// What the body shows, derived so previews and tests can reason about each state.
     private var panelState: ReviewPanelState {
@@ -31,6 +39,7 @@ struct ReviewPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            tabPicker
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -54,10 +63,19 @@ struct ReviewPanelView: View {
                                                onNotNow: review.snoozeIgnoreSuggestion,
                                                onDecline: review.declineIgnoreSuggestion)
                     }
-                    content
+                    if tab == .processed && panelState == .digest {
+                        ProcessedListView(model: processed)
+                    } else {
+                        content
+                    }
                 }
                 .padding(16)
             }
+            if tab == .processed && panelState == .digest {
+                Divider()
+                ProcessedActionBar(model: processed)
+            }
+            UndoToast(model: processed)
         }
         .frame(minWidth: 620, idealWidth: 720, minHeight: 480, idealHeight: 640)
         .navigationTitle("Mail Digest")
@@ -92,6 +110,21 @@ struct ReviewPanelView: View {
             .accessibilityLabel("Settings")
         }
         .padding(16)
+    }
+
+    /// Review / Processed switch. Hidden until there is a digest to look at.
+    @ViewBuilder private var tabPicker: some View {
+        if panelState == .digest {
+            Picker("View", selection: $tab) {
+                Text("Review").tag(PanelTab.review)
+                Text("Processed (\(processed.allEntries.count))").tag(PanelTab.processed)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, 10)
+        }
     }
 
     private var headerTitle: String {

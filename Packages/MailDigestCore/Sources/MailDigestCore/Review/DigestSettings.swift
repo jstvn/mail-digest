@@ -22,6 +22,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public var declinedIgnoreSuggestions: [String]
     /// Daily mailboxes. Empty means all inboxes.
     public var dailyMailboxes: [MailboxRef]
+    /// Move processed emails into a "Mail Digest" mailbox in the same account automatically. Off by default.
+    public var autoFileProcessed: Bool
 
     public static let defaultOllamaURL = "http://localhost:11434"
     public static let defaultModel = "qwen3:4b"
@@ -32,7 +34,9 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 remindersListName: String = DigestSettings.defaultListName,
                 retention: HistoryRetention = .default, vipSenders: [String] = [], blockedSenders: [String] = [],
                 ignoredSenders: [String] = [], trustedNewsletterSenders: [String] = [],
-                declinedIgnoreSuggestions: [String] = [], dailyMailboxes: [MailboxRef] = []) {
+                declinedIgnoreSuggestions: [String] = [], dailyMailboxes: [MailboxRef] = [],
+                autoFileProcessed: Bool = false) {
+        self.autoFileProcessed = autoFileProcessed
         self.runHour = runHour
         self.runMinute = runMinute
         self.lookbackHours = lookbackHours
@@ -52,7 +56,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case runHour, runMinute, lookbackHours, maxEmailsPerRun, ollamaURL, ollamaModel, remindersListName
         case retention, vipSenders, blockedSenders, ignoredSenders, trustedNewsletterSenders, declinedIgnoreSuggestions
-        case dailyMailboxes
+        case dailyMailboxes, autoFileProcessed
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
@@ -72,7 +76,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   ignoredSenders: try c.decodeIfPresent([String].self, forKey: .ignoredSenders) ?? [],
                   trustedNewsletterSenders: try c.decodeIfPresent([String].self, forKey: .trustedNewsletterSenders) ?? [],
                   declinedIgnoreSuggestions: try c.decodeIfPresent([String].self, forKey: .declinedIgnoreSuggestions) ?? [],
-                  dailyMailboxes: try c.decodeIfPresent([MailboxRef].self, forKey: .dailyMailboxes) ?? [])
+                  dailyMailboxes: try c.decodeIfPresent([MailboxRef].self, forKey: .dailyMailboxes) ?? [],
+                  autoFileProcessed: try c.decodeIfPresent(Bool.self, forKey: .autoFileProcessed) ?? d.autoFileProcessed)
     }
 
     /// The Ollama endpoint, or the default when the text isn't a usable http(s) URL.

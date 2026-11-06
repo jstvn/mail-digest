@@ -56,6 +56,13 @@ final class ModelCodableTests: XCTestCase {
         try roundTrip(MailboxInfo(ref: box, messageCount: 10, unreadCount: 2, kind: .inbox))
         try roundTrip(MailboxKind.custom)
         try roundTrip(MailActionResult(messageID: "m1", account: "iCloud", originalMailbox: "Inbox", succeeded: false, error: "nf"))
+        try roundTrip(MailActionResult(messageID: "m1", account: "iCloud", originalMailbox: "Inbox", succeeded: true,
+                                       error: nil, destinationMailbox: "Trash"))
+        // Data saved before `destinationMailbox` existed still decodes.
+        let old = #"{"messageID":"m","account":"a","originalMailbox":"Inbox","succeeded":true}"#
+        let decoded = try JSONDecoder().decode(MailActionResult.self, from: Data(old.utf8))
+        XCTAssertNil(decoded.destinationMailbox)
+        XCTAssertTrue(decoded.succeeded)
     }
 
     func testExtractionModels() throws {

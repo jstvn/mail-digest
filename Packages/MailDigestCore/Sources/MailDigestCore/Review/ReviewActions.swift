@@ -12,11 +12,17 @@ public struct EmailContext: Sendable, Equatable {
     public var sender: String
     public var subject: String
     public var mailbox: MailboxRef
+    /// When the email arrived (Processed tab); nil when unknown.
+    public var receivedAt: Date?
+    /// Mail's own id for the message, a lookup hint for mail actions (never identity).
+    public var storeRowID: Int64?
 
-    public init(sender: String, subject: String, mailbox: MailboxRef) {
+    public init(sender: String, subject: String, mailbox: MailboxRef, receivedAt: Date? = nil, storeRowID: Int64? = nil) {
         self.sender = sender
         self.subject = subject
         self.mailbox = mailbox
+        self.receivedAt = receivedAt
+        self.storeRowID = storeRowID
     }
 }
 
