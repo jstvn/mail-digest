@@ -766,3 +766,262 @@ private actor Counter {
         #expect(job.state == .paused && job.pauseReason == .heat && job.totals.done == 2)
     }
 }
+
+// MARK: - Refresh before resuming a Daily job, and resource rules on Start/Resume (Q43)
+
+private let archive = MailboxRef(account: "iCloud", name: "Archive")
+private let elsewhere = MailboxRef(account: "iCloud", name: "Receipts")
+
+/// Recent mail in iCloud Inbox, inside the Daily window (newest first: recent-0 is the newest).
+private func recentMessages(_ count: Int) -> [EmailMessage] {
+    (0..<count).map { n in
+        EmailMessage(id: "recent-\(n)@fixture", account: "iCloud", mailbox: "Inbox",
+                     sender: "Sam <sam@example.com>", subject: "Recent \(n)",
+                     receivedAt: today.addingTimeInterval(-3600 * Double(n + 1)),
+                     body: "Hello. Please reply by Friday.", headers: [:])
+    }
+}
+
+@Suite struct JobRunnerResumeRefreshTests {
+    /// A Daily job over Inbox and Archive, paused by the user after its first email.
+    private func pausedDaily(_ count: Int = 5) async throws -> (Harness, Job) {
+        let h = Harness(source: FixtureMailSource(messages: recentMessages(count)), llm: StubLLMClient(),
+                        settings: settings(mailboxes: [icloud, archive]))
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "recent-0@fixture" { await runner.pause() }
+        }
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract(nil)
+        let job = try await h.job()
+        #expect(job.kind == .daily && job.state == .paused && job.totals.done == 1)
+        return (h, job)
+    }
+
+    private func item(_ h: Harness, _ id: String) async throws -> JobItem {
+        try #require(await h.store.allItems().first { $0.messageID == id })
+    }
+
+    @Test func resumeSkipsDeletedAndMovedOutMailKeepsTheRestAndFollowsMoves() async throws {
+        let (h, job) = try await pausedDaily()
+        let doneBefore = try await item(h, "recent-0@fixture")
+        await h.source.removeMessage(id: "recent-1@fixture")                // deleted
+        await h.source.moveMessage(id: "recent-2@fixture", to: elsewhere)   // moved outside the job
+        await h.source.moveMessage(id: "recent-3@fixture", to: archive)     // moved between selected mailboxes
+        // recent-4 is unchanged.
+
+        try await h.runner.resume(jobID: job.id)
+        await h.runner.waitUntilIdle()
+
+        for gone in ["recent-1@fixture", "recent-2@fixture"] {
+            let i = try await item(h, gone)
+            #expect(i.state == .skipped && i.outcome == JobRunner.goneFromMailboxOutcome)
+            #expect(i.attempts == 0 && i.lastError == nil)
+            #expect(!(await h.store.processedIDs().contains(gone)))
+        }
+        let calls = await h.llm.extractCalls.map(\.id)
+        #expect(calls == ["recent-0@fixture", "recent-3@fixture", "recent-4@fixture"])
+        let moved = try await item(h, "recent-3@fixture")
+        #expect(moved.state == .done && moved.mailbox.name == "Archive")
+        #expect(try await item(h, "recent-4@fixture").mailbox == icloud)
+        // The finished item and its result are untouched.
+        #expect(try await item(h, "recent-0@fixture") == doneBefore)
+        let finished = try await h.job(job.id)
+        #expect(finished.state == .finished)
+        #expect(finished.totals == JobTotals(queued: 0, done: 3, failed: 0, skipped: 2))
+        // Gone mail leaves no result in the review digest.
+        let digest = try await h.digest()
+        #expect(Set(digest.info.map(\.emailID)) == ["recent-0@fixture", "recent-3@fixture", "recent-4@fixture"])
+        #expect(digest.skipped.isEmpty)
+    }
+
+    @Test func resumeNeverExtendsTheScopeOrAddsNewMail() async throws {
+        let (h, job) = try await pausedDaily(3)
+        let itemsBefore = await h.store.allItems().count
+        await h.source.moveMessage(id: "recent-2@fixture", to: archive)
+        // Arrived after the job was queued, inside its time range: still not added to this job.
+        var late = recentMessages(1)[0]
+        late.id = "late@fixture"
+        late.receivedAt = today.addingTimeInterval(-60)
+        await h.source.addMessage(late)
+        try await h.runner.resume(jobID: job.id)
+        await h.runner.waitUntilIdle()
+        #expect(await h.store.allItems().count == itemsBefore)
+        let resumed = try await h.job(job.id)
+        #expect(resumed.scopeFrom == job.scopeFrom && resumed.scopeTo == job.scopeTo)
+        #expect(!(await h.llm.extractCalls.map(\.id).contains("late@fixture")))
+    }
+
+    @Test func listingFailureAbortsResumeAndKeepsTheQueue() async throws {
+        let (h, job) = try await pausedDaily()
+        let before = await h.store.allItems()
+        await h.source.removeMessage(id: "recent-1@fixture")
+        await h.source.setListingFails(true, for: archive)
+
+        await #expect(throws: FixtureMailError.listingFailed) { try await h.runner.resume(jobID: job.id) }
+        #expect(await h.store.allItems() == before)
+        #expect(try await h.job(job.id).state == .paused)
+        #expect(await h.llm.extractCalls.count == 1)
+
+        // Once Mail can be read again, the resume goes through.
+        await h.source.setListingFails(false, for: archive)
+        try await h.runner.resume(jobID: job.id)
+        await h.runner.waitUntilIdle()
+        #expect(try await item(h, "recent-1@fixture").outcome == JobRunner.goneFromMailboxOutcome)
+        #expect(try await h.job(job.id).state == .finished)
+    }
+
+    @Test func backlogResumeDoesNotRelist() async throws {
+        let h = Harness(source: FixtureMailSource(messages: oldMessages(4)), llm: StubLLMClient())
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-0@fixture" { await runner.pause() }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract(nil)
+        let lists = await h.source.listCalls
+        try await h.runner.resume()
+        await h.runner.waitUntilIdle()
+        #expect(await h.source.listCalls == lists)
+        #expect(try await h.job().state == .finished)
+    }
+}
+
+@Suite struct JobRunnerResourceStartTests {
+    private func harness(_ count: Int = 4) -> Harness {
+        Harness(source: FixtureMailSource(messages: oldMessages(count)), llm: StubLLMClient())
+    }
+
+    @Test func backlogStartedWhileBlockedIsStoredPausedBeforeAnyEmail() async throws {
+        let h = harness()
+        await h.collector.attach(h.runner.progress)
+        await h.runner.setResourceBlockers([.backlog: .battery])
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+
+        #expect(await h.llm.extractCalls.isEmpty)
+        let job = try await h.job()
+        #expect(job.state == .paused && job.autoPaused && job.pauseReason == .battery)
+        #expect(job.totals == JobTotals(queued: 4, done: 0, failed: 0, skipped: 0))
+        #expect(await eventually { await h.collector.events.last?.state == .paused })
+        #expect(await h.collector.events.last?.nextUp?.messageID == "old-0@fixture")
+
+        // Still blocked: nothing runs. Once the rule clears it auto-resumes in this session (Q44).
+        #expect(try await h.runner.autoResume(blocked: [.backlog: .battery]) == nil)
+        #expect(try await h.runner.autoResume(blocked: [:]) == job.id)
+        await h.runner.waitUntilIdle()
+        #expect(try await h.job().state == .finished)
+        #expect(await h.llm.extractCalls.count == 4)
+    }
+
+    @Test func manualResumeWhileBlockedStaysPausedAndSaysWhy() async throws {
+        let h = harness()
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-0@fixture" { await runner.pause() }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract(nil)
+        let job = try await h.job()
+
+        await h.runner.setResourceBlockers([.backlog: .quietHours])
+        await #expect(throws: JobRunnerError.resourceBlocked(.quietHours)) { try await h.runner.resume(jobID: job.id) }
+        let parked = try await h.job()
+        #expect(parked.state == .paused && parked.pauseReason == .quietHours && parked.autoPaused)
+        #expect(await h.llm.extractCalls.count == 1)
+
+        // Mandatory rules apply as well.
+        await h.runner.setResourceBlockers([.backlog: .lowPowerMode])
+        await #expect(throws: JobRunnerError.resourceBlocked(.lowPowerMode)) { try await h.runner.resume() }
+
+        #expect(try await h.runner.autoResume(blocked: [:]) == job.id)
+        await h.runner.waitUntilIdle()
+        #expect(try await h.job().state == .finished)
+    }
+
+    @Test func blockedResumeOfAStoppedJobKeepsItStopped() async throws {
+        let h = harness()
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-0@fixture" { await runner.stop() }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        let job = try await h.job()
+        await h.runner.setResourceBlockers([.backlog: .battery])
+        await #expect(throws: JobRunnerError.resourceBlocked(.battery)) { try await h.runner.resume(jobID: job.id) }
+        #expect(try await h.job().state == .stopped)
+        // Q48: never resumed automatically.
+        #expect(try await h.runner.autoResume(blocked: [:]) == nil)
+    }
+
+    @Test func resumeCannotWithdrawAPendingPauseWhileBlocked() async throws {
+        let h = harness()
+        let runner = h.runner
+        let threw = Box<Bool>()
+        await h.llm.setOnExtract { email in
+            guard email.id == "old-0@fixture" else { return }
+            await runner.pause()
+            await runner.setResourceBlockers([.backlog: .heat])
+            do { try await runner.resume() } catch JobRunnerError.resourceBlocked(.heat) { threw.value = true }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        #expect(threw.value == true)
+        let job = try await h.job()
+        #expect(job.state == .paused && job.pauseReason == .heat && job.totals.done == 1)
+    }
+
+    @Test func dailyFollowsItsOwnRules() async throws {
+        let h = Harness(source: FixtureMailSource(messages: recentMessages(2)), llm: StubLLMClient(),
+                        settings: settings(mailboxes: [icloud]))
+        // Battery and the run window only apply to Backlog jobs.
+        await h.runner.setResourceBlockers([.backlog: .battery])
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        #expect(try await h.job().state == .finished)
+
+        // Low Power Mode applies to Daily as well (the policy blocks the .daily kind).
+        let lpm = Harness(source: FixtureMailSource(messages: recentMessages(2)), llm: StubLLMClient(),
+                          settings: settings(mailboxes: [icloud]))
+        await lpm.runner.setResourceBlockers([.daily: .lowPowerMode, .backlog: .lowPowerMode])
+        try await lpm.runner.startDaily()
+        await lpm.runner.waitUntilIdle()
+        let parked = try await lpm.job()
+        #expect(parked.kind == .daily && parked.state == .paused && parked.pauseReason == .lowPowerMode)
+        #expect(await lpm.llm.extractCalls.isEmpty)
+    }
+
+    @Test func backlogHandOffAfterDailyRespectsANewBlocker() async throws {
+        let source = FixtureMailSource(messages: recentMessages(2) + oldMessages(6))
+        let h = Harness(source: source, llm: StubLLMClient(), settings: settings(mailboxes: [icloud]))
+        let runner = h.runner
+        let dailyTask = Box<Task<Void, Error>>()
+        let collector = h.collector
+        await h.collector.attach(h.runner.progress)
+        await h.llm.setOnExtract { email in
+            if email.id == "old-1@fixture" {
+                dailyTask.value = Task { try await runner.startDaily() }
+                _ = await eventually { await collector.events.contains { $0.kind == .backlog && $0.state == .pausing } }
+            } else if email.id.hasPrefix("recent-") {
+                // The Mac goes on battery while the Daily job runs.
+                await runner.setResourceBlockers([.backlog: .battery])
+            }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud], to: today.addingTimeInterval(-5 * 86_400)))
+        _ = await eventually { dailyTask.value != nil }
+        try await #require(dailyTask.value).value
+        await h.runner.waitUntilIdle()
+
+        let jobs = try await h.store.jobs()
+        #expect(try #require(jobs.first { $0.kind == .daily }).state == .finished)
+        let backlog = try #require(jobs.first { $0.kind == .backlog })
+        #expect(backlog.state == .paused && backlog.pauseReason == .battery && backlog.totals.done == 2)
+        #expect(try await h.runner.autoResume(blocked: [:]) == backlog.id)
+        await h.runner.waitUntilIdle()
+        #expect(try await h.job(backlog.id).state == .finished)
+    }
+}

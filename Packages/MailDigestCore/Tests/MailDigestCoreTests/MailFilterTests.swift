@@ -25,10 +25,47 @@ private func mail(_ sender: String, _ headers: [String: String] = [:]) -> EmailM
         #expect(f.skipReason(mail("other@x.com")) == nil)
     }
 
-    @Test func vipBeatsBlockAndBulk() {
+    // Q9: Blocked → VIP → Ignored → Trusted Newsletter → ordinary bulk → normal.
+    @Test func blockBeatsVIP() {
         let f = MailFilter(blockedSenders: ["boss@x.com"], vipSenders: ["boss@x.com"])
+        #expect(f.tier(mail("Boss <boss@x.com>")) == .skip)
+        #expect(f.skipReason(mail("Boss <boss@x.com>")) == "blocked sender")
+    }
+
+    @Test func vipBeatsIgnoreAndBulk() {
+        let f = MailFilter(ignoredSenders: ["boss@x.com"], vipSenders: ["boss@x.com"])
         #expect(f.tier(mail("Boss <boss@x.com>")) == .full)
         #expect(f.tier(mail("Boss <boss@x.com>", ["List-Unsubscribe": "<mailto:u@x.com>"])) == .full)
+        #expect(f.skipReason(mail("boss@x.com")) == nil)
+        // VIP keeps the ordinary limit even if also on the trusted list.
+        let both = MailFilter(vipSenders: ["boss@x.com"], trustedNewsletterSenders: ["boss@x.com"])
+        #expect(!both.isTrustedNewsletter(mail("boss@x.com")))
+        #expect(both.suggestionLimit(for: mail("boss@x.com")) == 3)
+    }
+
+    @Test func trustedNewsletterOverridesBulkOnly() {
+        let bulk = ["List-Unsubscribe": "<mailto:u@x.com>", "Precedence": "bulk", "Auto-Submitted": "auto-generated"]
+        let f = MailFilter(trustedNewsletterSenders: ["News@Uni.edu"])
+        #expect(f.tier(mail("Uni <news@uni.edu>", bulk)) == .full)
+        #expect(f.isTrustedNewsletter(mail("Uni <news@uni.edu>", bulk)))
+        #expect(f.suggestionLimit(for: mail("news@uni.edu")) == 8)
+        // An ordinary newsletter with the same headers stays summary-only.
+        #expect(f.tier(mail("other@uni.edu", bulk)) == .infoOnly)
+        #expect(!f.isTrustedNewsletter(mail("other@uni.edu", bulk)))
+        #expect(f.suggestionLimit(for: mail("other@uni.edu")) == 3)
+        // Bulk-like local part is overridden too.
+        let local = MailFilter(trustedNewsletterSenders: ["newsletter@shop.com"])
+        #expect(local.tier(mail("newsletter@shop.com")) == .full)
+    }
+
+    @Test func trustedNewsletterNeverOverridesBlockOrIgnore() {
+        let blocked = MailFilter(blockedSenders: ["n@x.com"], trustedNewsletterSenders: ["n@x.com"])
+        #expect(blocked.tier(mail("n@x.com")) == .skip)
+        #expect(!blocked.isTrustedNewsletter(mail("n@x.com")))
+        let ignored = MailFilter(ignoredSenders: ["n@x.com"], trustedNewsletterSenders: ["n@x.com"])
+        #expect(ignored.tier(mail("n@x.com")) == .skip)
+        #expect(ignored.skipReason(mail("n@x.com")) == "ignored sender")
+        #expect(!ignored.isTrustedNewsletter(mail("n@x.com")))
     }
 
     @Test func listUnsubscribeIsInfoOnly() {
@@ -68,7 +105,9 @@ private func mail(_ sender: String, _ headers: [String: String] = [:]) -> EmailM
     }
 
     @Test func estimatedTierUsesSenderOnly() {
-        let f = MailFilter(blockedSenders: ["b@x.com"], ignoredSenders: ["i@x.com"], vipSenders: ["v@x.com"])
+        let f = MailFilter(blockedSenders: ["b@x.com", "bv@x.com"], ignoredSenders: ["i@x.com", "vi@x.com"],
+                           vipSenders: ["v@x.com", "bv@x.com", "vi@x.com"],
+                           trustedNewsletterSenders: ["newsletter@x.com", "i@x.com"])
         func h(_ s: String) -> MessageHeader {
             MessageHeader(id: "1", account: "a", mailbox: "Inbox", sender: s, subject: "s", receivedAt: Date())
         }
@@ -77,6 +116,13 @@ private func mail(_ sender: String, _ headers: [String: String] = [:]) -> EmailM
         #expect(f.estimatedTier(for: h("v@x.com")) == .full)
         #expect(f.estimatedTier(for: h("no-reply@x.com")) == .infoOnly)
         #expect(f.estimatedTier(for: h("sam@x.com")) == .full)
+        // Same precedence as tier(_:), so the preview matches processing.
+        #expect(f.estimatedTier(for: h("bv@x.com")) == .skip)
+        #expect(f.estimatedTier(for: h("vi@x.com")) == .full)
+        #expect(f.estimatedTier(for: h("newsletter@x.com")) == .full)
+        for s in ["b@x.com", "bv@x.com", "vi@x.com", "i@x.com", "newsletter@x.com", "sam@x.com"] {
+            #expect(f.estimatedTier(for: h(s)) == f.tier(mail(s)), "\(s)")
+        }
     }
 
     @Test func fixtureTiers() throws {

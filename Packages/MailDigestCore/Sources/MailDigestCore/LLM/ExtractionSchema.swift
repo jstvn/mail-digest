@@ -1,6 +1,7 @@
 import Foundation
 
 /// The JSON schema sent to Ollama as `format` (see SPEC, "Extraction schema").
+/// `tasks` allows the Trusted Newsletter maximum; validation applies the stricter per-sender limit.
 public enum ExtractionSchema {
     private static func strings(_ values: [String]) -> JSONValue { .array(values.map { .string($0) }) }
 
@@ -17,7 +18,7 @@ public enum ExtractionSchema {
                 "items": .object(["type": .string("string")]),
             ]),
             "tasks": .object([
-                "type": .string("array"), "maxItems": .number(3),
+                "type": .string("array"), "maxItems": .number(Double(MailFilter.trustedNewsletterSuggestionLimit)),
                 "items": .object([
                     "type": .string("object"),
                     "properties": .object([

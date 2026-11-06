@@ -10,6 +10,13 @@ public enum StubLLMError: Error, Sendable, Equatable {
 public struct StubExtractCall: Sendable, Equatable {
     public var id: String
     public var tier: MailTier
+    public var trustedNewsletter: Bool
+
+    public init(id: String, tier: MailTier, trustedNewsletter: Bool = false) {
+        self.id = id
+        self.tier = tier
+        self.trustedNewsletter = trustedNewsletter
+    }
 }
 
 /// Scriptable `LLMClient` for pipeline tests.
@@ -53,8 +60,9 @@ public actor StubLLMClient: LLMClient {
         if !healthy { throw StubLLMError.unhealthy }
     }
 
-    public func extract(_ email: EmailMessage, tier: MailTier, today: Date, timeZone: TimeZone) async throws -> ExtractionResult {
-        extractCalls.append(StubExtractCall(id: email.id, tier: tier))
+    public func extract(_ email: EmailMessage, tier: MailTier, trustedNewsletter: Bool,
+                        today: Date, timeZone: TimeZone) async throws -> ExtractionResult {
+        extractCalls.append(StubExtractCall(id: email.id, tier: tier, trustedNewsletter: trustedNewsletter))
         if let hook = onExtract { try await hook(email) }
         try Task.checkCancellation()
         if let remaining = failures[email.id], remaining > 0 {

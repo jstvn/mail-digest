@@ -51,6 +51,9 @@ public enum JobRunnerError: Error, Sendable, Equatable {
     case jobNotFound
     /// The model provider failed its health check (Q25); the message says how to fix it.
     case providerUnavailable(String)
+    /// A resource rule blocks this kind of job right now (Q43). The job was left (or created) paused with
+    /// this reason and resumes by itself once the rule clears in this session (Q44).
+    case resourceBlocked(PauseReason)
 }
 
 /// Runs persisted jobs one email at a time with a checkpoint after each email.
@@ -82,6 +85,8 @@ public actor JobRunner {
     private var autoPauseReason: PauseReason?
     /// Jobs this runner auto-paused for a resource reason in this session; only these are auto-resumed.
     private var autoPausedThisSession: Set<UUID> = []
+    /// The resource rules that apply now, by job kind; Start and Resume check them first (Q43).
+    private var resourceBlockers: [JobKind: PauseReason] = [:]
     private var cancelRequested = false
     private var itemActive = false
     private var inFlight: Task<EmailOutcome, Error>?
@@ -289,6 +294,7 @@ public actor JobRunner {
     /// in an earlier session is never resumed here. Returns the resumed job id.
     @discardableResult
     public func autoResume(blocked: [JobKind: PauseReason]) async throws -> UUID? {
+        resourceBlockers = blocked
         guard !busy else { return nil }
         let candidate = try await store.jobs().first {
             autoPausedThisSession.contains($0.id) && $0.state == .paused && $0.pauseReason != nil
@@ -302,11 +308,18 @@ public actor JobRunner {
     /// Applies the current resource rules: pauses the active job if its kind is blocked, otherwise
     /// auto-resumes a job paused for a reason that has cleared.
     public func applyResourceRules(_ blocked: [JobKind: PauseReason]) async throws {
+        resourceBlockers = blocked
         if let run, loopTask != nil {
             if let reason = blocked[run.job.kind] { autoPause(reason) }
             return
         }
         try await autoResume(blocked: blocked)
+    }
+
+    /// Records the resource rules that apply now without pausing or resuming anything. Call it before
+    /// `start`, `startDaily`, `resume` or `retryFailed` so they see the current rules (Q43).
+    public func setResourceBlockers(_ blocked: [JobKind: PauseReason]) {
+        resourceBlockers = blocked
     }
 
     /// Cancels the in-flight email (it returns to `queued`) and ends the run. The job is persisted as
@@ -325,6 +338,11 @@ public actor JobRunner {
             if let jobID, jobID != run.job.id { throw JobRunnerError.alreadyRunning }
             if run.committed {
                 await waitUntilIdle()
+            } else if pauseRequested && !stopRequested, let reason = resourceBlockers[run.job.kind] {
+                // Q43: Resume never overrides an active resource rule; let the pause go ahead as an auto-pause.
+                autoPauseRequested = true
+                autoPauseReason = reason
+                throw JobRunnerError.resourceBlocked(reason)
             } else if pauseRequested && !stopRequested {
                 // The loop hasn't paused yet, so just withdraw the request.
                 pauseRequested = false
@@ -351,8 +369,16 @@ public actor JobRunner {
                 job = all.first { $0.state == .paused }
             }
             guard var job else { busy = false; return }
+            // Q43: an active resource rule keeps the job paused; it resumes once the rule clears (Q44). A stopped
+            // or failed job keeps its state, so it is never resumed without the user (Q48).
+            if let reason = resourceBlockers[job.kind] {
+                if job.state == .paused { try await parkBlocked(&job, reason: reason) }
+                throw JobRunnerError.resourceBlocked(reason)
+            }
             // Re-check the provider before resuming (Q25), so a still-down Ollama fails fast.
             try await preflight()
+            // Daily mail may have been deleted or filed since the pause; never process what is gone.
+            if job.kind == .daily { try await refreshQueue(of: job) }
             job.state = .running
             job.clearPause()
             job.lastError = nil
@@ -361,6 +387,7 @@ public actor JobRunner {
             resetFlags()
             resumeAfter = nil
             run = try await loadRun(job)
+            if let run { try await store.updateJob(run.job) }
             launch(kind: job.kind)
         } catch {
             busy = false
@@ -422,11 +449,25 @@ public actor JobRunner {
                 index = end
             }
 
-            job.state = .running
             job.totals.queued = headers.count
-            try await store.updateJob(job)
             let digest = Digest(id: job.id, createdAt: now, headline: "", emailCount: 0,
                                 suggestions: [], info: [], skipped: [])
+            // Q43: a job created while a resource rule applies is stored paused before any email runs.
+            if let reason = resourceBlockers[plan.kind] {
+                try await parkBlocked(&job, reason: reason)
+                try await parkPreemptedBacklog()
+                let parked = try await loadRun(job, newDigest: digest)
+                if let next = try await store.nextQueued(job: job.id, limit: 1).first {
+                    parked.nextUp = summary(next, outcome: nil)
+                }
+                run = parked
+                emit(force: true)
+                run = nil
+                busy = false
+                return
+            }
+            job.state = .running
+            try await store.updateJob(job)
             run = try await loadRun(job, newDigest: digest)
             launch(kind: plan.kind)
         } catch {
@@ -489,6 +530,11 @@ public actor JobRunner {
             resumeAfter = nil
             do {
                 guard var job = try await store.jobs().first(where: { $0.id == next }), job.state == .paused else { break }
+                // The hand-off is a resume too: a rule that applies now keeps the Backlog job paused (Q43).
+                if let reason = resourceBlockers[job.kind] {
+                    try await parkBlocked(&job, reason: reason)
+                    break
+                }
                 job.state = .running
                 job.clearPause()
                 try await store.updateJob(job)
@@ -500,6 +546,67 @@ public actor JobRunner {
         resumeAfter = nil
         busy = false
         loopTask = nil
+    }
+
+    // MARK: Resource rules (Q43)
+
+    /// Stores the job as auto-paused for `reason` and remembers it so it auto-resumes in this session once
+    /// the rule clears (Q44).
+    private func parkBlocked(_ job: inout Job, reason: PauseReason) async throws {
+        job.state = .paused
+        job.autoPaused = true
+        job.pauseReason = reason
+        autoPausedThisSession.insert(job.id)
+        try await store.updateJob(job)
+    }
+
+    /// A Daily job that could not start leaves the Backlog job it preempted waiting for the Daily job, which
+    /// would never hand back. Re-park it under its own resource rule, if any, so it can still auto-resume.
+    private func parkPreemptedBacklog() async throws {
+        guard let id = resumeAfter else { return }
+        resumeAfter = nil
+        guard var job = try await store.jobs().first(where: { $0.id == id }), job.state == .paused else { return }
+        if let reason = resourceBlockers[job.kind] { try await parkBlocked(&job, reason: reason) }
+    }
+
+    // MARK: Refresh before resuming a Daily job
+
+    /// Outcome text for a queued Daily email that is no longer in the job's mailboxes and scope.
+    static let goneFromMailboxOutcome = "skipped: no longer in mailbox"
+
+    /// Re-lists the job's mailboxes over its original `[scopeFrom, scopeTo)` range and reconciles the queue
+    /// by canonical Message-ID. A queued email still listed stays queued (pointing at the mailbox it is in
+    /// now); one that is gone is skipped without a model call, a failure or an attempt. Finished items,
+    /// their results and the scope are untouched, and new mail is not added. Any listing error aborts
+    /// before anything changes: a failed listing never proves an email is missing.
+    private func refreshQueue(of job: Job) async throws {
+        let items = try await store.items(job: job.id).filter { $0.state == .queued || $0.state == .processing }
+        guard !items.isEmpty else { return }
+
+        func key(_ id: String) -> String { MessageID.canonical(id) ?? id }
+        func sameMailbox(_ a: MailboxRef, _ b: MailboxRef) -> Bool { a.account == b.account && a.name == b.name }
+
+        // List everything first, so a failure part-way leaves the queue as it was.
+        var listed: [String: [MessageHeader]] = [:]
+        for mailbox in job.mailboxes {
+            for header in try await source.listHeaders(in: mailbox, from: job.scopeFrom, to: job.scopeTo) {
+                listed[key(header.id), default: []].append(header)
+            }
+        }
+
+        let now = clock.now()
+        for item in items {
+            guard let found = listed[key(item.messageID)], let first = found.first else {
+                try await store.recordItemOutcome(item.id, outcome: Self.goneFromMailboxOutcome, seconds: 0,
+                                                  finishedAt: now)
+                try await store.setItemState(item.id, .skipped, error: nil)
+                continue
+            }
+            // Still where it was queued: keep the stored mailbox and locator.
+            if found.contains(where: { sameMailbox($0.mailboxRef, item.mailbox) }) { continue }
+            try await store.updateItemLocation(item.id, mailbox: first.mailboxRef,
+                                               storeRowID: first.sourceReference.storeRowID)
+        }
     }
 
     // MARK: Processing loop

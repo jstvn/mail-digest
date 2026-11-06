@@ -41,10 +41,20 @@ public protocol DigestStore: Sendable {
     /// Every pinned info item across retained digests, newest digest first, with its owning digest.
     func pinnedInfo() async throws -> [PinnedInfo]
 
+    // MARK: Mail dispositions (Q39, Q42)
+
+    /// Upserts disposition records, keyed by (digest, email, kind). Throws
+    /// `DigestStoreError.digestNotFound` if a record's digest was never saved.
+    func recordDispositions(_ dispositions: [MailDisposition]) async throws
+    /// Removes one kind of disposition for the given emails of a digest (for example `moved` after Undo).
+    func removeDispositions(_ kind: MailDispositionKind, emailIDs: Set<String>, digestID: UUID) async throws
+    /// Every disposition recorded for a digest.
+    func dispositions(digestID: UUID) async throws -> [MailDisposition]
+
     // MARK: Retention
 
-    /// Deletes the planned digests (with their results) and jobs (with their items). Never touches
-    /// processed ids or decisions (Q18, Q21).
+    /// Deletes the planned digests (with their results and dispositions) and jobs (with their items).
+    /// Never touches processed ids or decisions (Q18, Q21).
     func apply(_ plan: RetentionPlan) async throws
 
     // MARK: Decisions
@@ -78,6 +88,9 @@ public protocol DigestStore: Sendable {
     /// (Q22): moving to `.queued` or `.failed` with a non-nil `error` increments them. Starting an item,
     /// pausing, stopping, recovery and provider-wide outages (requeued with `error: nil`) do not.
     func setItemState(_ itemID: UUID, _ state: JobItemState, error: String?) async throws
+    /// Points a still-queued item at the mailbox it was found in when a Daily job's listing was refreshed
+    /// before resuming. `storeRowID` replaces the old locator hint (nil clears it).
+    func updateItemLocation(_ itemID: UUID, mailbox: MailboxRef, storeRowID: Int64?) async throws
     /// Stores the outcome text, time taken and finish time for a finished item.
     func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws
     /// Moves a job's `failed` items back to `queued` with attempts reset to 0 (lastError is kept),

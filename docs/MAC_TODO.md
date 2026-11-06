@@ -189,12 +189,12 @@ Please check on the Mac:
 
 **Notes:**
 
-- "Delete all history now" is in the spec but not in Settings yet; `RetentionPolicy.deleteAllPlan` exists in core. Not added in T16 (out of scope).
+- "Delete all history now" was later added to Settings > General > History (2026-11-06).
 - Only dismissals since the sender's most recent approval count toward the suggestion (Q36).
 
 ## UI fixes after T16 (menu bar highlight, Mail Access size)
 
-- **Menu bar highlight.** `StatusItemHighlight` highlights the app's `NSStatusBarButton` while the `.window`-style panel is open (SwiftUI does not do this for window-style extras). Seen once in the running app: the highlight capsule appeared on click. Still to check by hand: hover highlight, highlight stays while the panel is open, clears when it closes (click outside, Esc, clicking the icon again, opening a window from the panel), and works with the pending-count label and while a job runs.
+- **Menu bar highlight.** *Superseded (2026-11-06):* the `StatusItemHighlight` workaround was removed. Tested on macOS 26.7.2 without it: the system highlights the status item while the window-style panel is open and clears it when the panel closes (clicking the icon again, clicking outside, opening a window from the panel).
 - **Mail Access window.** No longer sized to the full mailbox list: default 480 × 560, minimum 440 × 360, resizable, and the grouped form scrolls. Check with many mailboxes that every section (permissions, mailboxes, Refresh, Check Again) is reachable by scrolling and the window opens at the default size.
 
 ## T18 status
@@ -242,11 +242,47 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 8. **Unplug and replug (MacBook):** unplug during a Backlog job: it pauses after the current email with "battery power"; replug: it resumes by itself. A job you paused or stopped yourself does not resume on replug. Turn off "Pause on battery power": unplugging does nothing.
 9. **Low Power Mode:** turn it on (System Settings > Battery): both Backlog and Daily jobs pause with "Low Power Mode"; turn it off: they resume.
 10. **Thermal:** hard to trigger on purpose. Run a heavy workload (for example `yes > /dev/null` on all cores) until `pmset -g therm` or Activity Monitor reports a serious thermal state, and watch for "Mac is hot". Without that, treat it as unverified; the policy is covered by unit tests.
-11. **Quiet hours across midnight:** Settings > General > Backlog jobs: tick "Only run during quiet hours" and set a window that crosses midnight and excludes the current time (for example From 10:00 pm Until 7:00 am when it is daytime). A running Backlog job pauses with "quiet hours"; moving the start time to a few minutes ahead makes it resume at that time. Times are Brisbane time.
+11. **Run window across midnight:** Settings > General > Backlog jobs: tick "Only run during this time window" (renamed from "quiet hours", Q45) and set a window that crosses midnight and excludes the current time (for example From 10:00 pm Until 7:00 am when it is daytime). A running Backlog job pauses with "outside the run window"; moving the start time to a few minutes ahead makes it resume at that time. Times are Brisbane time.
 12. **Daily preempts Backlog:** set the run time a few minutes ahead while a Backlog job runs: the Backlog pauses ("Daily job running"), Daily runs, then the Backlog resumes by itself. A Backlog job you paused yourself is not resumed after Daily.
 13. **Retry Failed:** after a job with failed emails, "Retry Failed" (Activity log and Settings > Jobs) requeues them and resumes; it is disabled while any job runs.
 14. **Past Jobs after relaunch:** Settings > Jobs lists mailboxes, scope, totals, processing time and state; Resume works on a job paused in a previous session.
-15. **Menu bar icon:** while a job runs the icon shows a small progress ring that fills; paused shows a pause badge; the pending count still shows; the icon stays highlighted while the menu window is open (T-UI fix) and follows light/dark appearance (it is a template image). VoiceOver reads "Mail Digest, processing, N percent" or "job paused".
+15. **Menu bar icon:** while a job runs the icon shows a small progress ring that fills; paused shows a pause badge; the pending count still shows; the icon stays highlighted while the menu window is open (system behaviour) and follows light/dark appearance (it is a template image). VoiceOver reads "Mail Digest, processing, N percent" or "job paused".
 16. **HIG/accessibility pass:** Tab order and VoiceOver through the setup window (step labels, checkboxes, Start), the progress view and Settings > Jobs; Return starts the default action, Escape cancels the setup window.
 
-**Known limits:** the resource rules act when a condition changes (and once when a job starts), so a job you resume by hand while still on battery keeps running until the next change. The runner is rebuilt when settings change while idle; an auto-pause made earlier in the session is then not auto-resumed (resume by hand).
+**Known limits:** the runner is rebuilt when runner-relevant settings (now including Trusted Newsletter senders) change while idle; an auto-pause made earlier in the session is then not auto-resumed (resume by hand). The earlier limit "a manual Resume on battery keeps running" is fixed by Q43 below.
+
+## Menu row hover, Trusted Newsletter, resume refresh, Delete All History, Q39–Q49 (2026-11-06)
+
+**Code done (verified here: `swift test` in `MailDigestCore` and `MailDigestPersistence`, `xcodebuild` Debug build; nothing run against real Mail or Ollama):**
+
+- Menu bar rows use `MenuRowButtonStyle`: a rounded `selectedContentBackgroundColor` highlight with `selectedMenuItemTextColor` text while the pointer is over an enabled row. A window-style `MenuBarExtra` never gives SwiftUI buttons a native menu highlight, and `.buttonStyle(.plain)` draws none.
+- Trusted Newsletter senders reach `MailFilter` (Q9 order: Blocked → VIP → Ignored → Trusted → bulk → normal; Blocked now beats VIP). The prompt says whether the sender is trusted; the schema allows 8 tasks; the validator keeps 8 for trusted senders and 3 otherwise.
+- Resuming a Daily job re-lists its mailboxes over the original scope first. Deleted or moved-out emails are skipped as "no longer in mailbox" (no model call, no attempt, not marked processed). Emails moved between selected mailboxes follow the move. A listing error aborts the resume and keeps the queue.
+- Q43: Start and Resume check the resource rules first. A blocked new Backlog job is stored paused before any email; a blocked Resume leaves a paused job paused with the reason (a stopped job stays stopped) and shows why in the banner.
+- Q39/Q42: new `mail_disposition` table (migration `v3`) records moved, kept and auto-file-attempted emails per digest, deleted with its digest by retention. Auto-file runs after each persisted result while a job runs, only for results finished after the switch was turned on.
+- Settings > General > History: "Delete All History Now…" with a confirmation dialog.
+
+**Manual checks (Mac):**
+
+1. **Menu row hover:** open the menu bar menu and move the pointer over each row. The hovered row gets a blue rounded highlight with white text and icon, like the Ollama menu; disabled rows (Run Now and New Backlog Job while a job runs) don't highlight and look dimmed. Check light and dark mode, and an accent colour other than blue (System Settings > Appearance). ⌘, and ⌘Q still work while the menu is open; VoiceOver reads each row's title as a button. The status item icon stays highlighted while the menu is open. *Hover verified by the user (2026-11-06).*
+2. **Trusted Newsletter:** add a newsletter sender you receive (one with `List-Unsubscribe`) to Settings > Senders > Trusted newsletter senders, then Run Now. Its email shows a summary and can show reminder suggestions; another newsletter still shows summary only. Adding the same address to Blocked skips it.
+3. **Resume refresh (Daily):** start a Daily run with a few new emails, pause after the first, then in Mail delete one queued email and move another to a mailbox outside the Daily mailboxes. Resume: both show "skipped: no longer in mailbox" in the Activity log, nothing is counted as failed, and the rest are processed. Quit Mail before resuming: Resume shows "Could not read Mail…" and the job stays paused with its queue intact.
+4. **Blocked Start/Resume (Q43):** on battery with "Pause on battery power" on, start a Backlog job: it appears paused with "battery power" and no email is read; plug in and it starts by itself. Pause a job, unplug, click Resume: the banner explains why and the job stays paused. Repeat with Low Power Mode (also blocks Daily) and the run window.
+5. **Moved/Kept after relaunch (Q39):** in Processed, move a few emails to the Mail Digest folder and Keep a few others; quit and relaunch: they stay hidden. Undo a move before quitting: the restored emails reappear in Processed and are not auto-filed again.
+6. **Incremental auto-file (Q42):** turn on "File processed emails automatically", then run a job with info-only emails: each one moves to "Mail Digest" in its own account shortly after it finishes, while the job is still running. Emails with pending suggestions stay until you decide them. Emails processed before the switch was turned on are not moved. Relaunch: nothing is moved twice. Make a move fail (for example On My Mac mail): it is reported once and not retried.
+7. **Delete All History Now:** pin an info item and leave a Backlog job paused, then Settings > General > History > Delete All History Now… > Delete All History. The pinned item and the paused job (with its results) remain, other digests and finished jobs disappear from the panel, Processed and Settings > Jobs, and nothing changes in Mail or Reminders. Previously processed mail is still not reprocessed on the next run.
+
+## Menu alignment, status item highlight, Settings hang (2026-11-06)
+
+**Fixed and checked on the running app (macOS 26.7.2):**
+
+- **Settings hang (root cause).** `SettingsStore.settings` mutated itself inside its own `didSet` (the Q42 auto-file stamp). Under `@Observable` that re-enters the generated setter, so the first settings write (made as the Settings window loads) recursed without end on the main thread. A process sample showed `SettingsStore._settings.didset → settings.modify → _settings.setter → …`. The stamp now happens in an explicit setter over a private stored property. Checked: Settings opened three times in a row from the menu panel, the app became the active app with Settings as the key window, and no `SettingsStore` frames appeared in samples.
+- **Panel state.** Choosing Settings, Open Review Panel, New Backlog Job or Mail Access now closes the menu panel first (`dismiss`), as a native menu does; before, the panel stayed open over the new window.
+- **Row alignment.** Each row has a 24 pt icon column with the symbol centred and the title in its own column, so every title starts at the same x (checked in a screenshot).
+- **Status item highlight.** Native; the workaround is gone (see above).
+
+**Still to check by hand:**
+
+1. **Escape in the menu panel:** with the panel opened by a real click, press Escape. My synthetic Escape did not close the panel, so it is unconfirmed whether the window-style panel closes on Escape. In every state I saw, the status item highlight matched whether the panel was visible.
+2. **Settings from the keyboard:** with the panel open, ⌘, opens Settings in front and closes the panel; type in a field straight away (the keyboard goes to Settings, not the previous app).
+3. **Settings reopen after closing:** close Settings with the red button or ⌘W, reopen from the panel several times; it comes to the front each time.

@@ -2,7 +2,9 @@ import Foundation
 
 /// In-memory `MailSource` for tests and previews; also records calls so tests can assert batch sizes.
 public actor FixtureMailSource: MailSource {
-    private let messages: [EmailMessage]
+    private var messages: [EmailMessage]
+    /// Mailboxes whose listing throws `FixtureMailError.listingFailed`, to test listing failures.
+    private var failingMailboxes: Set<MailboxRef> = []
     private let mailboxes: [MailboxInfo]
     /// Row-ID hints (by message id) reported in `listHeaders`, to exercise locator pass-through.
     private let storeRowIDs: [String: Int64]
@@ -42,8 +44,32 @@ public actor FixtureMailSource: MailSource {
 
     public func listMailboxes() async throws -> [MailboxInfo] { mailboxes }
 
+    // MARK: Test hooks
+
+    /// Adds a message, as if new mail arrived.
+    public func addMessage(_ message: EmailMessage) { messages.append(message) }
+
+    /// Deletes a message, as if it was removed from Mail.
+    public func removeMessage(id: String) { messages.removeAll { $0.id == id } }
+
+    /// Moves a message to another mailbox, as if the user filed it in Mail.
+    public func moveMessage(id: String, to mailbox: MailboxRef) {
+        for i in messages.indices where messages[i].id == id {
+            messages[i].account = mailbox.account
+            messages[i].mailbox = mailbox.name
+        }
+    }
+
+    /// Makes listing one mailbox throw (or succeed again).
+    public func setListingFails(_ fails: Bool, for mailbox: MailboxRef) {
+        if fails { failingMailboxes.insert(mailbox) } else { failingMailboxes.remove(mailbox) }
+    }
+
     public func listHeaders(in mailbox: MailboxRef, from: Date, to: Date) async throws -> [MessageHeader] {
         listCalls += 1
+        if failingMailboxes.contains(MailboxRef(account: mailbox.account, name: mailbox.name)) {
+            throw FixtureMailError.listingFailed
+        }
         return messages
             .filter { $0.account == mailbox.account && $0.mailbox == mailbox.name
                 && $0.receivedAt >= from && $0.receivedAt < to }
@@ -93,4 +119,9 @@ public actor FixtureMailSource: MailSource {
         }
         return FixtureMailSource(messages: out)
     }
+}
+
+/// Errors `FixtureMailSource` throws when a test asks it to.
+public enum FixtureMailError: Error, Sendable, Equatable {
+    case listingFailed
 }

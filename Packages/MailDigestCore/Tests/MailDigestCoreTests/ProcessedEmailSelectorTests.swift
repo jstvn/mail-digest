@@ -102,4 +102,33 @@ private func all(_ ids: String...) -> [String: EmailContext] { Dictionary(unique
         // Pending e2, failed e3 and failed f1 stay in the inbox; blocked mail is filed too.
         #expect(sel.autoFileIDs(processed) == ["e1", "e4", "b1"])
     }
+
+    // Q42: only results persisted after auto-file was switched on, never tried twice, never pending/failed.
+    @Test func incrementalAutoFileRules() {
+        let d = digest([sug("e2", .pending), sug("e3", .approved)],
+                       info: [info("e1"), info("e2"), info("e3"), info("e4"), info("e5"), info("e6"), info("old")],
+                       skipped: [skip("b1", "ignored sender"), skip("f1", "failed: x")])
+        let ids = all("e1", "e2", "e3", "e4", "e5", "e6", "old", "b1", "f1")
+        let on = t0
+        var finished: [String: Date] = [:]
+        for id in ["e1", "e2", "e3", "e4", "e5", "e6", "b1", "f1"] { finished[id] = on.addingTimeInterval(5) }
+        finished["old"] = on.addingTimeInterval(-5)   // finished before auto-file was switched on
+        let dispositions = MailDispositions(moved: ["e4"], kept: ["e5"], autoFileAttempted: ["e6"])
+        let out = sel.autoFileIDs(digest: d, emails: ids, dispositions: dispositions, finishedAt: finished, enabledAt: on)
+        #expect(out == ["e1", "e3", "b1"])
+        // Without a finish time an email is not yet processed for auto-file.
+        finished["e1"] = nil
+        #expect(sel.autoFileIDs(digest: d, emails: ids, dispositions: dispositions, finishedAt: finished, enabledAt: on)
+                == ["e3", "b1"])
+    }
+
+    @Test func dispositionsGroupByKind() {
+        let id = UUID()
+        let d = MailDispositions([
+            MailDisposition(digestID: id, emailID: "a", kind: .moved, recordedAt: t0),
+            MailDisposition(digestID: id, emailID: "b", kind: .kept, recordedAt: t0),
+            MailDisposition(digestID: id, emailID: "a", kind: .autoFileAttempted, recordedAt: t0),
+        ])
+        #expect(d.hidden == ["a", "b"] && d.autoFileAttempted == ["a"])
+    }
 }

@@ -5,12 +5,21 @@ public struct MailFilter: Sendable {
     public let blockedSenders: Set<String>
     public let ignoredSenders: Set<String>
     public let vipSenders: Set<String>
+    /// Newsletter senders whose mail may produce task suggestions despite bulk headers (Q16, Q9).
+    public let trustedNewsletterSenders: Set<String>
+
+    /// Per-email suggestion limit for ordinary mail, including VIP mail.
+    public static let ordinarySuggestionLimit = 3
+    /// Per-email suggestion limit for a Trusted Newsletter sender.
+    public static let trustedNewsletterSuggestionLimit = 8
 
     /// Entries are email addresses; they are normalised to lowercase.
-    public init(blockedSenders: Set<String> = [], ignoredSenders: Set<String> = [], vipSenders: Set<String> = []) {
+    public init(blockedSenders: Set<String> = [], ignoredSenders: Set<String> = [], vipSenders: Set<String> = [],
+                trustedNewsletterSenders: Set<String> = []) {
         self.blockedSenders = Set(blockedSenders.map { $0.lowercased() })
         self.ignoredSenders = Set(ignoredSenders.map { $0.lowercased() })
         self.vipSenders = Set(vipSenders.map { $0.lowercased() })
+        self.trustedNewsletterSenders = Set(trustedNewsletterSenders.map { $0.lowercased() })
     }
 
     /// Extracts the lowercased address from "Name <addr>" or a bare "addr".
@@ -22,20 +31,40 @@ public struct MailFilter: Sendable {
         return s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    /// Tier for a fully loaded email. VIP beats block and bulk rules.
+    /// Tier for a fully loaded email, in Q9 order:
+    /// Blocked → VIP → Ignored → Trusted Newsletter → ordinary bulk/newsletter → normal mail.
     public func tier(_ email: EmailMessage) -> MailTier {
         let addr = Self.address(from: email.sender)
-        if vipSenders.contains(addr) { return .full }
-        if blockedSenders.contains(addr) || ignoredSenders.contains(addr) { return .skip }
-        return hasBulkHeaders(email.headers) || Self.hasBulkLocalPart(addr) ? .infoOnly : .full
+        return senderTier(addr) ?? (hasBulkHeaders(email.headers) || Self.hasBulkLocalPart(addr) ? .infoOnly : .full)
     }
 
     /// Estimate from the sender alone, for the job preview (headers aren't loaded yet).
+    /// Uses the same sender precedence as `tier(_:)`.
     public func estimatedTier(for header: MessageHeader) -> MailTier {
         let addr = Self.address(from: header.sender)
+        return senderTier(addr) ?? (Self.hasBulkLocalPart(addr) ? .infoOnly : .full)
+    }
+
+    /// True when the email gets Trusted Newsletter treatment: the sender is on the allowlist and no
+    /// higher-precedence rule (block, VIP, ignore) applies. VIP mail keeps the ordinary limit.
+    public func isTrustedNewsletter(_ email: EmailMessage) -> Bool {
+        let addr = Self.address(from: email.sender)
+        return trustedNewsletterSenders.contains(addr) && !blockedSenders.contains(addr)
+            && !vipSenders.contains(addr) && !ignoredSenders.contains(addr)
+    }
+
+    /// The most task suggestions this email may produce: 8 for a Trusted Newsletter, otherwise 3.
+    public func suggestionLimit(for email: EmailMessage) -> Int {
+        isTrustedNewsletter(email) ? Self.trustedNewsletterSuggestionLimit : Self.ordinarySuggestionLimit
+    }
+
+    /// The tier decided by sender rules alone, or nil when the bulk checks decide.
+    private func senderTier(_ addr: String) -> MailTier? {
+        if blockedSenders.contains(addr) { return .skip }
         if vipSenders.contains(addr) { return .full }
-        if blockedSenders.contains(addr) || ignoredSenders.contains(addr) { return .skip }
-        return Self.hasBulkLocalPart(addr) ? .infoOnly : .full
+        if ignoredSenders.contains(addr) { return .skip }
+        if trustedNewsletterSenders.contains(addr) { return .full }
+        return nil
     }
 
     /// Why an email is skipped, or nil if it isn't in the skip tier.

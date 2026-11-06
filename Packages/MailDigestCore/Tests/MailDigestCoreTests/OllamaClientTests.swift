@@ -66,6 +66,8 @@ private func expectSnapshot(_ request: URLRequest, _ name: String, sourceFile: S
             summary: one plain sentence, under 25 words, saying what the email is about.
             key_facts: up to 4 short facts worth remembering (dates, places, amounts, names). Empty if none.
             tasks: only things the user must do or attend. Empty if none.
+            For an ordinary email, return at most 3 tasks. For a sender explicitly configured as a Trusted Newsletter, return at most 8 actionable tasks. The application applies the same sender-specific limit during validation.
+            This sender is not a Trusted Newsletter: return at most 3 tasks.
             Task title: short imperative phrase under 60 characters.
             due: ISO 8601 date (YYYY-MM-DD) or date-time (YYYY-MM-DDTHH:MM) in Australia/Brisbane, or null if no date is stated.
             evidence: copy the exact sentence from the email that justifies the task.
@@ -76,8 +78,18 @@ private func expectSnapshot(_ request: URLRequest, _ name: String, sourceFile: S
     @Test func infoOnlyPromptHasRuleLine() {
         let text = Prompts.extractionSystem(today: today, timeZone: tz, tier: .infoOnly)
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-        #expect(lines.count == 12)
-        #expect(lines[7] == "tasks must be an empty array.")
+        #expect(lines.count == 13)
+        #expect(lines[8] == "tasks must be an empty array.")
+        #expect(!text.contains("This sender is"))
+    }
+
+    @Test func trustedNewsletterPromptSaysSo() throws {
+        let text = Prompts.extractionSystem(today: today, timeZone: tz, tier: .full, trustedNewsletter: true)
+        #expect(text.contains("This sender is explicitly configured as a Trusted Newsletter: extract its actionable tasks, at most 8."))
+        #expect(!text.contains("tasks must be an empty array."))
+        let request = try client().makeExtractionRequest(assessmentEmail(), tier: .full, trustedNewsletter: true,
+                                                         today: today, timeZone: tz)
+        #expect(String(decoding: request.httpBody!, as: UTF8.self).contains("Trusted Newsletter: extract"))
     }
 
     @Test func userMessageFormat() throws {
@@ -233,7 +245,7 @@ private func expectSnapshot(_ request: URLRequest, _ name: String, sourceFile: S
             Issue.record("unexpected schema shape"); return
         }
         #expect(Set(props.keys) == ["summary", "category", "importance", "key_facts", "tasks"])
-        #expect(tasks["maxItems"] == .number(3))
+        #expect(tasks["maxItems"] == .number(8))
         let data = try ExtractionSchema.json.stableData()
         #expect(try JSONDecoder().decode(JSONValue.self, from: data) == ExtractionSchema.json)
     }

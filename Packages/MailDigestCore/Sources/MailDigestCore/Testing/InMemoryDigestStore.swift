@@ -10,6 +10,7 @@ public actor InMemoryDigestStore: DigestStore {
     private var decisionList: [Decision] = []
     private var jobList: [Job] = []
     private var itemList: [JobItem] = []
+    private var dispositionList: [MailDisposition] = []
     /// Item id -> index in `itemList`; rebuilt when retention removes items.
     private var itemIndex: [UUID: Int] = [:]
     /// Job id -> indices into `itemList`, in enqueue order (which is position order).
@@ -93,10 +94,27 @@ public actor InMemoryDigestStore: DigestStore {
         }
     }
 
+    public func recordDispositions(_ dispositions: [MailDisposition]) async throws {
+        for d in dispositions {
+            guard digestRows.contains(where: { $0.id == d.digestID }) else { throw DigestStoreError.digestNotFound(d.digestID) }
+            dispositionList.removeAll { $0.digestID == d.digestID && $0.emailID == d.emailID && $0.kind == d.kind }
+            dispositionList.append(d)
+        }
+    }
+
+    public func removeDispositions(_ kind: MailDispositionKind, emailIDs: Set<String>, digestID: UUID) async throws {
+        dispositionList.removeAll { $0.digestID == digestID && $0.kind == kind && emailIDs.contains($0.emailID) }
+    }
+
+    public func dispositions(digestID: UUID) async throws -> [MailDisposition] {
+        dispositionList.filter { $0.digestID == digestID }
+    }
+
     public func apply(_ plan: RetentionPlan) async throws {
         let digestIDs = Set(plan.digestIDs)
         digestRows.removeAll { digestIDs.contains($0.id) }
         for id in digestIDs { resultsByDigest[id] = nil }
+        dispositionList.removeAll { digestIDs.contains($0.digestID) }
         let jobIDs = Set(plan.jobIDs)
         jobList.removeAll { jobIDs.contains($0.id) }
         itemList.removeAll { jobIDs.contains($0.jobID) }
@@ -171,6 +189,12 @@ public actor InMemoryDigestStore: DigestStore {
         itemList[i].state = state
         itemList[i].lastError = error
         if error != nil && (state == .queued || state == .failed) { itemList[i].attempts += 1 }
+    }
+
+    public func updateItemLocation(_ itemID: UUID, mailbox: MailboxRef, storeRowID: Int64?) async throws {
+        guard let i = itemIndex[itemID] else { return }
+        itemList[i].mailbox = mailbox
+        itemList[i].storeRowID = storeRowID
     }
 
     public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws {

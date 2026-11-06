@@ -24,6 +24,9 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public var dailyMailboxes: [MailboxRef]
     /// Move processed emails into a "Mail Digest" mailbox in the same account automatically. Off by default.
     public var autoFileProcessed: Bool
+    /// When auto-file was last switched on. Only results finished after it are auto-filed, so switching it
+    /// on never sweeps older mail (Q42). Nil while auto-file is off.
+    public var autoFileEnabledAt: Date?
     /// Backlog jobs pause on battery power and resume when plugged in (default on).
     public var pauseBacklogOnBattery: Bool
     /// Backlog jobs only run inside the quiet-hours window (default off).
@@ -42,7 +45,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 retention: HistoryRetention = .default, vipSenders: [String] = [], blockedSenders: [String] = [],
                 ignoredSenders: [String] = [], trustedNewsletterSenders: [String] = [],
                 declinedIgnoreSuggestions: [String] = [], dailyMailboxes: [MailboxRef] = [],
-                autoFileProcessed: Bool = false, pauseBacklogOnBattery: Bool = true,
+                autoFileProcessed: Bool = false, autoFileEnabledAt: Date? = nil, pauseBacklogOnBattery: Bool = true,
                 quietHoursEnabled: Bool = false, quietHoursStartMinute: Int = 22 * 60,
                 quietHoursEndMinute: Int = 7 * 60) {
         self.pauseBacklogOnBattery = pauseBacklogOnBattery
@@ -50,6 +53,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         self.quietHoursStartMinute = quietHoursStartMinute
         self.quietHoursEndMinute = quietHoursEndMinute
         self.autoFileProcessed = autoFileProcessed
+        self.autoFileEnabledAt = autoFileProcessed ? autoFileEnabledAt : nil
         self.runHour = runHour
         self.runMinute = runMinute
         self.lookbackHours = lookbackHours
@@ -69,7 +73,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case runHour, runMinute, lookbackHours, maxEmailsPerRun, ollamaURL, ollamaModel, remindersListName
         case retention, vipSenders, blockedSenders, ignoredSenders, trustedNewsletterSenders, declinedIgnoreSuggestions
-        case dailyMailboxes, autoFileProcessed
+        case dailyMailboxes, autoFileProcessed, autoFileEnabledAt
         case pauseBacklogOnBattery, quietHoursEnabled, quietHoursStartMinute, quietHoursEndMinute
     }
 
@@ -92,6 +96,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   declinedIgnoreSuggestions: try c.decodeIfPresent([String].self, forKey: .declinedIgnoreSuggestions) ?? [],
                   dailyMailboxes: try c.decodeIfPresent([MailboxRef].self, forKey: .dailyMailboxes) ?? [],
                   autoFileProcessed: try c.decodeIfPresent(Bool.self, forKey: .autoFileProcessed) ?? d.autoFileProcessed,
+                  autoFileEnabledAt: try c.decodeIfPresent(Date.self, forKey: .autoFileEnabledAt),
                   pauseBacklogOnBattery: try c.decodeIfPresent(Bool.self, forKey: .pauseBacklogOnBattery)
                       ?? d.pauseBacklogOnBattery,
                   quietHoursEnabled: try c.decodeIfPresent(Bool.self, forKey: .quietHoursEnabled) ?? d.quietHoursEnabled,
@@ -124,17 +129,28 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         return m.isEmpty ? Self.defaultModel : m
     }
 
+    /// Keeps `autoFileEnabledAt` in step with the auto-file switch: stamped with `now` when it is switched on
+    /// (or is on without a stamp, as in settings saved before Q42), cleared when it is switched off.
+    public mutating func stampAutoFile(previous: DigestSettings?, now: Date) {
+        if !autoFileProcessed {
+            autoFileEnabledAt = nil
+        } else if previous?.autoFileProcessed != true || autoFileEnabledAt == nil {
+            autoFileEnabledAt = now
+        }
+    }
+
     /// The Reminders list name, or the default when blank.
     public var resolvedListName: String {
         let n = remindersListName.trimmingCharacters(in: .whitespacesAndNewlines)
         return n.isEmpty ? Self.defaultListName : n
     }
 
-    /// Sender rules as a runner filter (VIP / blocked / ignored). Trusted Newsletter senders are not part of it.
+    /// Sender rules as a runner filter (blocked / VIP / ignored / Trusted Newsletter).
     public var mailFilter: MailFilter {
         MailFilter(blockedSenders: Set(blockedSenders.map(MailFilter.address(from:))),
                    ignoredSenders: Set(ignoredSenders.map(MailFilter.address(from:))),
-                   vipSenders: Set(vipSenders.map(MailFilter.address(from:))))
+                   vipSenders: Set(vipSenders.map(MailFilter.address(from:))),
+                   trustedNewsletterSenders: Set(trustedNewsletterSenders.map(MailFilter.address(from:))))
     }
 
     /// Maps into the runner's settings. `inboxes` is used when no Daily mailboxes are chosen (all inboxes).

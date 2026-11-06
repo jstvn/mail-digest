@@ -58,7 +58,9 @@ public struct DigestPipeline: Sendable {
                 skipped: SkippedEmail(id: email.id, sender: email.sender, subject: email.subject, reason: reason),
                 summaryText: "skipped: \(reason)")
         }
-        let result = try await llm.extract(cleaned, tier: tier, today: today, timeZone: timeZone)
+        let trusted = tier == .full && filter.isTrustedNewsletter(email)
+        let result = try await llm.extract(cleaned, tier: tier, trustedNewsletter: trusted,
+                                           today: today, timeZone: timeZone)
 
         let info = InfoItem(
             id: email.id, emailID: email.id, category: result.category,
@@ -69,7 +71,8 @@ public struct DigestPipeline: Sendable {
         if tier == .full {
             // Validate against the cleaned body: evidence must come from text the model actually saw.
             let context = ValidationContext(today: today, recentSuggestions: recentSuggestions,
-                                            senderHasApprovedDecision: senderHasApprovedDecision)
+                                            senderHasApprovedDecision: senderHasApprovedDecision,
+                                            maxSuggestions: filter.suggestionLimit(for: email))
             suggestions = validator.validate(result.tasks, email: cleaned, context: context)
                 .map { var s = $0; s.category = info.category; return s }
         }

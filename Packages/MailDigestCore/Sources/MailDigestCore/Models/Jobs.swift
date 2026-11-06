@@ -17,8 +17,25 @@ public enum PauseReason: String, Codable, Sendable, Equatable, CaseIterable {
         case .battery: return "battery power"
         case .lowPowerMode: return "Low Power Mode"
         case .heat: return "Mac is hot"
-        case .quietHours: return "quiet hours"
+        // An allowed window (Q45), so "quiet hours" would suggest the opposite.
+        case .quietHours: return "outside the run window"
         case .dailyJob: return "Daily job running"
+        }
+    }
+
+    /// Why a Start or Resume left the job paused (Q43), for the banner.
+    public var blockedMessage: String {
+        switch self {
+        case .battery:
+            return "The Mac is on battery power, so the job stays paused. It resumes when you plug in, or turn off \"Pause on battery power\" in Settings."
+        case .quietHours:
+            return "It's outside the Backlog run window, so the job stays paused until the window opens. You can change the window in Settings."
+        case .lowPowerMode:
+            return "Low Power Mode is on, so the job stays paused until you turn it off."
+        case .heat:
+            return "The Mac is too hot, so the job stays paused until it cools down."
+        case .dailyJob:
+            return "A Daily job is running. This job continues after it."
         }
     }
 }

@@ -50,16 +50,42 @@ import Testing
         #expect(round.declinedIgnoreSuggestions == ["x@y.com"])
     }
 
+    @Test func autoFileStampFollowsTheSwitch() throws {
+        let t = Date(timeIntervalSince1970: 1_800_000_000)
+        var s = DigestSettings()
+        let off = s
+        s.autoFileProcessed = true
+        s.stampAutoFile(previous: off, now: t)
+        #expect(s.autoFileEnabledAt == t)
+        // Staying on keeps the first stamp.
+        let on = s
+        s.lookbackHours = 12
+        s.stampAutoFile(previous: on, now: t.addingTimeInterval(60))
+        #expect(s.autoFileEnabledAt == t)
+        // Settings saved before Q42 (on, no stamp) are stamped when loaded, so nothing older is swept.
+        var legacy = DigestSettings(autoFileProcessed: true)
+        legacy.stampAutoFile(previous: nil, now: t)
+        #expect(legacy.autoFileEnabledAt == t)
+        // Switching off clears it; it round-trips through JSON.
+        let round = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s))
+        #expect(round.autoFileEnabledAt == t)
+        s.autoFileProcessed = false
+        s.stampAutoFile(previous: on, now: t)
+        #expect(s.autoFileEnabledAt == nil)
+    }
+
     @Test func mapsIntoRunnerSettings() {
         var s = DigestSettings()
         s.lookbackHours = 24; s.maxEmailsPerRun = 50
         s.blockedSenders = ["Spam <SPAM@x.com>"]; s.vipSenders = ["boss@work.com"]
+        s.trustedNewsletterSenders = ["Uni News <News@Uni.edu>"]
         let inbox = MailboxRef(account: "iCloud", name: "Inbox")
         let r = s.runnerSettings(inboxes: [inbox])
         #expect(r.lookbackCap == 24 * 3600 && r.maxEmailsPerRun == 50)
         #expect(r.dailyMailboxes == [inbox])
         #expect(r.timeZone == RunnerSettings().timeZone)
         #expect(r.filter.blockedSenders == ["spam@x.com"] && r.filter.vipSenders == ["boss@work.com"])
+        #expect(r.filter.trustedNewsletterSenders == ["news@uni.edu"])
         let other = MailboxRef(account: "Outlook", name: "Inbox")
         s.dailyMailboxes = [other]
         #expect(s.runnerSettings(inboxes: [inbox]).dailyMailboxes == [other])

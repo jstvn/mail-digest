@@ -6,11 +6,16 @@ public struct ValidationContext: Sendable {
     /// Pending and approved suggestions from the last 14 days, supplied by the caller.
     public var recentSuggestions: [Suggestion]
     public var senderHasApprovedDecision: Bool
+    /// Rule 5: most suggestions kept from this email (3 for ordinary mail, 8 for a Trusted Newsletter).
+    public var maxSuggestions: Int
 
-    public init(today: Date, recentSuggestions: [Suggestion], senderHasApprovedDecision: Bool) {
+    public init(today: Date, recentSuggestions: [Suggestion], senderHasApprovedDecision: Bool,
+                maxSuggestions: Int = MailFilter.ordinarySuggestionLimit) {
         self.today = today
         self.recentSuggestions = recentSuggestions
         self.senderHasApprovedDecision = senderHasApprovedDecision
+        // Never above the schema's maximum, whatever the caller passes.
+        self.maxSuggestions = min(max(maxSuggestions, 0), MailFilter.trustedNewsletterSuggestionLimit)
     }
 }
 
@@ -102,8 +107,8 @@ public struct SuggestionValidator: Sendable {
             kept.append(s)
             known.append(s)
         }
-        // 5: at most three per email
-        return Array(kept.prefix(3))
+        // 5: at most 3 per ordinary email, 8 per Trusted Newsletter email
+        return Array(kept.prefix(context.maxSuggestions))
     }
 
     /// Keeps the `limit` highest-confidence suggestions, in their original order.

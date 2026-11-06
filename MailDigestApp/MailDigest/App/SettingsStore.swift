@@ -7,9 +7,22 @@ import Observation
 final class SettingsStore {
     private static let key = "digestSettings"
 
+    /// The settings; every change is saved and reported through `onChange`.
     var settings: DigestSettings {
-        didSet { if settings != oldValue { save(); onChange?() } }
+        get { stored }
+        set {
+            // Stamp here, not in an observer: under @Observable, mutating the property inside its own
+            // didSet re-enters the setter and recursed without end, hanging the app on any settings change.
+            var next = newValue
+            next.stampAutoFile(previous: stored, now: .now)
+            guard next != stored else { return }
+            stored = next
+            save()
+            onChange?()
+        }
     }
+    /// Backing storage; observation tracks it, so views reading `settings` still update.
+    private var stored: DigestSettings
 
     /// Called after every change, so the run model can re-check the power rules.
     @ObservationIgnored var onChange: (() -> Void)?
@@ -19,9 +32,14 @@ final class SettingsStore {
         self.defaults = defaults
         if let data = defaults.data(forKey: Self.key),
            let saved = try? JSONDecoder().decode(DigestSettings.self, from: data) {
-            settings = saved
+            var loaded = saved
+            // Saved before auto-file kept a start time (Q42): start counting from now, so nothing older is swept.
+            loaded.stampAutoFile(previous: saved, now: .now)
+            stored = loaded
+            // Keep that stamp, so the start time doesn't move forward on every launch.
+            if loaded != saved { save() }
         } else {
-            settings = DigestSettings()
+            stored = DigestSettings()
         }
     }
 
@@ -39,6 +57,6 @@ final class SettingsStore {
     }
 
     private func save() {
-        if let data = try? JSONEncoder().encode(settings) { defaults.set(data, forKey: Self.key) }
+        if let data = try? JSONEncoder().encode(stored) { defaults.set(data, forKey: Self.key) }
     }
 }

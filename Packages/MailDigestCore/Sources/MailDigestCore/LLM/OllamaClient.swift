@@ -54,8 +54,10 @@ public struct OllamaClient: LLMClient {
     // MARK: Request builders
 
     /// Builds the `/api/chat` request for an extraction call.
-    public func makeExtractionRequest(_ email: EmailMessage, tier: MailTier, today: Date, timeZone: TimeZone) throws -> URLRequest {
-        try chatRequest(system: Prompts.extractionSystem(today: today, timeZone: timeZone, tier: tier),
+    public func makeExtractionRequest(_ email: EmailMessage, tier: MailTier, trustedNewsletter: Bool = false,
+                                      today: Date, timeZone: TimeZone) throws -> URLRequest {
+        try chatRequest(system: Prompts.extractionSystem(today: today, timeZone: timeZone, tier: tier,
+                                                         trustedNewsletter: trustedNewsletter),
                         user: Prompts.extractionUser(email, timeZone: timeZone),
                         format: ExtractionSchema.json, timeout: extractTimeout)
     }
@@ -106,8 +108,10 @@ public struct OllamaClient: LLMClient {
         }
     }
 
-    public func extract(_ email: EmailMessage, tier: MailTier, today: Date, timeZone: TimeZone) async throws -> ExtractionResult {
-        let request = try makeExtractionRequest(email, tier: tier, today: today, timeZone: timeZone)
+    public func extract(_ email: EmailMessage, tier: MailTier, trustedNewsletter: Bool,
+                        today: Date, timeZone: TimeZone) async throws -> ExtractionResult {
+        let request = try makeExtractionRequest(email, tier: tier, trustedNewsletter: trustedNewsletter,
+                                                today: today, timeZone: timeZone)
         var result = try await withRetry { try Self.decodeExtraction(try await send(request)) }
         if tier == .infoOnly { result.tasks = [] }
         return result

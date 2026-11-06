@@ -339,7 +339,7 @@ import MailDigestCore
         #expect(try reopened.setting("k") == "v")
         #expect(try await reopened.isProcessed("m"))
         let applied = try await reopened.writer.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations") }
-        #expect(applied == ["v1", "v2"])
+        #expect(applied == ["v1", "v2", "v3"])
     }
 
     @Test func stoppedStateAndPauseReasonSurviveReopen() async throws {
@@ -421,5 +421,85 @@ import MailDigestCore
         #expect(try await reopened.pinnedInfo().map(\.item.emailID) == ["a"])
         try await reopened.setPinned(false, infoID: "a", digestID: d.id)
         #expect(try await GRDBDigestStore(path: dir.databasePath).pinnedInfo().isEmpty)
+    }
+
+    // MARK: Mail dispositions (Q39, Q42)
+
+    @Test func dispositionsRecordRemoveAndSurviveReopen() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanUp() }
+        let d = makeDigest()
+        do {
+            let store = try GRDBDigestStore(path: dir.databasePath)
+            await #expect(throws: DigestStoreError.digestNotFound(d.id)) {
+                try await store.recordDispositions([MailDisposition(digestID: d.id, emailID: "a", kind: .moved, recordedAt: t0)])
+            }
+            try await store.save(d)
+            try await store.recordDispositions([
+                MailDisposition(digestID: d.id, emailID: "a", kind: .moved, recordedAt: t0),
+                MailDisposition(digestID: d.id, emailID: "a", kind: .autoFileAttempted, recordedAt: t0),
+                MailDisposition(digestID: d.id, emailID: "b", kind: .kept, recordedAt: t0),
+            ])
+            // Upsert: recording the same (digest, email, kind) again keeps one row.
+            try await store.recordDispositions([MailDisposition(digestID: d.id, emailID: "a", kind: .moved,
+                                                                recordedAt: t0.addingTimeInterval(1))])
+            // Saving the digest again (as the runner does for the headline) must not cascade them away.
+            try await store.save(d)
+        }
+        let store = try GRDBDigestStore(path: dir.databasePath)
+        var got = MailDispositions(try await store.dispositions(digestID: d.id))
+        #expect(got == MailDispositions(moved: ["a"], kept: ["b"], autoFileAttempted: ["a"]))
+        #expect(try await store.dispositions(digestID: d.id).count == 3)
+
+        // Undo clears only the moved record.
+        try await store.removeDispositions(.moved, emailIDs: ["a"], digestID: d.id)
+        got = MailDispositions(try await store.dispositions(digestID: d.id))
+        #expect(got == MailDispositions(moved: [], kept: ["b"], autoFileAttempted: ["a"]))
+    }
+
+    @Test func retentionDeletesDispositionsWithTheirDigestOnly() async throws {
+        let store = try GRDBDigestStore.inMemory()
+        let gone = makeJob(state: .finished), stopped = makeJob(state: .stopped)
+        for job in [gone, stopped] {
+            try await store.createJob(job)
+            try await store.enqueue([makeHeader("m-\(job.id)")], job: job.id)
+            try await store.save(makeDigest(id: job.id, at: job.createdAt))
+            try await store.appendEmailResult(EmailResult(emailID: "m-\(job.id)", info: makeInfo("m-\(job.id)")), to: job.id)
+            try await store.recordDispositions([MailDisposition(digestID: job.id, emailID: "m-\(job.id)", kind: .moved,
+                                                                recordedAt: t0)])
+            try await store.markProcessed(ProcessedEmail(id: "m-\(job.id)", receivedAt: t0, tier: .full, processedAt: t0))
+        }
+        let digests = [try #require(await store.digest(id: gone.id)), try #require(await store.digest(id: stopped.id))]
+        let plan = RetentionPolicy().deleteAllPlan(digests: digests, jobs: try await store.jobs())
+        // A stopped job is resumable, so it and its digest stay.
+        #expect(plan == RetentionPlan(digestIDs: [gone.id], jobIDs: [gone.id]))
+        try await store.apply(plan)
+        #expect(try await store.dispositions(digestID: gone.id).isEmpty)
+        #expect(try await store.dispositions(digestID: stopped.id).count == 1)
+        #expect(try await store.items(job: stopped.id).count == 1)
+        // Dedupe records are never removed by retention.
+        #expect(try await store.isProcessed("m-\(gone.id)"))
+        #expect(try await store.isProcessed("m-\(stopped.id)"))
+    }
+
+    @Test func v2DatabaseUpgradesToDispositions() async throws {
+        let queue = try DatabaseQueue()
+        try GRDBDigestStore.migrator.migrate(queue, upTo: "v2")
+        try GRDBDigestStore.migrator.migrate(queue)
+        let tables = try await queue.read { try String.fetchAll($0, sql: "SELECT name FROM sqlite_master WHERE type = 'table'") }
+        #expect(tables.contains("mail_disposition"))
+    }
+
+    @Test func itemLocationUpdates() async throws {
+        let store = try GRDBDigestStore.inMemory()
+        let job = makeJob()
+        try await store.createJob(job)
+        try await store.enqueue([makeHeader("m1", rowID: 7)], job: job.id)
+        let item = try #require(await store.items(job: job.id).first)
+        let archive = MailboxRef(account: "iCloud", name: "Archive", accountID: "A1", mailboxURL: "imap://A1/Archive")
+        try await store.updateItemLocation(item.id, mailbox: archive, storeRowID: 42)
+        let moved = try #require(await store.items(job: job.id).first)
+        #expect(moved.mailbox == archive && moved.storeRowID == 42)
+        #expect(moved.state == item.state && moved.attempts == item.attempts && moved.position == item.position)
     }
 }

@@ -70,7 +70,7 @@ final class DigestRunModel {
         self.reminders = RemindersAccessModel()
         self.processed = ProcessedMailModel(review: review, settings: settings)
         reminders.attach(review: review)
-        review.onSuggestionsSettled = { [processed] in await processed.autoFileIfEnabled() }
+        review.onSuggestionsSettled = { [processed] in await processed.refresh() }
         review.listName = { [settings] in settings.settings.resolvedListName }
         review.settingsStore = settings
         settings.onChange = { [weak self] in self?.evaluateResources() }
@@ -186,6 +186,7 @@ final class DigestRunModel {
             let opened = try await Task.detached(priority: .userInitiated) { try GRDBDigestStore(path: path) }.value
             store = opened
             await review.attach(store: opened)
+            await processed.attach(store: opened)
             return opened
         } catch {
             Self.log.error("could not open database: \(String(describing: error), privacy: .public)")
@@ -277,6 +278,7 @@ final class DigestRunModel {
         let runner = await runner(for: inboxes, store: store)
         let startedAt = clock.now()
         do {
+            await runner.setResourceBlockers(currentBlockers())
             try await runner.startDaily()
             evaluateResources(force: true)
             await runner.waitUntilIdle()
@@ -317,11 +319,14 @@ final class DigestRunModel {
         defer { busyFlag = false; progressText = nil }
         guard let runner = await ensureRunner() else { return }
         do {
+            await runner.setResourceBlockers(currentBlockers())
             try await runner.resume(jobID: jobID)
             restoredProgress = nil
             await runner.waitUntilIdle()
         } catch {
             banner = Self.message(for: error)
+            // A blocked resume leaves the job paused with its reason; show that in the strip and Past Jobs.
+            await refreshJobLists()
             return
         }
         await finishRun()
@@ -336,11 +341,13 @@ final class DigestRunModel {
         defer { busyFlag = false; progressText = nil }
         guard let runner = await ensureRunner() else { return }
         do {
+            await runner.setResourceBlockers(currentBlockers())
             try await runner.retryFailed(jobID: jobID)
             restoredProgress = nil
             await runner.waitUntilIdle()
         } catch {
             banner = Self.message(for: error)
+            await refreshJobLists()
             return
         }
         await finishRun()
@@ -364,6 +371,8 @@ final class DigestRunModel {
             return banner ?? "Could not open the Mail Digest database."
         }
         do {
+            // Q43: a job created while a rule applies is stored paused before any email is read.
+            await runner.setResourceBlockers(currentBlockers())
             try await runner.start(plan)
         } catch {
             busyFlag = false; progressText = nil
@@ -403,7 +412,7 @@ final class DigestRunModel {
             lastRunFoundNothing = false
         }
         if !lastRunFoundNothing, let created = review.digest?.createdAt { lastRunAt = created }
-        await processed.autoFileIfEnabled()
+        await processed.refresh()
     }
 
     // MARK: Job lists, activity and resources
@@ -462,14 +471,13 @@ final class DigestRunModel {
         evaluateResources()
     }
 
-    /// Applies the core resource policy. Normally it acts only when the set of blocking reasons changes, so a
-    /// job the user resumed by hand on battery keeps running until the next change; `force` (a job just
-    /// started) applies the current rules once.
+    /// Applies the core resource policy when the set of blocking reasons changes (or once more with `force`).
+    /// Start and Resume check the same rules themselves (Q43), so a manual Resume never overrides them.
     func evaluateResources(force: Bool = false) {
         let policy = settings.settings.resourcePolicy()
         let now = clock.now()
         monitor.scheduleBoundary(at: policy.quietHours?.nextBoundary(after: now, in: policy.timeZone))
-        let blocked = policy.blocked(conditions: monitor.conditions, now: now)
+        let blocked = currentBlockers()
         guard force || blocked != lastBlocked else { return }
         lastBlocked = blocked
         guard let runner else { return }
@@ -477,6 +485,40 @@ final class DigestRunModel {
             do { try await runner.applyResourceRules(blocked) } catch {
                 Self.log.error("resource rules failed: \(String(describing: error), privacy: .public)")
             }
+        }
+    }
+
+    /// The resource rules that apply right now, by job kind (Daily only honours Low Power Mode).
+    private func currentBlockers() -> [JobKind: PauseReason] {
+        settings.settings.resourcePolicy().blocked(conditions: monitor.conditions, now: clock.now())
+    }
+
+    // MARK: Delete all history
+
+    /// Settings > History > Delete All History Now. Uses the retention path: pinned digests and unfinished or
+    /// resumable jobs (with their digests and context) are kept, processed ids and sender decisions are never
+    /// deleted, and nothing in Mail or Reminders is touched. Returns the message to show.
+    func deleteAllHistory() async -> DeleteHistoryResult {
+        guard let store = await openStore() else { return .failure("The Mail Digest database could not be opened.") }
+        do {
+            let plan = RetentionPolicy().deleteAllPlan(digests: try await store.retainedDigests(),
+                                                       jobs: try await store.jobs())
+            try await store.apply(plan)
+            Self.log.notice("delete all history: digests=\(plan.digestIDs.count, privacy: .public) jobs=\(plan.jobIDs.count, privacy: .public)")
+            await review.reload()
+            await processed.refresh()
+            await refreshJobLists()
+            if let digest = try? await store.latestDigest() {
+                lastRunSummary = Self.summary(for: digest)
+            } else {
+                lastRunSummary = nil
+            }
+            let n = plan.digestIDs.count
+            return .success(n == 0 ? "There was no history to delete."
+                                   : "Deleted \(n) \(n == 1 ? "digest" : "digests"). Pinned items and unfinished jobs were kept.")
+        } catch {
+            Self.log.error("delete all history failed: \(String(describing: error), privacy: .public)")
+            return .failure("History could not be deleted. Nothing was changed.")
         }
     }
 
@@ -492,9 +534,9 @@ final class DigestRunModel {
         relevant.retention = .default
         relevant.remindersListName = DigestSettings.defaultListName
         relevant.runHour = 6; relevant.runMinute = 30
-        relevant.trustedNewsletterSenders = []
         relevant.declinedIgnoreSuggestions = []
         relevant.autoFileProcessed = false
+        relevant.autoFileEnabledAt = nil
         relevant.pauseBacklogOnBattery = true
         relevant.quietHoursEnabled = false
         let key = RunnerKey(settings: relevant, inboxes: Set(inboxes))
@@ -526,6 +568,8 @@ final class DigestRunModel {
             Task {
                 await review.reload()
                 await refreshActivity(jobID: update.jobID)
+                // Q42: file each newly finished result now, not when the whole job ends.
+                await processed.refresh()
             }
         }
         // A job the resource monitor resumed has no caller waiting on it, so settle it here.
@@ -572,6 +616,7 @@ final class DigestRunModel {
 
     private static func message(for error: Error) -> String {
         if case JobRunnerError.providerUnavailable(let message) = error { return message }
+        if case JobRunnerError.resourceBlocked(let reason) = error { return reason.blockedMessage }
         if case OsascriptError.automationDenied = error {
             return "Mail automation is off. Open Mail Access to allow it."
         }
@@ -590,3 +635,9 @@ struct PastJobRow: Identifiable, Equatable, Sendable {
 }
 
 enum JobSetupError: Error { case databaseUnavailable }
+
+/// What "Delete All History Now" reports back to Settings.
+enum DeleteHistoryResult: Equatable {
+    case success(String)
+    case failure(String)
+}

@@ -94,6 +94,17 @@ public struct ProcessedEmailSelector: Sendable {
         (processed.handled + processed.blocked).map(\.emailID)
     }
 
+    /// Q42: emails of the current digest auto-file should move now. An email qualifies once its result is
+    /// persisted (its job item has a finish time) and it is eligible above; pending, in-flight and failed
+    /// emails never are. Emails finished before auto-file was switched on are left alone (no sweep), and
+    /// moved, kept, already-tried or undone emails (`dispositions`) are never tried again.
+    public func autoFileIDs(digest: Digest, emails: [String: EmailContext], dispositions: MailDispositions,
+                            finishedAt: [String: Date], enabledAt: Date) -> [String] {
+        let processed = entries(digest: digest, emails: emails,
+                                excluding: dispositions.hidden.union(dispositions.autoFileAttempted))
+        return autoFileIDs(processed).filter { id in finishedAt[id].map { $0 >= enabledAt } ?? false }
+    }
+
     /// Ids for the "Select all newsletters" shortcut.
     public func newsletterIDs(_ entries: [ProcessedEntry]) -> Set<String> {
         Set(entries.filter { $0.category == .newsletters }.map(\.id))

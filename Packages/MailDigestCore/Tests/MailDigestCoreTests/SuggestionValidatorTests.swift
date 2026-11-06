@@ -16,8 +16,8 @@ private func task(_ title: String = "Send the report", due: String? = nil, evide
                   evidence: evidence, confidence: confidence)
 }
 
-private func context(recent: [Suggestion] = [], approved: Bool = false) -> ValidationContext {
-    ValidationContext(today: today, recentSuggestions: recent, senderHasApprovedDecision: approved)
+private func context(recent: [Suggestion] = [], approved: Bool = false, max: Int = 3) -> ValidationContext {
+    ValidationContext(today: today, recentSuggestions: recent, senderHasApprovedDecision: approved, maxSuggestions: max)
 }
 
 private func suggestion(_ title: String, due: Date? = nil, status: SuggestionStatus = .pending,
@@ -193,6 +193,15 @@ private let validator = SuggestionValidator(timeZone: brisbane)
         }
         let out = validator.validate(tasks, email: email(body), context: context())
         #expect(out.map(\.title) == ["Task number 1", "Task number 4", "Task number 3"])
+    }
+
+    @Test func trustedNewsletterKeepsUpToEight() {
+        let body = "Please do all of these things."
+        let tasks = (0..<10).map { task("Task number \($0)", evidence: body, confidence: 0.9 - Double($0) * 0.01) }
+        #expect(validator.validate(tasks, email: email(body), context: context(max: 8)).count == 8)
+        #expect(validator.validate(tasks, email: email(body), context: context()).count == 3)
+        // The limit can never exceed the schema maximum.
+        #expect(context(max: 50).maxSuggestions == 8)
     }
 
     @Test func makeIDIsUsed() {

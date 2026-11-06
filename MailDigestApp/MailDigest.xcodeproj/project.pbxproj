@@ -8,8 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		A10000000000000000000010 /* MailDigestCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000020 /* MailDigestCore */; };
-		A10000000000000000000026 /* MailDigestPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000025 /* MailDigestPersistence */; };
 		A10000000000000000000011 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000021 /* GRDB */; };
+		A10000000000000000000026 /* MailDigestPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000025 /* MailDigestPersistence */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */

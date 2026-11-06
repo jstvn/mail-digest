@@ -112,6 +112,19 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         migrator.registerMigration("v2") { db in
             try db.execute(sql: "ALTER TABLE job ADD COLUMN pause_reason TEXT")
         }
+        // v3 (Q39, Q42): moved/kept emails and auto-file attempts, owned by their digest so retention removes
+        // them with it. Separate from `processed_email`, which dedupe keeps forever.
+        migrator.registerMigration("v3") { db in
+            try db.execute(sql: """
+                CREATE TABLE mail_disposition (
+                    digest_id TEXT NOT NULL REFERENCES digest(id) ON DELETE CASCADE,
+                    email_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    recorded_at REAL NOT NULL,
+                    PRIMARY KEY (digest_id, email_id, kind)
+                )
+                """)
+        }
         return migrator
     }
 
@@ -290,11 +303,52 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         }
     }
 
+    // MARK: Mail dispositions
+
+    public func recordDispositions(_ dispositions: [MailDisposition]) async throws {
+        guard !dispositions.isEmpty else { return }
+        try await writer.write { db in
+            for d in dispositions {
+                // Checked up front so callers get the same error as `appendEmailResult`, not a constraint error.
+                guard try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM digest WHERE id = ?)",
+                                        arguments: [d.digestID.uuidString]) == true else {
+                    throw DigestStoreError.digestNotFound(d.digestID)
+                }
+                try db.execute(sql: """
+                    INSERT INTO mail_disposition (digest_id, email_id, kind, recorded_at) VALUES (?, ?, ?, ?)
+                    ON CONFLICT(digest_id, email_id, kind) DO UPDATE SET recorded_at = excluded.recorded_at
+                    """, arguments: [d.digestID.uuidString, d.emailID, d.kind.rawValue,
+                                     d.recordedAt.timeIntervalSince1970])
+            }
+        }
+    }
+
+    public func removeDispositions(_ kind: MailDispositionKind, emailIDs: Set<String>, digestID: UUID) async throws {
+        guard !emailIDs.isEmpty else { return }
+        try await writer.write { db in
+            for id in emailIDs {
+                try db.execute(sql: "DELETE FROM mail_disposition WHERE digest_id = ? AND email_id = ? AND kind = ?",
+                               arguments: [digestID.uuidString, id, kind.rawValue])
+            }
+        }
+    }
+
+    public func dispositions(digestID: UUID) async throws -> [MailDisposition] {
+        try await writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT * FROM mail_disposition WHERE digest_id = ? ORDER BY recorded_at",
+                             arguments: [digestID.uuidString]).compactMap { row -> MailDisposition? in
+                guard let kind = MailDispositionKind(rawValue: row["kind"]) else { return nil }
+                return MailDisposition(digestID: digestID, emailID: row["email_id"], kind: kind,
+                                       recordedAt: Date(timeIntervalSince1970: row["recorded_at"]))
+            }
+        }
+    }
+
     // MARK: Retention
 
     public func apply(_ plan: RetentionPlan) async throws {
         try await writer.write { db in
-            // Cascades remove each digest's results and each job's items; processed ids and decisions have no
+            // Cascades remove each digest's results and dispositions and each job's items; processed ids and decisions have no
             // foreign key to either and are never touched (Q18, Q21).
             for id in plan.digestIDs { try db.execute(sql: "DELETE FROM digest WHERE id = ?", arguments: [id.uuidString]) }
             for id in plan.jobIDs { try db.execute(sql: "DELETE FROM job WHERE id = ?", arguments: [id.uuidString]) }
@@ -440,6 +494,14 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             try db.execute(sql: """
                 UPDATE job_item SET state = ?, last_error = ?, attempts = attempts + ? WHERE id = ?
                 """, arguments: [state.rawValue, error, spendsAttempt ? 1 : 0, itemID.uuidString])
+        }
+    }
+
+    public func updateItemLocation(_ itemID: UUID, mailbox: MailboxRef, storeRowID: Int64?) async throws {
+        let json = try JSON.encode(mailbox)
+        try await writer.write { db in
+            try db.execute(sql: "UPDATE job_item SET mailbox = ?, mail_store_row_id = ? WHERE id = ?",
+                           arguments: [json, storeRowID, itemID.uuidString])
         }
     }
 

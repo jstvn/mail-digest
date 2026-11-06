@@ -107,4 +107,37 @@ private func job(age: TimeInterval, state: JobState = .finished) -> Job {
                                 jobs: [pinnedJob])
         #expect(later.digestIDs == [pinned.id] && later.jobIDs == [pinned.id])
     }
+
+    @Test func deleteAllKeepsPinnedAndResumableContextAndNeverProcessedIdsOrDecisions() async throws {
+        let store = InMemoryDigestStore()
+        func jobFor(_ d: Digest, _ state: JobState) -> Job {
+            Job(id: d.id, kind: .backlog, mailboxes: [], scopeFrom: now, scopeTo: now, state: state,
+                createdAt: d.createdAt, totals: JobTotals(queued: 0, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        }
+        let pinned = digest(age: 0), plain = digest(age: 0), paused = digest(age: 0), stopped = digest(age: 0)
+        let jobs = [jobFor(pinned, .finished), jobFor(plain, .finished), jobFor(paused, .paused),
+                    jobFor(stopped, .stopped)]
+        for d in [pinned, plain, paused, stopped] { try await store.save(d) }
+        for j in jobs { try await store.createJob(j) }
+        try await store.setPinned(true, infoID: "e", digestID: pinned.id)
+        try await store.markProcessed(ProcessedEmail(id: "e", receivedAt: now, tier: .full, processedAt: now))
+        try await store.recordDecision(Decision(suggestionID: UUID(), sender: "a@b.c", action: .dismissed, decidedAt: now))
+        try await store.recordDispositions([
+            MailDisposition(digestID: plain.id, emailID: "e", kind: .moved, recordedAt: now),
+            MailDisposition(digestID: pinned.id, emailID: "e", kind: .kept, recordedAt: now),
+        ])
+
+        let plan = policy.deleteAllPlan(digests: try await store.retainedDigests(), jobs: try await store.jobs())
+        #expect(plan == RetentionPlan(digestIDs: [plain.id], jobIDs: [plain.id]))
+        try await store.apply(plan)
+
+        #expect(try await store.digest(id: plain.id) == nil)
+        for kept in [pinned, paused, stopped] { #expect(try await store.digest(id: kept.id) != nil) }
+        #expect(Set(try await store.jobs().map(\.id)) == [pinned.id, paused.id, stopped.id])
+        #expect(await store.processedIDs() == ["e"])
+        #expect(try await store.decisions(for: "a@b.c").count == 1)
+        // Dispositions go with their digest only.
+        #expect(try await store.dispositions(digestID: plain.id).isEmpty)
+        #expect(try await store.dispositions(digestID: pinned.id).map(\.kind) == [.kept])
+    }
 }

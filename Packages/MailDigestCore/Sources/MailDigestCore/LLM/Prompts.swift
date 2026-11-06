@@ -11,8 +11,10 @@ public enum Prompts {
         return f
     }
 
-    /// System prompt for one extraction call.
-    public static func extractionSystem(today: Date, timeZone: TimeZone, tier: MailTier) -> String {
+    /// System prompt for one extraction call. `trustedNewsletter` tells the model the sender is on the
+    /// user's Trusted Newsletter list, so its actionable tasks are wanted (up to 8).
+    public static func extractionSystem(today: Date, timeZone: TimeZone, tier: MailTier,
+                                        trustedNewsletter: Bool = false) -> String {
         let todayISO = formatter("yyyy-MM-dd", timeZone).string(from: today)
         let tz = timeZone.identifier
         var lines = [
@@ -23,9 +25,18 @@ public enum Prompts {
             "summary: one plain sentence, under 25 words, saying what the email is about.",
             "key_facts: up to 4 short facts worth remembering (dates, places, amounts, names). Empty if none.",
             "tasks: only things the user must do or attend. Empty if none.",
+            "For an ordinary email, return at most 3 tasks. For a sender explicitly configured as a Trusted Newsletter, "
+                + "return at most 8 actionable tasks. The application applies the same sender-specific limit during validation.",
         ]
         // The rule line is omitted entirely (no blank line) for tiers that may have tasks.
-        if tier == .infoOnly { lines.append("tasks must be an empty array.") }
+        if tier == .infoOnly {
+            lines.append("tasks must be an empty array.")
+        } else if trustedNewsletter {
+            lines.append("This sender is explicitly configured as a Trusted Newsletter: "
+                + "extract its actionable tasks, at most 8.")
+        } else {
+            lines.append("This sender is not a Trusted Newsletter: return at most 3 tasks.")
+        }
         lines += [
             "Task title: short imperative phrase under 60 characters.",
             "due: ISO 8601 date (YYYY-MM-DD) or date-time (YYYY-MM-DDTHH:MM) in \(tz), or null if no date is stated.",

@@ -48,6 +48,46 @@ private func fixture(_ prefix: String) throws -> EmailMessage {
         #expect(out.summaryText == "info only")
     }
 
+    @Test func trustedNewsletterGetsTasksUpToEight() async throws {
+        let email = try fixture("news-tech-09")
+        let evidence = try #require(email.body.split(separator: "\n").map(String.init)
+            .first { $0.trimmingCharacters(in: .whitespaces).count > 10 })
+        let tasks = (0..<10).map {
+            ExtractedTask(title: "Newsletter task \($0)", due: nil, dueHasTime: false, priority: .medium,
+                          evidence: evidence, confidence: 0.9)
+        }
+        let result = ExtractionResult(summary: "News.", category: .newsletters, importance: 2, keyFacts: [], tasks: tasks)
+        let llm = StubLLMClient(results: [email.id: result])
+
+        // Ordinary newsletter: summary only, model told nothing special.
+        let ordinary = try await run(pipeline(llm), email)
+        #expect(ordinary.tier == .infoOnly && ordinary.info != nil && ordinary.suggestions.isEmpty)
+
+        // Trusted: summary plus up to 8 validated suggestions, and the model is told.
+        let filter = MailFilter(trustedNewsletterSenders: [MailFilter.address(from: email.sender)])
+        let trusted = try await run(pipeline(llm, filter: filter), email)
+        #expect(trusted.tier == .full && trusted.info != nil)
+        #expect(trusted.suggestions.count == 8)
+        let calls = await llm.extractCalls
+        #expect(calls.map(\.trustedNewsletter) == [false, true])
+        #expect(calls.map(\.tier) == [.infoOnly, .full])
+    }
+
+    @Test func ordinaryFullMailStaysAtThree() async throws {
+        let email = try fixture("bill-rent-04")
+        let evidence = try #require(email.body.split(separator: "\n").map(String.init)
+            .first { $0.trimmingCharacters(in: .whitespaces).count > 10 })
+        let tasks = (0..<6).map {
+            ExtractedTask(title: "Rent task \($0)", due: nil, dueHasTime: false, priority: .medium,
+                          evidence: evidence, confidence: 0.9)
+        }
+        let llm = StubLLMClient(results: [email.id: ExtractionResult(
+            summary: "Rent.", category: .finance, importance: 3, keyFacts: [], tasks: tasks)])
+        let out = try await run(pipeline(llm), email)
+        #expect(out.suggestions.count == 3)
+        #expect(await llm.extractCalls.map(\.trustedNewsletter) == [false])
+    }
+
     @Test func blockedSenderSkipsWithoutModelCall() async throws {
         let llm = StubLLMClient()
         let email = try fixture("work-13")
@@ -94,7 +134,8 @@ private func fixture(_ prefix: String) throws -> EmailMessage {
     @Test func headlineFallsBackWhenModelThrows() async {
         struct Failing: LLMClient {
             func healthCheck() async throws {}
-            func extract(_ email: EmailMessage, tier: MailTier, today: Date, timeZone: TimeZone) async throws -> ExtractionResult { throw StubLLMError.malformed }
+            func extract(_ email: EmailMessage, tier: MailTier, trustedNewsletter: Bool, today: Date,
+                         timeZone: TimeZone) async throws -> ExtractionResult { throw StubLLMError.malformed }
             func headline(for info: [InfoItem], suggestionCount: Int) async throws -> String { throw StubLLMError.malformed }
         }
         let p = DigestPipeline(llm: Failing(), filter: MailFilter(), timeZone: tz)
