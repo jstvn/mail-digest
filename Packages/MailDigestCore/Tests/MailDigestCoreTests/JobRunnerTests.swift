@@ -839,23 +839,6 @@ private func recentMessages(_ count: Int) -> [EmailMessage] {
         #expect(digest.skipped.isEmpty)
     }
 
-    @Test func resumeNeverExtendsTheScopeOrAddsNewMail() async throws {
-        let (h, job) = try await pausedDaily(3)
-        let itemsBefore = await h.store.allItems().count
-        await h.source.moveMessage(id: "recent-2@fixture", to: archive)
-        // Arrived after the job was queued, inside its time range: still not added to this job.
-        var late = recentMessages(1)[0]
-        late.id = "late@fixture"
-        late.receivedAt = today.addingTimeInterval(-60)
-        await h.source.addMessage(late)
-        try await h.runner.resume(jobID: job.id)
-        await h.runner.waitUntilIdle()
-        #expect(await h.store.allItems().count == itemsBefore)
-        let resumed = try await h.job(job.id)
-        #expect(resumed.scopeFrom == job.scopeFrom && resumed.scopeTo == job.scopeTo)
-        #expect(!(await h.llm.extractCalls.map(\.id).contains("late@fixture")))
-    }
-
     @Test func listingFailureAbortsResumeAndKeepsTheQueue() async throws {
         let (h, job) = try await pausedDaily()
         let before = await h.store.allItems()
@@ -875,20 +858,255 @@ private func recentMessages(_ count: Int) -> [EmailMessage] {
         #expect(try await h.job(job.id).state == .finished)
     }
 
-    @Test func backlogResumeDoesNotRelist() async throws {
-        let h = Harness(source: FixtureMailSource(messages: oldMessages(4)), llm: StubLLMClient())
+    // MARK: Daily discovery
+
+    private func newMail(_ id: String, at date: Date, in box: String = "Inbox") -> EmailMessage {
+        EmailMessage(id: id, account: "iCloud", mailbox: box, sender: "Sam <sam@example.com>", subject: id,
+                     receivedAt: date, body: "Hello. Please reply by Friday.", headers: [:])
+    }
+
+    private func resumeAndFinish(_ h: Harness, _ job: Job) async throws {
+        try await h.runner.resume(jobID: job.id)
+        await h.runner.waitUntilIdle()
+    }
+
+    @Test func dailyResumeDiscoversNewMailInTheSameJobAfterExistingPositions() async throws {
+        let (h, job) = try await pausedDaily(3)
+        let before = await h.store.allItems()
+        let now = today.addingTimeInterval(3600)
+        h.clock.set(now)
+        await h.source.addMessage(newMail("fresh-a@fixture", at: today.addingTimeInterval(600)))
+        await h.source.addMessage(newMail("fresh-b@fixture", at: today.addingTimeInterval(1800)))
+        let rangesBefore = await h.source.listRanges.count
+
+        try await resumeAndFinish(h, job)
+
+        let items = await h.store.allItems()
+        #expect(items.count == before.count + 2)
+        #expect(Set(items.map(\.jobID)) == [job.id])
+        let maxOld = before.map(\.position).max() ?? 0
+        // Newest first among the new items, positions continue after the existing ones.
+        #expect(try await item(h, "fresh-b@fixture").position == maxOld + 1)
+        #expect(try await item(h, "fresh-a@fixture").position == maxOld + 2)
+        let resumed = try await h.job(job.id)
+        #expect(resumed.state == .finished && resumed.scopeFrom == job.scopeFrom && resumed.scopeTo == now)
+        #expect(await h.store.allDigests().count == 1)
+        #expect(try await h.digest().id == job.id)
+        #expect(Set(try await h.digest().info.map(\.emailID)).isSuperset(of: ["fresh-a@fixture", "fresh-b@fixture"]))
+        // Discovery window starts at the cursor (the old scope end) and ends at the resume time.
+        let discovery = await h.source.listRanges[rangesBefore...].filter { $0.to == now }
+        #expect(!discovery.isEmpty)
+        #expect(discovery.allSatisfy { $0.from == today })
+        #expect(await h.source.checkCalls == 2)
+    }
+
+    @Test func dailyDiscoveryNeverLooksBackFurtherThanTheCap() async throws {
+        let (h, job) = try await pausedDaily(2)
+        let now = today.addingTimeInterval(10 * 86_400)
+        h.clock.set(now)
+        let rangesBefore = await h.source.listRanges.count
+        try await resumeAndFinish(h, job)
+        let discovery = await h.source.listRanges[rangesBefore...].filter { $0.to == now }
+        #expect(!discovery.isEmpty)
+        #expect(discovery.allSatisfy { $0.from == now.addingTimeInterval(-48 * 3600) })
+    }
+
+    @Test func reconciliationCoversItemsOlderThanTheNewWindow() async throws {
+        let (h, job) = try await pausedDaily(5)
+        h.clock.set(today.addingTimeInterval(10 * 86_400))
+        await h.source.removeMessage(id: "recent-1@fixture")
+        await h.source.moveMessage(id: "recent-3@fixture", to: archive)
+        try await resumeAndFinish(h, job)
+        #expect(try await item(h, "recent-1@fixture").outcome == JobRunner.goneFromMailboxOutcome)
+        #expect(try await item(h, "recent-3@fixture").mailbox.name == "Archive")
+        #expect(try await item(h, "recent-3@fixture").state == .done)
+        #expect(try await item(h, "recent-4@fixture").state == .done)
+    }
+
+    @Test func discoveryNeverReaddsMailAlreadyInTheJobProcessedOrQueuedElsewhere() async throws {
+        let (h, job) = try await pausedDaily(3)
+        await h.source.removeMessage(id: "recent-1@fixture")
+        // Gone from the old window but reappearing in the new one: it is already an item of this job.
+        await h.source.addMessage(newMail("recent-1@fixture", at: today.addingTimeInterval(4000)))
+        await h.source.addMessage(newMail("recent-0@fixture", at: today.addingTimeInterval(4100)))
+        await h.source.addMessage(newMail("elsewhere@fixture", at: today.addingTimeInterval(4200)))
+        await h.source.addMessage(newMail("processed@fixture", at: today.addingTimeInterval(4300)))
+        try await h.store.markProcessed(ProcessedEmail(id: "processed@fixture", receivedAt: today, tier: .full,
+                                                       processedAt: today))
+        let other = Job(id: UUID(), kind: .backlog, mailboxes: [icloud], scopeFrom: today, scopeTo: today,
+                        state: .paused, createdAt: today.addingTimeInterval(-5),
+                        totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        try await h.store.createJob(other)
+        try await h.store.enqueue([MessageHeader(id: "elsewhere@fixture", account: "iCloud", mailbox: "Inbox",
+                                                 sender: "x", subject: "x", receivedAt: today,
+                                                 sourceReference: MailMessageReference(messageID: "elsewhere@fixture",
+                                                                                       storeRowID: nil))], job: other.id)
+        h.clock.set(today.addingTimeInterval(7200))
+        let before = await h.store.allItems().filter { $0.jobID == job.id }.count
+
+        try await resumeAndFinish(h, job)
+
+        let mine = await h.store.allItems().filter { $0.jobID == job.id }
+        #expect(mine.count == before)
+        #expect(mine.filter { $0.messageID == "recent-1@fixture" }.count == 1)
+        #expect(try await item(h, "recent-1@fixture").state == .skipped)
+        #expect(!mine.map(\.messageID).contains("processed@fixture"))
+        #expect(!mine.map(\.messageID).contains("elsewhere@fixture"))
+        #expect(mine.filter { $0.messageID == "recent-0@fixture" }.count == 1)
+    }
+
+    @Test func dailyResumeRespectsTheDailyCapWithoutDroppingQueuedItems() async throws {
+        var cfg = settings(mailboxes: [icloud, archive])
+        cfg.maxEmailsPerRun = 4
+        let h = Harness(source: FixtureMailSource(messages: recentMessages(3)), llm: StubLLMClient(), settings: cfg)
         let runner = h.runner
-        await h.llm.setOnExtract { email in
-            if email.id == "old-0@fixture" { await runner.pause() }
-        }
-        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.llm.setOnExtract { email in if email.id == "recent-0@fixture" { await runner.pause() } }
+        try await h.runner.startDaily()
         await h.runner.waitUntilIdle()
         await h.llm.setOnExtract(nil)
-        let lists = await h.source.listCalls
+        let job = try await h.job()
+        // 2 open items remain, so only 2 of the 3 new emails fit (newest first).
+        h.clock.set(today.addingTimeInterval(3600))
+        for n in 0..<3 { await h.source.addMessage(newMail("new-\(n)@fixture", at: today.addingTimeInterval(Double(100 * (n + 1))))) }
+        try await resumeAndFinish(h, job)
+        let ids = Set(await h.store.allItems().map(\.messageID))
+        #expect(ids.contains("new-2@fixture") && ids.contains("new-1@fixture") && !ids.contains("new-0@fixture"))
+        #expect(ids.count == 5)
+    }
+
+    @Test func dailyResumeWithQueueOverTheCapAdmitsNothingNew() async throws {
+        let (h, job) = try await pausedDaily(5)   // 4 open
+        _ = job
+        var cfg = settings(mailboxes: [icloud, archive])
+        cfg.maxEmailsPerRun = 2
+        let h2 = Harness(source: h.source, llm: h.llm, store: h.store, settings: cfg)
+        h2.clock.set(today.addingTimeInterval(3600))
+        await h.source.addMessage(newMail("fresh@fixture", at: today.addingTimeInterval(100)))
+        // The runner in h2 uses its own clock instance; its "now" is `today`, so only the cap matters here.
+        let before = await h.store.allItems().count
+        try await h2.runner.resume(jobID: job.id)
+        await h2.runner.waitUntilIdle()
+        let items = await h.store.allItems()
+        #expect(items.count == before)
+        #expect(items.filter { $0.state == .done }.count == 5)
+    }
+
+    @Test func discoveryListingFailureLeavesEverythingUnchanged() async throws {
+        let (h, job) = try await pausedDaily(3)
+        let before = await h.store.allItems()
+        h.clock.set(today.addingTimeInterval(3600))
+        await h.source.addMessage(newMail("fresh@fixture", at: today.addingTimeInterval(600), in: "Archive"))
+        // Reconciliation lists Inbox and Archive; fail Archive so the (first) listing errors.
+        await h.source.setListingFails(true, for: archive)
+        await #expect(throws: FixtureMailError.listingFailed) { try await h.runner.resume(jobID: job.id) }
+        #expect(await h.store.allItems() == before)
+        #expect(try await h.job(job.id) == job)
+
+        await h.source.setListingFails(false, for: archive)
+        try await resumeAndFinish(h, job)
+        #expect(try await h.job(job.id).state == .finished)
+        #expect(await h.store.allItems().filter { $0.messageID == "fresh@fixture" }.count == 1)
+    }
+
+    @Test func listingFailureInDiscoveryOnlyAbortsWithoutPartialChanges() async throws {
+        // No open items: reconciliation lists nothing, so the failure is in the discovery listing.
+        let h = Harness(source: FixtureMailSource(messages: recentMessages(1)), llm: StubLLMClient(),
+                        settings: settings(mailboxes: [icloud, archive]))
+        let runner = h.runner
+        await h.llm.setOnExtract { _ in await runner.pause() }
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract(nil)
+        let job = try await h.job()
+        #expect(job.state == .paused && job.totals.queued == 0)
+        let before = await h.store.allItems()
+        h.clock.set(today.addingTimeInterval(3600))
+        await h.source.addMessage(newMail("fresh@fixture", at: today.addingTimeInterval(600)))
+        await h.source.setListingFails(true, for: archive)
+        await #expect(throws: FixtureMailError.listingFailed) { try await h.runner.resume(jobID: job.id) }
+        #expect(await h.store.allItems() == before)
+        #expect(try await h.job(job.id).scopeTo == job.scopeTo)
+        await h.source.setListingFails(false, for: archive)
+        try await resumeAndFinish(h, job)
+        #expect(try await h.job(job.id).scopeTo == today.addingTimeInterval(3600))
+        #expect(await h.store.allItems().map(\.messageID).contains("fresh@fixture"))
+    }
+
+    @Test func resumingTwiceNeverDuplicates() async throws {
+        let (h, job) = try await pausedDaily(2)
+        h.clock.set(today.addingTimeInterval(3600))
+        await h.source.addMessage(newMail("fresh@fixture", at: today.addingTimeInterval(600)))
+        try await resumeAndFinish(h, job)
+        let count = await h.store.allItems().count
+        h.clock.set(today.addingTimeInterval(7200))
+        try await resumeAndFinish(h, job)
+        #expect(await h.store.allItems().count == count)
+    }
+
+    @Test func anotherUnresolvedDailyJobSkipsDiscovery() async throws {
+        let (h, job) = try await pausedDaily(2)
+        let other = Job(id: UUID(), kind: .daily, mailboxes: [icloud], scopeFrom: today, scopeTo: today,
+                        state: .stopped, createdAt: today.addingTimeInterval(-1),
+                        totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        try await h.store.createJob(other)
+        h.clock.set(today.addingTimeInterval(3600))
+        await h.source.addMessage(newMail("fresh@fixture", at: today.addingTimeInterval(600)))
+        try await resumeAndFinish(h, job)
+        #expect(!(await h.store.allItems().map(\.messageID).contains("fresh@fixture")))
+        #expect(try await h.job(job.id).scopeTo == job.scopeTo)
+    }
+
+    // MARK: Backlog reconciliation
+
+    @Test func backlogResumeReconcilesOverItsScopeOnlyAndAddsNothing() async throws {
+        let h = Harness(source: FixtureMailSource(messages: oldMessages(4)), llm: StubLLMClient(),
+                        settings: settings(mailboxes: [icloud, archive]))
+        let runner = h.runner
+        await h.llm.setOnExtract { email in if email.id == "old-0@fixture" { await runner.pause() } }
+        let plan = h.plan(boxes: [icloud, archive])
+        try await h.runner.start(plan)
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract(nil)
+        let job = try await h.job()
+        await h.source.removeMessage(id: "old-1@fixture")
+        await h.source.moveMessage(id: "old-2@fixture", to: archive)
+        // Arrives inside the scope after queueing, and later than the scope; neither is appended.
+        await h.source.addMessage(newMail("late-in@fixture", at: today.addingTimeInterval(-86_400)))
+        await h.source.addMessage(newMail("late-after@fixture", at: today.addingTimeInterval(30)))
+        let calls = await h.source.listCalls
+        h.clock.set(today.addingTimeInterval(3600))
+
         try await h.runner.resume()
         await h.runner.waitUntilIdle()
-        #expect(await h.source.listCalls == lists)
-        #expect(try await h.job().state == .finished)
+
+        #expect(await h.source.listCalls > calls)
+        #expect(await h.source.checkCalls == 0)
+        let ranges = await h.source.listRanges.dropFirst(calls)
+        #expect(ranges.allSatisfy { $0.from <= job.scopeFrom && $0.to >= job.scopeTo && $0.to < today.addingTimeInterval(3600) })
+        #expect(try await item(h, "old-1@fixture").outcome == JobRunner.goneFromMailboxOutcome)
+        #expect(try await item(h, "old-1@fixture").attempts == 0)
+        #expect(try await item(h, "old-2@fixture").mailbox.name == "Archive")
+        let ids = await h.store.allItems().map(\.messageID)
+        #expect(!ids.contains("late-in@fixture") && !ids.contains("late-after@fixture"))
+        let done = try await h.job(job.id)
+        #expect(done.scopeFrom == job.scopeFrom && done.scopeTo == job.scopeTo && done.state == .finished)
+    }
+
+    @Test func backlogListingFailureLeavesTheQueueUnchanged() async throws {
+        let h = Harness(source: FixtureMailSource(messages: oldMessages(3)), llm: StubLLMClient(),
+                        settings: settings(mailboxes: [icloud, archive]))
+        let runner = h.runner
+        await h.llm.setOnExtract { email in if email.id == "old-0@fixture" { await runner.pause() } }
+        try await h.runner.start(h.plan(boxes: [icloud, archive]))
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract(nil)
+        let before = await h.store.allItems()
+        let job = try await h.job()
+        await h.source.removeMessage(id: "old-1@fixture")
+        await h.source.setListingFails(true, for: archive)
+        await #expect(throws: FixtureMailError.listingFailed) { try await h.runner.resume() }
+        #expect(await h.store.allItems() == before)
+        #expect(try await h.job() == job)
     }
 }
 

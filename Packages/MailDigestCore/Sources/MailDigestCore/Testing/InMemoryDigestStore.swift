@@ -148,6 +148,10 @@ public actor InMemoryDigestStore: DigestStore {
     // MARK: Queue
 
     public func enqueue(_ headers: [MessageHeader], job jobID: UUID) async throws {
+        appendItems(headers, job: jobID)
+    }
+
+    private func appendItems(_ headers: [MessageHeader], job jobID: UUID) {
         var position = itemsByJob[jobID]?.last.map { itemList[$0].position } ?? 0
         for h in headers {
             position += 1
@@ -191,10 +195,25 @@ public actor InMemoryDigestStore: DigestStore {
         if error != nil && (state == .queued || state == .failed) { itemList[i].attempts += 1 }
     }
 
-    public func updateItemLocation(_ itemID: UUID, mailbox: MailboxRef, storeRowID: Int64?) async throws {
-        guard let i = itemIndex[itemID] else { return }
-        itemList[i].mailbox = mailbox
-        itemList[i].storeRowID = storeRowID
+    public func applyResumeRefresh(_ refresh: QueueRefresh) async throws {
+        func isOpen(_ i: Int) -> Bool { itemList[i].state == .queued || itemList[i].state == .processing }
+        for id in refresh.skippedItemIDs {
+            guard let i = itemIndex[id], isOpen(i) else { continue }
+            itemList[i].state = .skipped
+            itemList[i].lastError = nil
+            itemList[i].outcome = refresh.skipOutcome
+            itemList[i].seconds = 0
+            itemList[i].finishedAt = refresh.skippedAt
+        }
+        for move in refresh.relocations {
+            guard let i = itemIndex[move.itemID], isOpen(i) else { continue }
+            itemList[i].mailbox = move.mailbox
+            itemList[i].storeRowID = move.storeRowID
+        }
+        appendItems(refresh.appended, job: refresh.jobID)
+        if let scopeTo = refresh.scopeTo, let j = jobList.firstIndex(where: { $0.id == refresh.jobID }) {
+            jobList[j].scopeTo = scopeTo
+        }
     }
 
     public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws {

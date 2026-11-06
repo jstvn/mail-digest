@@ -543,6 +543,9 @@ public actor JobRunner {
 - Pause takes effect between emails (normally within 30 seconds). If the user picks "Pause now", the in-flight Ollama request is cancelled with `Task` cancellation and the item is requeued
 - Stop ends the job; finished items stay done, and the remaining items can be resumed later from the job list
 - Paused jobs survive app restarts and resume only when the user clicks Resume (or automatically after a Daily job, if they were auto-paused)
+- Resume first reconciles the job's queued and processing items with its mailboxes by canonical Message-ID, over the job's scope widened to every open item's received date: an email still there stays queued, one moved to another selected mailbox follows the move, and one that is gone is skipped as "no longer in mailbox" (Q51). Finished items are never touched
+- **Daily Resume** then looks for new mail over a fresh window `[max(lastDailyScopeTo, now - lookbackCap), now)` (the Q23 cursor at the moment of resuming, never the job's original window) and appends what is eligible to the same job and digest, within the Q26 allowance `maxEmailsPerRun - open items`. On success the job's `scopeTo` moves to that `now`. It skips this step while another Daily job is unresolved (Q52). **Backlog Resume** only reconciles: its scope and selection never grow (Q53)
+- Resume lists everything before changing anything and writes the reconciliation, new items and scope change in one transaction. If a listing fails, the job keeps its state, queue and scope and the error is shown
 
 **Keeping the app responsive**
 

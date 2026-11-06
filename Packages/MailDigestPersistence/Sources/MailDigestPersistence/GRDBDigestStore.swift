@@ -434,16 +434,47 @@ public final class GRDBDigestStore: DigestStore, Sendable {
     public func enqueue(_ headers: [MessageHeader], job jobID: UUID) async throws {
         let encoded = try headers.map { try JSON.encode($0.mailboxRef) }
         try await writer.write { db in
-            var position = try Int.fetchOne(db, sql: "SELECT COALESCE(MAX(position), 0) FROM job_item WHERE job_id = ?",
-                                            arguments: [jobID.uuidString]) ?? 0
-            for (h, mailbox) in zip(headers, encoded) {
-                position += 1
+            try Self.insertItems(db, headers, encodedMailboxes: encoded, jobID: jobID)
+        }
+    }
+
+    /// Appends queued items after the job's last position. Runs inside the caller's transaction.
+    private static func insertItems(_ db: Database, _ headers: [MessageHeader], encodedMailboxes: [String],
+                                    jobID: UUID) throws {
+        var position = try Int.fetchOne(db, sql: "SELECT COALESCE(MAX(position), 0) FROM job_item WHERE job_id = ?",
+                                        arguments: [jobID.uuidString]) ?? 0
+        for (h, mailbox) in zip(headers, encodedMailboxes) {
+            position += 1
+            try db.execute(sql: """
+                INSERT INTO job_item (id, job_id, message_id, mailbox, mail_store_row_id, sender, subject,
+                                      received_at, position, state, attempts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0)
+                """, arguments: [UUID().uuidString, jobID.uuidString, h.id, mailbox, h.sourceReference.storeRowID,
+                                 h.sender, h.subject, h.receivedAt.timeIntervalSince1970, position])
+        }
+    }
+
+    public func applyResumeRefresh(_ refresh: QueueRefresh) async throws {
+        let appendedMailboxes = try refresh.appended.map { try JSON.encode($0.mailboxRef) }
+        let moves = try refresh.relocations.map { (try JSON.encode($0.mailbox), $0) }
+        // One write transaction: GRDB rolls everything back if any statement throws.
+        try await writer.write { db in
+            for id in refresh.skippedItemIDs {
                 try db.execute(sql: """
-                    INSERT INTO job_item (id, job_id, message_id, mailbox, mail_store_row_id, sender, subject,
-                                          received_at, position, state, attempts)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0)
-                    """, arguments: [UUID().uuidString, jobID.uuidString, h.id, mailbox, h.sourceReference.storeRowID,
-                                     h.sender, h.subject, h.receivedAt.timeIntervalSince1970, position])
+                    UPDATE job_item SET state = 'skipped', last_error = NULL, outcome = ?, seconds = 0,
+                        finished_at = ? WHERE id = ? AND state IN ('queued', 'processing')
+                    """, arguments: [refresh.skipOutcome, refresh.skippedAt.timeIntervalSince1970, id.uuidString])
+            }
+            for (json, move) in moves {
+                try db.execute(sql: """
+                    UPDATE job_item SET mailbox = ?, mail_store_row_id = ?
+                    WHERE id = ? AND state IN ('queued', 'processing')
+                    """, arguments: [json, move.storeRowID, move.itemID.uuidString])
+            }
+            try Self.insertItems(db, refresh.appended, encodedMailboxes: appendedMailboxes, jobID: refresh.jobID)
+            if let scopeTo = refresh.scopeTo {
+                try db.execute(sql: "UPDATE job SET scope_to = ? WHERE id = ?",
+                               arguments: [scopeTo.timeIntervalSince1970, refresh.jobID.uuidString])
             }
         }
     }
@@ -494,14 +525,6 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             try db.execute(sql: """
                 UPDATE job_item SET state = ?, last_error = ?, attempts = attempts + ? WHERE id = ?
                 """, arguments: [state.rawValue, error, spendsAttempt ? 1 : 0, itemID.uuidString])
-        }
-    }
-
-    public func updateItemLocation(_ itemID: UUID, mailbox: MailboxRef, storeRowID: Int64?) async throws {
-        let json = try JSON.encode(mailbox)
-        try await writer.write { db in
-            try db.execute(sql: "UPDATE job_item SET mailbox = ?, mail_store_row_id = ? WHERE id = ?",
-                           arguments: [json, storeRowID, itemID.uuidString])
         }
     }
 

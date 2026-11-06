@@ -170,13 +170,7 @@ public actor JobRunner {
             // Again under `busy`: another caller may have created a Daily job while the Backlog job paused.
             try await requireNoUnresolvedDaily()
             let now = clock.now()
-            let floor = now.addingTimeInterval(-settings.lookbackCap)
-            // The last Daily job's scope end, not `store.lastRunDate()`: a Backlog digest also moves the
-            // store's last-run date and would make the next Daily job skip mail.
-            let lastDaily = try await store.jobs()
-                .filter { $0.kind == .daily && $0.state != .failed && $0.state != .listing }
-                .map(\.scopeTo).max()
-            let from = max(lastDaily ?? floor, floor)
+            let from = try await dailyWindowStart(now: now)
             try await preflight()
             // Mail not running is not fatal here; listing will report it if it matters.
             if (try? await source.checkForNewMail()) != nil { try await sleep(settings.waitAfterCheck) }
@@ -195,8 +189,24 @@ public actor JobRunner {
 
     /// Throws `dailyJobUnresolved` when any Daily job other than `except` is unresolved (Q52).
     private func requireNoUnresolvedDaily(except: UUID? = nil) async throws {
+        guard !(try await otherDailyUnresolved(except: except)) else { throw JobRunnerError.dailyJobUnresolved }
+    }
+
+    private func otherDailyUnresolved(except: UUID?) async throws -> Bool {
         let others = try await store.jobs().filter { $0.id != except }
-        guard DailyLifecycle(jobs: others) == .none else { throw JobRunnerError.dailyJobUnresolved }
+        return DailyLifecycle(jobs: others) != .none
+    }
+
+    /// Where a Daily window starts (Q23): the newest scope end of earlier Daily jobs, never more than
+    /// `lookbackCap` before `now`. Failed and still-listing jobs don't count, so their mail is listed again.
+    /// Uses the jobs' scope end, not `store.lastRunDate()`: a Backlog digest also moves the last-run date
+    /// and would make the next Daily window skip mail.
+    private func dailyWindowStart(now: Date) async throws -> Date {
+        let floor = now.addingTimeInterval(-settings.lookbackCap)
+        let cursor = try await store.jobs()
+            .filter { $0.kind == .daily && $0.state != .failed && $0.state != .listing }
+            .map(\.scopeTo).max()
+        return max(cursor ?? floor, floor)
     }
 
     /// Auto-pauses the running Backlog job so a Daily job can go first, and waits until it has paused.
@@ -243,12 +253,17 @@ public actor JobRunner {
         for mailbox in plan.mailboxes where headers[mailbox] == nil {
             let listed = try await source.listHeaders(in: mailbox, from: plan.from, to: plan.to)
             headers[mailbox] = listed
-            for h in listed where !plan.excludedMessageIDs.contains(h.id) {
-                let processed = try await store.isProcessed(h.id)
-                if processed { unavailable.insert(h.id) } else if try await store.isQueued(h.id) { unavailable.insert(h.id) }
-            }
+            unavailable.formUnion(try await processedOrQueued(listed.map(\.id).filter { !plan.excludedMessageIDs.contains($0) }))
         }
         return (headers, unavailable)
+    }
+
+    private func processedOrQueued(_ ids: [String]) async throws -> Set<String> {
+        var result = Set<String>()
+        for id in ids {
+            if try await store.isProcessed(id) { result.insert(id) } else if try await store.isQueued(id) { result.insert(id) }
+        }
+        return result
     }
 
     /// The one listing-and-dedupe path shared by `preview` and `start`.
@@ -412,8 +427,13 @@ public actor JobRunner {
             }
             // Re-check the provider before resuming (Q25), so a still-down Ollama fails fast.
             try await preflight()
-            // Daily mail may have been deleted or filed since the pause; never process what is gone.
-            if job.kind == .daily { try await refreshQueue(of: job) }
+            // Mail may have been deleted or filed since the pause (both kinds); Daily also picks up new mail.
+            // All listings happen first and the changes are applied atomically, so a failure changes nothing.
+            let refresh = try await prepareRefresh(for: job)
+            if !refresh.isEmpty {
+                try await store.applyResumeRefresh(refresh)
+                if let scopeTo = refresh.scopeTo { job.scopeTo = scopeTo }
+            }
             job.state = .running
             job.clearPause()
             job.lastError = nil
@@ -622,44 +642,82 @@ public actor JobRunner {
         if let reason = resourceBlockers[job.kind] { try await parkBlocked(&job, reason: reason) }
     }
 
-    // MARK: Refresh before resuming a Daily job
+    // MARK: Refresh before resuming
 
-    /// Outcome text for a queued Daily email that is no longer in the job's mailboxes and scope.
+    /// Outcome text for a queued email that is no longer in the job's mailboxes.
     static let goneFromMailboxOutcome = "skipped: no longer in mailbox"
 
-    /// Re-lists the job's mailboxes over its original `[scopeFrom, scopeTo)` range and reconciles the queue
-    /// by canonical Message-ID. A queued email still listed stays queued (pointing at the mailbox it is in
-    /// now); one that is gone is skipped without a model call, a failure or an attempt. Finished items,
-    /// their results and the scope are untouched, and new mail is not added. Any listing error aborts
-    /// before anything changes: a failed listing never proves an email is missing.
-    private func refreshQueue(of job: Job) async throws {
-        let items = try await store.items(job: job.id).filter { $0.state == .queued || $0.state == .processing }
-        guard !items.isEmpty else { return }
+    /// Builds the queue refresh for resuming `job`. Only reads; any listing error propagates before
+    /// anything is changed. A failed listing never proves mail is gone.
+    private func prepareRefresh(for job: Job) async throws -> QueueRefresh {
+        let allItems = try await store.items(job: job.id)
+        let open = allItems.filter { $0.state == .queued || $0.state == .processing }
+        // Daily discovery: mail that arrived since the cursor (Q53). Backlog scopes are fixed. Skipped while
+        // another Daily job is unresolved, so a resume never makes a second one (Q52).
+        let discovers = job.kind == .daily ? !(try await otherDailyUnresolved(except: job.id)) : false
+        // Same "check Mail first" step as `startDaily`; Mail not running is not fatal.
+        if discovers, (try? await source.checkForNewMail()) != nil { try await sleep(settings.waitAfterCheck) }
+        // One `now` for the whole resume: skip times, the discovery window and the new scope end.
+        let now = clock.now()
 
-        func key(_ id: String) -> String { MessageID.canonical(id) ?? id }
-        func sameMailbox(_ a: MailboxRef, _ b: MailboxRef) -> Bool { a.account == b.account && a.name == b.name }
+        let reconciled = try await reconcile(open: open, job: job)
+        var refresh = QueueRefresh(jobID: job.id, skippedItemIDs: reconciled.skipped,
+                                   skipOutcome: Self.goneFromMailboxOutcome, skippedAt: now,
+                                   relocations: reconciled.relocations)
+        if discovers {
+            refresh.appended = try await discover(job: job, allItems: allItems, now: now,
+                                                  openRemaining: open.count - reconciled.skipped.count)
+            refresh.scopeTo = now
+        }
+        return refresh
+    }
 
-        // List everything first, so a failure part-way leaves the queue as it was.
+    private func canonicalKey(_ id: String) -> String { MessageID.canonical(id) ?? id }
+
+    /// Lists the job's mailboxes over its stored scope, widened to cover every open item so one older than
+    /// the scope is never taken for missing, and matches open items by canonical Message-ID (Q51).
+    private func reconcile(open: [JobItem], job: Job) async throws
+        -> (skipped: [UUID], relocations: [QueueRefresh.Relocation]) {
+        guard let oldest = open.map(\.receivedAt).min(), let newest = open.map(\.receivedAt).max() else {
+            return ([], [])
+        }
+        let from = min(job.scopeFrom, oldest)
+        let to = max(job.scopeTo, newest.addingTimeInterval(1))
         var listed: [String: [MessageHeader]] = [:]
         for mailbox in job.mailboxes {
-            for header in try await source.listHeaders(in: mailbox, from: job.scopeFrom, to: job.scopeTo) {
-                listed[key(header.id), default: []].append(header)
+            for header in try await source.listHeaders(in: mailbox, from: from, to: to) {
+                listed[canonicalKey(header.id), default: []].append(header)
             }
         }
-
-        let now = clock.now()
-        for item in items {
-            guard let found = listed[key(item.messageID)], let first = found.first else {
-                try await store.recordItemOutcome(item.id, outcome: Self.goneFromMailboxOutcome, seconds: 0,
-                                                  finishedAt: now)
-                try await store.setItemState(item.id, .skipped, error: nil)
+        var skipped: [UUID] = []
+        var moves: [QueueRefresh.Relocation] = []
+        for item in open {
+            guard let found = listed[canonicalKey(item.messageID)], let first = found.first else {
+                skipped.append(item.id)
                 continue
             }
             // Still where it was queued: keep the stored mailbox and locator.
-            if found.contains(where: { sameMailbox($0.mailboxRef, item.mailbox) }) { continue }
-            try await store.updateItemLocation(item.id, mailbox: first.mailboxRef,
-                                               storeRowID: first.sourceReference.storeRowID)
+            if found.contains(where: { $0.account == item.mailbox.account && $0.mailbox == item.mailbox.name }) { continue }
+            moves.append(.init(itemID: item.id, mailbox: first.mailboxRef, storeRowID: first.sourceReference.storeRowID))
         }
+        return (skipped, moves)
+    }
+
+    /// Lists `[cursor, now)` for a Daily job and picks what to append to it, through the same eligibility
+    /// path as a new job. Nothing already in this job (in any state), processed, or queued elsewhere is
+    /// offered again. Q26: new mail only fills what the cap leaves after the job's remaining open items.
+    private func discover(job: Job, allItems: [JobItem], now: Date, openRemaining: Int) async throws -> [MessageHeader] {
+        let plan = JobPlan(kind: .daily, mailboxes: job.mailboxes, from: try await dailyWindowStart(now: now),
+                           to: now, excludedMessageIDs: [])
+        var (headers, unavailable) = try await listHeaders(plan)
+        let inJob = Set(allItems.map { canonicalKey($0.messageID) })
+        for list in headers.values {
+            for h in list where inJob.contains(canonicalKey(h.id)) { unavailable.insert(h.id) }
+        }
+        let allowance = settings.maxEmailsPerRun.map { max(0, $0 - openRemaining) }
+        let selection = JobPreviewBuilder.select(plan: plan, headers: headers, unavailable: unavailable,
+                                                 limit: allowance)
+        return selection.toProcess
     }
 
     // MARK: Processing loop

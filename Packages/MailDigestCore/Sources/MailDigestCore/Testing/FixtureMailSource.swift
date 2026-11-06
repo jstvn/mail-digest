@@ -15,6 +15,8 @@ public actor FixtureMailSource: MailSource {
     public private(set) var fetchReferenceCalls: [[MailMessageReference]] = []
     /// Number of `listHeaders` calls.
     public private(set) var listCalls = 0
+    /// Mailbox and range of every `listHeaders` call, in call order.
+    public private(set) var listRanges: [(mailbox: MailboxRef, from: Date, to: Date)] = []
     /// Number of `checkForNewMail` calls.
     public private(set) var checkCalls = 0
 
@@ -67,6 +69,7 @@ public actor FixtureMailSource: MailSource {
 
     public func listHeaders(in mailbox: MailboxRef, from: Date, to: Date) async throws -> [MessageHeader] {
         listCalls += 1
+        listRanges.append((mailbox, from, to))
         if failingMailboxes.contains(MailboxRef(account: mailbox.account, name: mailbox.name)) {
             throw FixtureMailError.listingFailed
         }

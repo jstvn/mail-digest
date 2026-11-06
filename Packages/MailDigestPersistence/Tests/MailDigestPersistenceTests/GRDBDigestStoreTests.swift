@@ -490,16 +490,38 @@ import MailDigestCore
         #expect(tables.contains("mail_disposition"))
     }
 
-    @Test func itemLocationUpdates() async throws {
+    @Test func resumeRefreshAppliesSkipsMovesAppendsAndScopeTogether() async throws {
         let store = try GRDBDigestStore.inMemory()
         let job = makeJob()
         try await store.createJob(job)
-        try await store.enqueue([makeHeader("m1", rowID: 7)], job: job.id)
-        let item = try #require(await store.items(job: job.id).first)
+        try await store.enqueue([makeHeader("m1", rowID: 7), makeHeader("m2", rowID: 8), makeHeader("m3", rowID: 9)],
+                                job: job.id)
+        let items = try await store.items(job: job.id)
+        try await store.setItemState(items[2].id, .done, error: nil)
         let archive = MailboxRef(account: "iCloud", name: "Archive", accountID: "A1", mailboxURL: "imap://A1/Archive")
-        try await store.updateItemLocation(item.id, mailbox: archive, storeRowID: 42)
-        let moved = try #require(await store.items(job: job.id).first)
-        #expect(moved.mailbox == archive && moved.storeRowID == 42)
-        #expect(moved.state == item.state && moved.attempts == item.attempts && moved.position == item.position)
+        let at = Date(timeIntervalSince1970: 5000)
+        let newScope = Date(timeIntervalSince1970: 9000)
+
+        try await store.applyResumeRefresh(QueueRefresh(
+            jobID: job.id,
+            // m3 is done: an attempt to skip or move it is ignored.
+            skippedItemIDs: [items[0].id, items[2].id], skipOutcome: "gone", skippedAt: at,
+            relocations: [.init(itemID: items[1].id, mailbox: archive, storeRowID: 42),
+                          .init(itemID: items[2].id, mailbox: archive, storeRowID: 1)],
+            appended: [makeHeader("m4", rowID: 10)], scopeTo: newScope))
+
+        let after = try await store.items(job: job.id)
+        #expect(after.count == 4)
+        #expect(after[0].state == .skipped && after[0].outcome == "gone" && after[0].finishedAt == at
+            && after[0].attempts == 0 && after[0].lastError == nil)
+        #expect(after[1].mailbox == archive && after[1].storeRowID == 42 && after[1].state == .queued)
+        #expect(after[2] == items[2].with(state: .done))
+        #expect(after[3].messageID == "m4" && after[3].position == 4 && after[3].state == .queued)
+        #expect(try await store.jobs().first?.scopeTo == newScope)
+        #expect(try await store.jobs().first?.scopeFrom == job.scopeFrom)
     }
+}
+
+private extension JobItem {
+    func with(state: JobItemState) -> JobItem { var copy = self; copy.state = state; return copy }
 }

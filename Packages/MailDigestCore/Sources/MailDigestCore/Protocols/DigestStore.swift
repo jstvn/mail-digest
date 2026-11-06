@@ -88,9 +88,11 @@ public protocol DigestStore: Sendable {
     /// (Q22): moving to `.queued` or `.failed` with a non-nil `error` increments them. Starting an item,
     /// pausing, stopping, recovery and provider-wide outages (requeued with `error: nil`) do not.
     func setItemState(_ itemID: UUID, _ state: JobItemState, error: String?) async throws
-    /// Points a still-queued item at the mailbox it was found in when a Daily job's listing was refreshed
-    /// before resuming. `storeRowID` replaces the old locator hint (nil clears it).
-    func updateItemLocation(_ itemID: UUID, mailbox: MailboxRef, storeRowID: Int64?) async throws
+    /// Applies a resume's queue refresh in ONE transaction: skips and relocates the listed open (queued or
+    /// processing) items, appends the new headers after the job's last item (positions continue), and sets
+    /// the job's `scopeTo` when given. Finished items are never touched. Either everything is applied or,
+    /// on error, nothing.
+    func applyResumeRefresh(_ refresh: QueueRefresh) async throws
     /// Stores the outcome text, time taken and finish time for a finished item.
     func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws
     /// Moves a job's `failed` items back to `queued` with attempts reset to 0 (lastError is kept),
