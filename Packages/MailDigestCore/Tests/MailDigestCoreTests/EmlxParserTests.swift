@@ -245,3 +245,106 @@ private func reason(_ data: Data) -> EmlxUnusableReason? {
         #expect(String(decoding: data, as: UTF8.self) == #"["emlx","partialEmlx","jxa"]"#)
     }
 }
+
+@Suite struct EmlxInspectionTests {
+    @Test func plainOnlyIsComplete() throws {
+        let p = try usable(emlx("\(baseHeaders)\nContent-Type: text/plain; charset=utf-8\n\nHi\n"))
+        #expect(p.inspection == .complete)
+    }
+
+    @Test func plainAndHtmlAlternativeIsComplete() throws {
+        let p = try usable(emlx("""
+        \(baseHeaders)
+        Content-Type: multipart/alternative; boundary="b1"
+
+        --b1
+        Content-Type: text/plain; charset=utf-8
+
+        Hello
+        --b1
+        Content-Type: text/html; charset=utf-8
+
+        <p>Hello</p>
+        --b1--
+        """))
+        #expect(p.inspection == .complete)
+    }
+
+    @Test func attachmentIsUninspected() throws {
+        let p = try usable(emlx("""
+        \(baseHeaders)
+        Content-Type: multipart/mixed; boundary="b1"
+
+        --b1
+        Content-Type: text/plain; charset=utf-8
+
+        See attached
+        --b1
+        Content-Type: text/plain; name="notes.txt"
+        Content-Disposition: attachment; filename="notes.txt"
+
+        secret notes
+        --b1--
+        """))
+        #expect(p.inspection == .uninspectedParts)
+        #expect(p.body == "See attached")
+    }
+
+    @Test func inlineImageIsUninspected() throws {
+        let p = try usable(emlx("""
+        \(baseHeaders)
+        Content-Type: multipart/related; boundary="b1"
+
+        --b1
+        Content-Type: text/html; charset=utf-8
+
+        <p>Hi <img src="cid:x"></p>
+        --b1
+        Content-Type: image/png
+        Content-Transfer-Encoding: base64
+        Content-ID: <x>
+        Content-Disposition: inline
+
+        iVBORw0KGgo=
+        --b1--
+        """))
+        #expect(p.inspection == .uninspectedParts)
+    }
+
+    @Test func calendarPartIsUninspected() throws {
+        let p = try usable(emlx("""
+        \(baseHeaders)
+        Content-Type: multipart/alternative; boundary="b1"
+
+        --b1
+        Content-Type: text/plain; charset=utf-8
+
+        Meeting invite
+        --b1
+        Content-Type: text/calendar; method=REQUEST
+
+        BEGIN:VCALENDAR
+        END:VCALENDAR
+        --b1--
+        """))
+        #expect(p.inspection == .uninspectedParts)
+    }
+
+    @Test func undecodableSecondRepresentationIsUninspected() throws {
+        let p = try usable(emlx("""
+        \(baseHeaders)
+        Content-Type: multipart/alternative; boundary="b1"
+
+        --b1
+        Content-Type: text/plain; charset=utf-8
+
+        Hello
+        --b1
+        Content-Type: text/html; charset=x-unknown-charset
+
+        <p>Hello</p>
+        --b1--
+        """))
+        #expect(p.inspection == .uninspectedParts)
+    }
+}

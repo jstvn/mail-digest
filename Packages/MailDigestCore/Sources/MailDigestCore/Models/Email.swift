@@ -12,6 +12,11 @@ public struct MailMessageReference: Codable, Sendable, Equatable, Hashable {
     }
 }
 
+/// How much of a message's content was actually read (Q66). Anything but `.complete` fails closed.
+public enum ContentInspection: String, Codable, Sendable, Equatable {
+    case complete, uninspectedParts, unknown
+}
+
 /// A full message as fetched from Mail, with body and the few headers the filter needs.
 public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     public var id: String              // RFC Message-ID without angle brackets
@@ -23,10 +28,14 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     public var body: String            // plain text as Mail renders it
     public var headers: [String: String] // only List-Unsubscribe, Precedence, Auto-Submitted
     public var sourceReference: MailMessageReference
+    /// Defaults to `.unknown` so fixtures and older callers fail closed.
+    public var contentInspection: ContentInspection
 
     public init(id: String, account: String, mailbox: String, sender: String, subject: String,
                 receivedAt: Date, body: String, headers: [String: String],
-                sourceReference: MailMessageReference? = nil) {
+                sourceReference: MailMessageReference? = nil,
+                contentInspection: ContentInspection = .unknown) {
+        self.contentInspection = contentInspection
         self.sourceReference = sourceReference ?? MailMessageReference(messageID: id, storeRowID: nil)
         self.id = id
         self.account = account
@@ -39,7 +48,7 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, account, mailbox, sender, subject, receivedAt, body, headers, sourceReference
+        case id, account, mailbox, sender, subject, receivedAt, body, headers, sourceReference, contentInspection
     }
 
     public init(from decoder: Decoder) throws {
@@ -52,7 +61,8 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
                   receivedAt: try c.decode(Date.self, forKey: .receivedAt),
                   body: try c.decode(String.self, forKey: .body),
                   headers: try c.decode([String: String].self, forKey: .headers),
-                  sourceReference: try c.decodeIfPresent(MailMessageReference.self, forKey: .sourceReference))
+                  sourceReference: try c.decodeIfPresent(MailMessageReference.self, forKey: .sourceReference),
+                  contentInspection: try c.decodeIfPresent(ContentInspection.self, forKey: .contentInspection) ?? .unknown)
     }
 }
 

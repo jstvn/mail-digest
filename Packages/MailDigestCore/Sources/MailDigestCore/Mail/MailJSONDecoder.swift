@@ -174,7 +174,8 @@ public struct MailJSONDecoder: Sendable {
                      headers: filterHeaders(raw.rawHeaders ?? ""),
                      sourceReference: MailMessageReference(
                         messageID: MessageID.canonical(raw.id) ?? raw.id.trimmingCharacters(in: .whitespacesAndNewlines),
-                        storeRowID: raw.storeRowID))
+                        storeRowID: raw.storeRowID),
+                     contentInspection: .unknown)
     }
 
     /// JS `toISOString()` emits milliseconds but other sources do not, so accept both forms.
