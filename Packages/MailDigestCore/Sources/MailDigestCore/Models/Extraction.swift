@@ -68,3 +68,11 @@ public struct ExtractionResult: Codable, Sendable, Equatable {
         case tasks
     }
 }
+
+extension ExtractionResult {
+    /// The one decoding path for model output, shared by the local and cloud clients.
+    /// Returns nil when the text is not valid extraction JSON.
+    static func decode(jsonText: String) -> ExtractionResult? {
+        try? JSONDecoder().decode(ExtractionResult.self, from: Data(jsonText.utf8))
+    }
+}

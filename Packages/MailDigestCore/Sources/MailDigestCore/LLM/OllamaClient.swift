@@ -139,8 +139,10 @@ public struct OllamaClient: LLMClient {
 
     static func decodeExtraction(_ data: Data) throws -> ExtractionResult {
         let content = try decodeContent(data)
-        do { return try JSONDecoder().decode(ExtractionResult.self, from: Data(content.utf8)) }
-        catch { throw LLMError.malformedResponse("content is not valid extraction JSON") }
+        guard let result = ExtractionResult.decode(jsonText: content) else {
+            throw LLMError.malformedResponse("content is not valid extraction JSON")
+        }
+        return result
     }
 
     /// Sends the request and returns the body of a 2xx answer.
