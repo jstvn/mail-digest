@@ -1497,3 +1497,134 @@ private func recentMessages(_ count: Int) -> [EmailMessage] {
         #expect(try await store.jobs().count == 1)
     }
 }
+
+/// T29: lifecycle events emitted at the real transitions, written with the job-state change.
+@Suite struct JobRunnerLifecycleEventTests {
+    private func harness(_ count: Int = 4, failures: [String: Int] = [:]) -> Harness {
+        Harness(source: FixtureMailSource(messages: oldMessages(count)), llm: StubLLMClient(failures: failures))
+    }
+
+    private func events(_ h: Harness) async throws -> [JobEvent] {
+        try await h.store.jobEvents(job: try await h.job().id)
+    }
+
+    private func kinds(_ h: Harness) async throws -> [JobEventKind] { try await events(h).map(\.kind) }
+
+    @Test func normalCompletion() async throws {
+        let h = harness()
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        #expect(try await kinds(h) == [.created, .started, .completed])
+        let job = try await h.job()
+        #expect(job.startedAt == today && job.endedAt == today)
+        // Per-email work and progress never write events.
+        #expect(try await events(h).count == 3)
+    }
+
+    @Test func completionWithFailuresCarriesTheCount() async throws {
+        let h = harness(3, failures: ["old-0@fixture": Int.max])
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        let all = try await events(h)
+        #expect(all.map(\.kind) == [.created, .started, .completedWithFailures])
+        #expect(all.last?.payload.count == 1)
+    }
+
+    @Test func pauseThenResume() async throws {
+        let h = harness()
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-1@fixture" { await runner.pause() }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        // A second pause while already paused is a no-op.
+        await h.runner.pause()
+        #expect(try await kinds(h) == [.created, .started, .paused])
+        #expect(try await events(h).last?.payload.pauseReason == nil)
+
+        await h.llm.setOnExtract(nil)
+        try await h.runner.resume()
+        await h.runner.waitUntilIdle()
+        let all = try await events(h)
+        #expect(all.map(\.kind) == [.created, .started, .paused, .resumed, .completed])
+        #expect(all[3].payload.trigger == .user)
+    }
+
+    @Test func autoPauseThenAutoResume() async throws {
+        let h = harness()
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-1@fixture" { await runner.autoPause(.battery) }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract(nil)
+        _ = try await h.runner.autoResume(blocked: [:])
+        await h.runner.waitUntilIdle()
+        let all = try await events(h)
+        #expect(all.map(\.kind) == [.created, .started, .autoPaused, .resumed, .completed])
+        #expect(all[2].payload.pauseReason == .battery)
+        #expect(all[3].payload.trigger == .automatic)
+    }
+
+    @Test func stopSetsEndedAtAndResumeClearsIt() async throws {
+        let h = harness()
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-1@fixture" { await runner.stop() }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        #expect(try await kinds(h) == [.created, .started, .stopped])
+        #expect(try await h.job().endedAt == today)
+
+        await h.llm.setOnExtract(nil)
+        // A stopped job only resumes by id.
+        try await h.runner.resume(jobID: try await h.job().id)
+        await h.runner.waitUntilIdle()
+        #expect(try await kinds(h) == [.created, .started, .stopped, .resumed, .completed])
+        #expect(try await h.job().endedAt == today)
+    }
+
+    @Test func retryFailedRecordsRequestThenResume() async throws {
+        let h = harness(3, failures: ["old-0@fixture": Int.max])
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        await h.llm.setFailures([:])
+        let job = try await h.job()
+        #expect(try await h.runner.retryFailed(jobID: job.id) == 1)
+        await h.runner.waitUntilIdle()
+        let all = try await events(h)
+        #expect(all.map(\.kind) == [.created, .started, .completedWithFailures, .retryRequested, .resumed, .completed])
+        #expect(all[3].payload.count == 1)
+    }
+
+    @Test func recoverOnLaunchOnlyForInterruptedJobs() async throws {
+        let h = harness()
+        func job(_ state: JobState, _ offset: TimeInterval) -> Job {
+            Job(id: UUID(), kind: .backlog, mailboxes: [icloud], scopeFrom: today, scopeTo: today, state: state,
+                createdAt: today.addingTimeInterval(offset),
+                totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        }
+        // Created before the fixed clock's "now", so event times order as in real use.
+        let running = job(.running, -30), paused = job(.paused, -20), stopping = job(.stopping, -10)
+        for j in [running, paused, stopping] { try await h.store.createJob(j) }
+        try await h.runner.recoverOnLaunch()
+
+        let runningEvents = try await h.store.jobEvents(job: running.id)
+        #expect(runningEvents.map(\.kind) == [.created, .recoveredAfterInterruption])
+        #expect(runningEvents.last?.payload.trigger == .launch)
+        #expect(try await h.store.jobEvents(job: paused.id).map(\.kind) == [.created])
+        #expect(try await h.store.jobEvents(job: stopping.id).map(\.kind) == [.created, .recoveredAfterInterruption])
+        let stopped = try await h.store.jobs().first { $0.id == stopping.id }
+        #expect(stopped?.state == .stopped && stopped?.endedAt == today)
+    }
+
+    @Test func itemStartTimeIsRecordedWhenProcessingBegins() async throws {
+        let h = harness(2)
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        #expect(await h.store.allItems().allSatisfy { $0.startedAt == today })
+    }
+}

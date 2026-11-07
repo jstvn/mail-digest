@@ -151,6 +151,27 @@ public final class GRDBDigestStore: DigestStore, Sendable {
                                    ordinal: row["ordinal"] as Int, suggestions: list)
             }
         }
+        // v5 (T29): lifecycle times, per-item routing provenance, Activity paging indexes and the append-only
+        // `job_event` log. Existing rows keep NULLs; nothing is back-filled.
+        migrator.registerMigration("v5") { db in
+            try db.execute(sql: """
+                ALTER TABLE job ADD COLUMN started_at REAL;
+                ALTER TABLE job ADD COLUMN ended_at REAL;
+                CREATE INDEX job_created_id ON job (created_at, id);
+                ALTER TABLE job_item ADD COLUMN started_at REAL;
+                ALTER TABLE job_item ADD COLUMN routing TEXT;
+                ALTER TABLE job_item ADD COLUMN provider TEXT;
+                CREATE INDEX job_item_job_provider ON job_item (job_id, provider);
+                CREATE TABLE job_event (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id TEXT NOT NULL REFERENCES job(id) ON DELETE CASCADE,
+                    kind TEXT NOT NULL,
+                    at REAL NOT NULL,
+                    payload TEXT NOT NULL DEFAULT '{}'
+                );
+                CREATE INDEX job_event_job_at ON job_event (job_id, at, id);
+                """)
+        }
         return migrator
     }
 
@@ -503,7 +524,12 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             // Cascades remove each digest's results and dispositions and each job's items; processed ids and decisions have no
             // foreign key to either and are never touched (Q18, Q21).
             for id in plan.digestIDs { try db.execute(sql: "DELETE FROM digest WHERE id = ?", arguments: [id.uuidString]) }
-            for id in plan.jobIDs { try db.execute(sql: "DELETE FROM job WHERE id = ?", arguments: [id.uuidString]) }
+            // Events cascade too; the explicit delete keeps retention correct even if foreign keys were off.
+            for id in plan.jobIDs {
+                try db.execute(sql: "DELETE FROM job_event WHERE job_id = ?", arguments: [id.uuidString])
+                try db.execute(sql: "DELETE FROM job_item WHERE job_id = ?", arguments: [id.uuidString])
+                try db.execute(sql: "DELETE FROM job WHERE id = ?", arguments: [id.uuidString])
+            }
         }
     }
 
@@ -532,33 +558,85 @@ public final class GRDBDigestStore: DigestStore, Sendable {
 
     public func createJob(_ job: Job) async throws {
         let mailboxes = try JSON.encode(job.mailboxes)
+        let created = JobEvent(jobID: job.id, kind: .created, at: job.createdAt)
+        let payload = try JSON.encode(created.payload)
         try await writer.write { db in
             try db.execute(sql: """
                 INSERT INTO job (id, kind, mailboxes, scope_from, scope_to, state, created_at,
-                                 queued, done, failed, skipped, auto_paused, last_error, pause_reason)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 queued, done, failed, skipped, auto_paused, last_error, pause_reason,
+                                 started_at, ended_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, arguments: Self.jobArguments(job, mailboxes: mailboxes))
+            try Self.insertEvent(db, created, payload: payload)
         }
     }
 
-    public func updateJob(_ job: Job) async throws {
+    public func updateJob(_ job: Job, event: JobEvent?) async throws {
         let mailboxes = try JSON.encode(job.mailboxes)
+        let encoded = try event.map { (try JSON.encode($0.payload), $0) }
         try await writer.write { db in
-            // Replaces by id; a missing job is ignored, as in the in-memory store.
+            // Replaces by id; a missing job is ignored (with its event), as in the in-memory store.
             try db.execute(sql: """
                 UPDATE job SET kind = ?2, mailboxes = ?3, scope_from = ?4, scope_to = ?5, state = ?6,
                     created_at = ?7, queued = ?8, done = ?9, failed = ?10, skipped = ?11, auto_paused = ?12,
-                    last_error = ?13, pause_reason = ?14
+                    last_error = ?13, pause_reason = ?14, started_at = ?15, ended_at = ?16
                 WHERE id = ?1
                 """, arguments: Self.jobArguments(job, mailboxes: mailboxes))
+            if db.changesCount > 0, let (payload, event) = encoded {
+                try Self.insertEvent(db, event, payload: payload)
+            }
         }
+    }
+
+    private static func insertEvent(_ db: Database, _ event: JobEvent, payload: String) throws {
+        try db.execute(sql: "INSERT INTO job_event (job_id, kind, at, payload) VALUES (?, ?, ?, ?)",
+                       arguments: [event.jobID.uuidString, event.kind.rawValue, event.at.timeIntervalSince1970, payload])
     }
 
     private static func jobArguments(_ job: Job, mailboxes: String) -> StatementArguments {
         [job.id.uuidString, job.kind.rawValue, mailboxes, job.scopeFrom.timeIntervalSince1970,
          job.scopeTo.timeIntervalSince1970, job.state.rawValue, job.createdAt.timeIntervalSince1970,
          job.totals.queued, job.totals.done, job.totals.failed, job.totals.skipped, job.autoPaused, job.lastError,
-         job.pauseReason?.rawValue]
+         job.pauseReason?.rawValue, job.startedAt?.timeIntervalSince1970, job.endedAt?.timeIntervalSince1970]
+    }
+
+    public func jobEvents(job jobID: UUID) async throws -> [JobEvent] {
+        try await writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT * FROM job_event WHERE job_id = ? ORDER BY at, id",
+                             arguments: [jobID.uuidString]).compactMap { row in
+                // An unknown kind (written by a newer build) is dropped rather than shown as something it wasn't.
+                guard let kind = JobEventKind(rawValue: row["kind"]) else { return nil }
+                return JobEvent(id: row["id"], jobID: UUID(uuidString: row["job_id"]) ?? jobID,
+                         kind: kind,
+                         at: Date(timeIntervalSince1970: row["at"]),
+                         payload: (try? JSON.decode(JobEventPayload.self, row["payload"] as String)) ?? .empty)
+            }
+        }
+    }
+
+    public func activityJobs(_ query: ActivityQuery) async throws -> [Job] {
+        guard query.limit > 0 else { return [] }
+        var clauses: [String] = []
+        var args = StatementArguments()
+        if let c = query.before {
+            clauses.append("(created_at < ? OR (created_at = ? AND id < ?))")
+            args += [c.createdAt.timeIntervalSince1970, c.createdAt.timeIntervalSince1970, c.id.uuidString]
+        }
+        if let kind = query.kind {
+            clauses.append("kind = ?")
+            args += [kind.rawValue]
+        }
+        if let path = query.path {
+            clauses.append("EXISTS (SELECT 1 FROM job_item WHERE job_item.job_id = job.id AND job_item.provider = ?)")
+            args += [path.rawValue]
+        }
+        let whereSQL = clauses.isEmpty ? "" : "WHERE " + clauses.joined(separator: " AND ")
+        args += [query.limit]
+        let arguments = args
+        return try await writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT * FROM job \(whereSQL) ORDER BY created_at DESC, id DESC LIMIT ?",
+                             arguments: arguments).map(Self.job)
+        }
     }
 
     public func jobs() async throws -> [Job] {
@@ -578,7 +656,9 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             createdAt: Date(timeIntervalSince1970: row["created_at"]),
             totals: JobTotals(queued: row["queued"], done: row["done"], failed: row["failed"], skipped: row["skipped"]),
             autoPaused: row["auto_paused"], lastError: row["last_error"],
-            pauseReason: (row["pause_reason"] as String?).flatMap(PauseReason.init(rawValue:)))
+            pauseReason: (row["pause_reason"] as String?).flatMap(PauseReason.init(rawValue:)),
+            startedAt: (row["started_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
+            endedAt: (row["ended_at"] as Double?).map(Date.init(timeIntervalSince1970:)))
     }
 
     // MARK: Queue
@@ -667,23 +747,50 @@ public final class GRDBDigestStore: DigestStore, Sendable {
                 outcome: row["outcome"], seconds: row["seconds"], attempts: row["attempts"],
                 lastError: row["last_error"],
                 finishedAt: (row["finished_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
-                storeRowID: row["mail_store_row_id"])
+                storeRowID: row["mail_store_row_id"],
+                startedAt: (row["started_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
+                // An undecodable routing blob reads as "not recorded" rather than failing the whole list.
+                routing: (row["routing"] as String?).flatMap { try? JSON.decode(RoutingProvenance.self, $0) },
+                provider: (row["provider"] as String?).flatMap(ExecutionProvider.init(rawValue:)))
     }
 
-    public func setItemState(_ itemID: UUID, _ state: JobItemState, error: String?) async throws {
+    public func setItemState(_ itemID: UUID, _ state: JobItemState, error: String?, startedAt: Date?) async throws {
         // Q22: only a genuine item error moving the item to queued/failed spends an attempt.
         let spendsAttempt = error != nil && (state == .queued || state == .failed)
+        // The start time is written in the same statement as the move to `.processing`.
+        let start = state == .processing ? startedAt?.timeIntervalSince1970 : nil
         try await writer.write { db in
             try db.execute(sql: """
-                UPDATE job_item SET state = ?, last_error = ?, attempts = attempts + ? WHERE id = ?
-                """, arguments: [state.rawValue, error, spendsAttempt ? 1 : 0, itemID.uuidString])
+                UPDATE job_item SET state = ?, last_error = ?, attempts = attempts + ?,
+                    started_at = COALESCE(?, started_at) WHERE id = ?
+                """, arguments: [state.rawValue, error, spendsAttempt ? 1 : 0, start, itemID.uuidString])
         }
     }
 
-    public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws {
+    public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date,
+                                  routing: RoutingProvenance?) async throws {
+        let encoded = try routing.map(JSON.encode)
+        let provider = routing?.execution?.provider.rawValue
         try await writer.write { db in
-            try db.execute(sql: "UPDATE job_item SET outcome = ?, seconds = ?, finished_at = ? WHERE id = ?",
-                           arguments: [outcome, seconds, finishedAt.timeIntervalSince1970, itemID.uuidString])
+            if let encoded {
+                // Routing and provider land in the same statement as the outcome.
+                try db.execute(sql: """
+                    UPDATE job_item SET outcome = ?, seconds = ?, finished_at = ?, routing = ?, provider = ?
+                    WHERE id = ?
+                    """, arguments: [outcome, seconds, finishedAt.timeIntervalSince1970, encoded, provider,
+                                     itemID.uuidString])
+            } else {
+                try db.execute(sql: "UPDATE job_item SET outcome = ?, seconds = ?, finished_at = ? WHERE id = ?",
+                               arguments: [outcome, seconds, finishedAt.timeIntervalSince1970, itemID.uuidString])
+            }
+        }
+    }
+
+    public func recordAssessment(job jobID: UUID, messageID: String, routing: RoutingProvenance) async throws {
+        let encoded = try JSON.encode(routing)
+        try await writer.write { db in
+            try db.execute(sql: "UPDATE job_item SET routing = ? WHERE job_id = ? AND message_id = ?",
+                           arguments: [encoded, jobID.uuidString, messageID])
         }
     }
 

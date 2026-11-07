@@ -293,7 +293,7 @@ public actor JobRunner {
         job.clearPause()
         job.totals.failed = max(0, job.totals.failed - requeued.count)
         job.totals.queued += requeued.count
-        try await store.updateJob(job)
+        try await store.updateJob(job, event: event(.retryRequested, job.id, JobEventPayload(count: requeued.count)))
         try await resume(jobID: jobID)
         return requeued.count
     }
@@ -340,7 +340,7 @@ public actor JobRunner {
                 && blocked[$0.kind] == nil
         }
         guard let candidate else { return nil }
-        try await resume(jobID: candidate.id)
+        try await resume(jobID: candidate.id, trigger: .automatic)
         return candidate.id
     }
 
@@ -374,6 +374,10 @@ public actor JobRunner {
     /// Resumes the given paused job, or the most recent paused one. Also used after a restart.
     /// Resuming a Daily job by id while a Backlog job runs pre-empts it, as `startDaily()` does (Q23, Q52).
     public func resume(jobID: UUID? = nil) async throws {
+        try await resume(jobID: jobID, trigger: .user)
+    }
+
+    private func resume(jobID: UUID?, trigger: JobEventTrigger) async throws {
         var backlogToResume: UUID?
         if let run, loopTask != nil, let jobID, jobID != run.job.id {
             let target = try await store.jobs().first { $0.id == jobID }
@@ -438,7 +442,8 @@ public actor JobRunner {
             job.clearPause()
             job.lastError = nil
             autoPausedThisSession.remove(job.id)
-            try await store.updateJob(job)
+            let running = markRunning(&job, trigger: trigger)
+            try await store.updateJob(job, event: running)
             resetFlags()
             resumeAfter = backlogToResume
             run = try await loadRun(job)
@@ -466,16 +471,25 @@ public actor JobRunner {
         autoPausedThisSession.remove(jobID)
         job.state = .stopped
         job.clearPause()
-        try await store.updateJob(job)
+        job.endedAt = clock.now()
+        try await store.updateJob(job, event: event(.stopped, job.id))
     }
 
     /// Call once at launch: items left `processing` go back to `queued` and interrupted jobs become `.paused`.
     public func recoverOnLaunch() async throws {
+        // Counted per job before the requeue, so the event says how many items were in flight.
+        var interrupted: [UUID: Int] = [:]
+        for job in try await store.jobs() where [.running, .pausing, .listing, .stopping].contains(job.state) {
+            interrupted[job.id] = try await store.items(job: job.id).filter { $0.state == .processing }.count
+        }
         _ = try await store.requeueInterrupted()
         for var job in try await store.jobs() where [.running, .pausing, .listing, .stopping].contains(job.state) {
             // An interrupted Stop stays a Stop (Q15); everything else was never asked to stop, so it is paused.
             job.state = job.state == .stopping ? .stopped : .paused
-            try await store.updateJob(job)
+            if job.state == .stopped { job.endedAt = clock.now() }
+            try await store.updateJob(job, event: event(
+                .recoveredAfterInterruption, job.id,
+                JobEventPayload(trigger: .launch, count: interrupted[job.id] ?? 0)))
         }
     }
 
@@ -540,12 +554,15 @@ public actor JobRunner {
                 return
             }
             job.state = .running
-            try await store.updateJob(job)
+            let started = markRunning(&job, trigger: .user)
+            try await store.updateJob(job, event: started)
             run = try await loadRun(job, newDigest: digest)
             launch(kind: plan.kind)
         } catch {
             job.state = .failed
-            try? await store.updateJob(job)
+            job.endedAt = clock.now()
+            try? await store.updateJob(job, event: event(.failed, job.id,
+                                                         JobEventPayload(errorCategory: Self.errorCategory(error))))
             busy = false
             run = nil
             throw error
@@ -610,7 +627,8 @@ public actor JobRunner {
                 }
                 job.state = .running
                 job.clearPause()
-                try await store.updateJob(job)
+                let resumed = markRunning(&job, trigger: .automatic)
+                try await store.updateJob(job, event: resumed)
                 resetFlags()
                 run = try await loadRun(job)
             } catch { break }
@@ -630,7 +648,7 @@ public actor JobRunner {
         job.autoPaused = true
         job.pauseReason = reason
         autoPausedThisSession.insert(job.id)
-        try await store.updateJob(job)
+        try await store.updateJob(job, event: event(.autoPaused, job.id, JobEventPayload(pauseReason: reason)))
     }
 
     /// A Daily job that could not start leaves the Backlog job it preempted waiting for the Daily job, which
@@ -732,7 +750,9 @@ public actor JobRunner {
             run.job.state = .failed
             run.job.lastError = (error as? ProviderFailure)?.message ?? Self.shortReason(error)
             run.current = nil
-            try? await store.updateJob(run.job)
+            run.job.endedAt = clock.now()
+            try? await store.updateJob(run.job, event: event(.failed, run.job.id,
+                                                             JobEventPayload(errorCategory: Self.errorCategory(error))))
             emit(force: true)
             return .failed
         }
@@ -806,7 +826,7 @@ public actor JobRunner {
         run.current = summary(item, outcome: nil)
         run.stage = .summarising
         defer { itemActive = false; inFlight = nil }
-        try await store.setItemState(item.id, .processing, error: nil)
+        try await store.setItemState(item.id, .processing, error: nil, startedAt: clock.now())
         emit(force: false)
 
         let started = clock.now()
@@ -911,6 +931,7 @@ public actor JobRunner {
         run.job.state = stopped ? .stopped : .paused
         run.job.autoPaused = reason != nil
         run.job.pauseReason = reason
+        if stopped { run.job.endedAt = clock.now() }
         if let reason, reason != .dailyJob { autoPausedThisSession.insert(run.job.id) }
         run.current = nil
         run.queueHead = []
@@ -919,7 +940,15 @@ public actor JobRunner {
         } else {
             run.nextUp = nil
         }
-        try await store.updateJob(run.job)
+        let transition: JobEvent
+        if stopped {
+            transition = event(.stopped, run.job.id)
+        } else if let reason {
+            transition = event(.autoPaused, run.job.id, JobEventPayload(pauseReason: reason))
+        } else {
+            transition = event(.paused, run.job.id)
+        }
+        try await store.updateJob(run.job, event: transition)
         emit(force: true)
         return .paused
     }
@@ -941,9 +970,43 @@ public actor JobRunner {
             }
         }
         run.job.state = .finished
-        try await store.updateJob(run.job)
+        run.job.endedAt = clock.now()
+        let failed = run.job.totals.failed
+        let ending = failed > 0
+            ? event(.completedWithFailures, run.job.id, JobEventPayload(count: failed))
+            : event(.completed, run.job.id)
+        try await store.updateJob(run.job, event: ending)
         emit(force: true)
         return .finished
+    }
+
+    // MARK: Lifecycle events
+
+    private func event(_ kind: JobEventKind, _ jobID: UUID, _ payload: JobEventPayload = .empty) -> JobEvent {
+        JobEvent(jobID: jobID, kind: kind, at: clock.now(), payload: payload)
+    }
+
+    /// Prepares `job` for running and returns the matching event: `started` the first time (also sets
+    /// `startedAt`), `resumed` after that. A job stored before v5 that already did work gets `resumed` and
+    /// keeps a nil `startedAt` (nothing is back-filled).
+    private func markRunning(_ job: inout Job, trigger: JobEventTrigger) -> JobEvent {
+        let t = job.totals
+        job.endedAt = nil
+        if job.startedAt == nil, t.done + t.failed + t.skipped == 0 {
+            job.startedAt = clock.now()
+            return event(.started, job.id)
+        }
+        return event(.resumed, job.id, JobEventPayload(trigger: trigger))
+    }
+
+    /// A short code for the failure class; never the error's text, which could contain email data.
+    private static func errorCategory(_ error: Error) -> String {
+        switch error {
+        case is ProviderFailure, is JobRunnerError, is LLMError: return "provider"
+        case is DigestStoreError: return "store"
+        case is MailDecodingError, is EmlxUnusableReason: return "mail"
+        default: return "unknown"
+        }
     }
 
     // MARK: Helpers

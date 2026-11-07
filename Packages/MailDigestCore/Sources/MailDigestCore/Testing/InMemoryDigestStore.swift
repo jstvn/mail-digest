@@ -10,6 +10,8 @@ public actor InMemoryDigestStore: DigestStore {
     private var decisionList: [Decision] = []
     private var jobList: [Job] = []
     private var itemList: [JobItem] = []
+    private var eventList: [JobEvent] = []
+    private var nextEventID: Int64 = 1
     private var dispositionList: [MailDisposition] = []
     /// Item id -> index in `itemList`; rebuilt when retention removes items.
     private var itemIndex: [UUID: Int] = [:]
@@ -117,6 +119,7 @@ public actor InMemoryDigestStore: DigestStore {
         dispositionList.removeAll { digestIDs.contains($0.digestID) }
         let jobIDs = Set(plan.jobIDs)
         jobList.removeAll { jobIDs.contains($0.id) }
+        eventList.removeAll { jobIDs.contains($0.jobID) }
         itemList.removeAll { jobIDs.contains($0.jobID) }
         // Items moved, so the position lookups must be rebuilt.
         itemIndex = [:]
@@ -193,13 +196,49 @@ public actor InMemoryDigestStore: DigestStore {
 
     // MARK: Jobs
 
-    public func createJob(_ job: Job) async throws { jobList.append(job) }
+    public func createJob(_ job: Job) async throws {
+        jobList.append(job)
+        append(JobEvent(jobID: job.id, kind: .created, at: job.createdAt))
+    }
 
-    public func updateJob(_ job: Job) async throws {
-        if let i = jobList.firstIndex(where: { $0.id == job.id }) { jobList[i] = job }
+    public func updateJob(_ job: Job, event: JobEvent?) async throws {
+        guard let i = jobList.firstIndex(where: { $0.id == job.id }) else { return }
+        jobList[i] = job
+        if let event { append(event) }
+    }
+
+    private func append(_ event: JobEvent) {
+        var event = event
+        event.id = nextEventID
+        nextEventID += 1
+        eventList.append(event)
     }
 
     public func jobs() async throws -> [Job] { jobList.sorted { $0.createdAt > $1.createdAt } }
+
+    public func jobEvents(job jobID: UUID) async throws -> [JobEvent] {
+        eventList.filter { $0.jobID == jobID }.sorted { ($0.at, $0.id ?? 0) < ($1.at, $1.id ?? 0) }
+    }
+
+    public func activityJobs(_ query: ActivityQuery) async throws -> [Job] {
+        guard query.limit > 0 else { return [] }
+        // Same order as the SQL store: created_at DESC, id DESC (upper-case UUID text).
+        let ordered = jobList.sorted {
+            $0.createdAt != $1.createdAt ? $0.createdAt > $1.createdAt : $0.id.uuidString > $1.id.uuidString
+        }
+        var page: [Job] = []
+        for job in ordered {
+            if let c = query.before {
+                let after = job.createdAt < c.createdAt || (job.createdAt == c.createdAt && job.id.uuidString < c.id.uuidString)
+                if !after { continue }
+            }
+            if let kind = query.kind, job.kind != kind { continue }
+            if let path = query.path, !(itemsByJob[job.id] ?? []).contains(where: { itemList[$0].provider == path }) { continue }
+            page.append(job)
+            if page.count == query.limit { break }
+        }
+        return page
+    }
 
     // MARK: Queue
 
@@ -244,8 +283,9 @@ public actor InMemoryDigestStore: DigestStore {
         (itemsByJob[jobID] ?? []).map { itemList[$0] }
     }
 
-    public func setItemState(_ itemID: UUID, _ state: JobItemState, error: String?) async throws {
+    public func setItemState(_ itemID: UUID, _ state: JobItemState, error: String?, startedAt: Date?) async throws {
         guard let i = itemIndex[itemID] else { return }
+        if state == .processing, let startedAt { itemList[i].startedAt = startedAt }
         itemList[i].state = state
         itemList[i].lastError = error
         if error != nil && (state == .queued || state == .failed) { itemList[i].attempts += 1 }
@@ -272,11 +312,20 @@ public actor InMemoryDigestStore: DigestStore {
         }
     }
 
-    public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date) async throws {
+    public func recordItemOutcome(_ itemID: UUID, outcome: String, seconds: Double, finishedAt: Date,
+                                  routing: RoutingProvenance?) async throws {
         guard let i = itemIndex[itemID] else { return }
         itemList[i].outcome = outcome
         itemList[i].seconds = seconds
         itemList[i].finishedAt = finishedAt
+        if let routing {
+            itemList[i].routing = routing
+            itemList[i].provider = routing.execution?.provider
+        }
+    }
+
+    public func recordAssessment(job jobID: UUID, messageID: String, routing: RoutingProvenance) async throws {
+        for i in itemsByJob[jobID] ?? [] where itemList[i].messageID == messageID { itemList[i].routing = routing }
     }
 
     public func requeueFailed(job jobID: UUID) async throws -> [JobItem] {

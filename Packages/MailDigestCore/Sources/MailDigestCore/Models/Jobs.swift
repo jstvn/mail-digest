@@ -96,10 +96,16 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
     /// Why the job stopped as `.failed` (for example "Ollama is not reachable…"). Safe to show; never
     /// contains email content. Cleared when the job is resumed.
     public var lastError: String?
+    /// When the job first started running; nil for jobs stored before v5 and jobs never started.
+    public var startedAt: Date?
+    /// When the job last reached a terminal state (stopped, finished, failed); cleared when it runs again.
+    public var endedAt: Date?
 
     public init(id: UUID, kind: JobKind, mailboxes: [MailboxRef], scopeFrom: Date, scopeTo: Date,
                 state: JobState, createdAt: Date, totals: JobTotals, autoPaused: Bool, lastError: String? = nil,
-                pauseReason: PauseReason? = nil) {
+                pauseReason: PauseReason? = nil, startedAt: Date? = nil, endedAt: Date? = nil) {
+        self.startedAt = startedAt
+        self.endedAt = endedAt
         self.pauseReason = pauseReason
         self.lastError = lastError
         self.id = id
@@ -139,6 +145,12 @@ public struct JobItem: Codable, Sendable, Equatable, Identifiable {
     public var finishedAt: Date?
     /// Private locator from the SQLite listing; a hint only, never identity.
     public var storeRowID: Int64?
+    /// When the item last moved to `.processing`; nil for older rows.
+    public var startedAt: Date?
+    /// Privacy assessment and execution record; nil when none was recorded.
+    public var routing: RoutingProvenance?
+    /// Final executor, mirrored from `routing.execution` for filtering; nil when no model ran.
+    public var provider: ExecutionProvider?
 
     /// Identity plus locator, as passed to `MailSource.fetchMessages`.
     public var reference: MailMessageReference {
@@ -148,7 +160,11 @@ public struct JobItem: Codable, Sendable, Equatable, Identifiable {
     public init(id: UUID, jobID: UUID, messageID: String, mailbox: MailboxRef, sender: String,
                 subject: String, receivedAt: Date, position: Int, state: JobItemState,
                 outcome: String?, seconds: Double?, attempts: Int, lastError: String?, finishedAt: Date? = nil,
-                storeRowID: Int64? = nil) {
+                storeRowID: Int64? = nil, startedAt: Date? = nil, routing: RoutingProvenance? = nil,
+                provider: ExecutionProvider? = nil) {
+        self.startedAt = startedAt
+        self.routing = routing
+        self.provider = provider
         self.storeRowID = storeRowID
         self.id = id
         self.jobID = jobID
@@ -168,7 +184,7 @@ public struct JobItem: Codable, Sendable, Equatable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, jobID, messageID, mailbox, sender, subject, receivedAt, position, state, outcome
-        case seconds, attempts, lastError, finishedAt, storeRowID
+        case seconds, attempts, lastError, finishedAt, storeRowID, startedAt, routing, provider
     }
 
     public init(from decoder: Decoder) throws {
@@ -186,7 +202,10 @@ public struct JobItem: Codable, Sendable, Equatable, Identifiable {
                   attempts: try c.decode(Int.self, forKey: .attempts),
                   lastError: try c.decodeIfPresent(String.self, forKey: .lastError),
                   finishedAt: try c.decodeIfPresent(Date.self, forKey: .finishedAt),
-                  storeRowID: try c.decodeIfPresent(Int64.self, forKey: .storeRowID))
+                  storeRowID: try c.decodeIfPresent(Int64.self, forKey: .storeRowID),
+                  startedAt: try c.decodeIfPresent(Date.self, forKey: .startedAt),
+                  routing: try c.decodeIfPresent(RoutingProvenance.self, forKey: .routing),
+                  provider: try c.decodeIfPresent(ExecutionProvider.self, forKey: .provider))
     }
 }
 
