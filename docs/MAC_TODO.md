@@ -345,3 +345,132 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 22. **Reviewed section:** approved and dismissed suggestions in a past day and in a Backlog job are read-only: no checkbox, editing, menus or focus. They are excluded from the triage bar. Failed suggestions stay actionable and show their failure note.
 23. **Today empty state:** with no digest today but earlier unreviewed suggestions, carry-over shows above a compact "No digest yet today".
 24. **Lazy rows:** ↑/↓ through a long list reaches rows that were off screen. A reveal from the job popover scrolls to a lazy row or info card. The two-line row layout truncates sensibly at the minimum width (760 pt).
+
+## Hybrid privacy routing and Activity Center (T26–T32)
+
+**Not yet verified on the Mac.** Check each item by hand with the signed app. Routing checks need a real Gemini key and Ollama, and use synthetic emails only.
+
+**Keychain (T31)**
+
+- Save a key: Keychain Access shows service `dev.pages.justinwang.maildigest.gemini`, account `api-key`, not synchronizable, "After first unlock, this device only".
+- Saving a key shows no Keychain access prompt.
+- Save a different key: the button reads "Update Key" and there is still exactly one item.
+- Quit and relaunch: status still reads "API key saved in Keychain".
+- A scheduled run can read the saved key.
+- After rebuilding or updating the app with the same bundle id and signing, the key is still readable without a prompt.
+- Remove Key shows a confirmation.
+- Remove Key: the item is gone, status reads "No API key" and the Cloud Digest toggle is off.
+- Cancel on Remove Key changes nothing.
+- Delete the item in Keychain Access, then reopen Settings: "No API key" and the toggle is off.
+- A pasted key with a trailing newline is stored trimmed.
+- An empty or whitespace-only field keeps Save disabled.
+- The key never appears in Console (subsystem `dev.pages.justinwang.maildigest`) during save, Test Connection or a cloud run.
+
+**Cloud settings and acknowledgement (T31)**
+
+- First enable shows the acknowledgement sheet with all Q63 points.
+- The terms link in the acknowledgement sheet works.
+- Cancel or Esc on the sheet leaves the toggle off and stores no revision.
+- Accepting the sheet turns the toggle on and it persists across relaunch.
+- Turning cloud off and on again does not ask again.
+- Raising `CloudPrivacyPolicy.currentRevision` asks again.
+- The toggle is disabled without a saved key.
+- Saving a key does not enable cloud.
+- The disclosure footer is readable.
+- The sheet and footer read well in VoiceOver.
+- The sheet buttons are keyboard-reachable.
+- In the 520×520 Settings window, the longer Model tab scrolls and reads well.
+- Test Connection shows Connected for a valid setup.
+- Test Connection shows Invalid API key for a bad key.
+- Test Connection shows Model unavailable for a bogus model.
+- Test Connection shows Rate limited.
+- Test Connection shows Network error when offline.
+- Test Connection shows Server error.
+- Test Connection shows Unexpected response.
+- Test Connection shows a progress indicator while running.
+- Test Connection uses the field value when non-empty, otherwise the saved key.
+- VoiceOver announces the Test Connection result.
+- Live check with a real key: `gemini-3.5-flash-lite` reports Connected (models.get lists generateContent).
+- The triage model picker shows installed or missing hints for each model.
+- The triage model picker shows "Couldn't check" when Ollama is stopped.
+- The threshold slider steps 1% from 80% to 99%.
+- VoiceOver reads the threshold value.
+
+**Routing (T26–T30, needs a real key and Ollama; synthetic emails only)**
+
+- Gemini accepts the adapted `responseJsonSchema` (first real generateContent call).
+- Gemini returns valid extraction JSON for a synthetic newsletter.
+- With cloud on, a synthetic allowlisted newsletter with complete inspection is processed by Gemini.
+- That newsletter's Activity row shows "Public · Trusted Sender" and "Cloud · Gemini 3.5 Flash-Lite".
+- That newsletter's info card shows the cloud glyph.
+- A message with an attachment stays local: "Local only · Content not fully inspected".
+- A message with an inline image stays local: "Local only · Content not fully inspected".
+- A message fetched through the JXA fallback stays local.
+- A synthetic OTP message stays local with "Private · Rule".
+- A synthetic bank message stays local with "Private · Rule".
+- A synthetic medical message stays local with "Private · Rule".
+- An ambiguous message runs System One once.
+- The info popover shows scores, threshold and triage model for an ambiguous message.
+- An ambiguous message below threshold stays local.
+- Stopping Ollama's triage model makes ambiguous mail stay local with "The privacy check was unavailable".
+- A missing triage model makes ambiguous mail stay local with "The privacy check was unavailable".
+- An invalid key during a run falls back to local once.
+- Offline during a run falls back to local once.
+- Fallback shows "Gemini failed → Local Qwen3 4B" and the reason in Activity.
+- Fallback produces no duplicate results in the digest.
+- Turning Cloud Digest off mid-job makes the next email local ("Cloud Digest is off").
+- Pause Now during a Gemini call, then Resume: no fallback is recorded.
+- Pause Now during a Gemini call, then Resume: no re-triage.
+- Pause Now during a Gemini call, then Resume: the email gives one result.
+- With cloud off, a Daily run gives the same results as before.
+- With cloud off, a Daily run makes no System One or network calls.
+- With cloud off, `ollama ps` shows only qwen3:4b.
+- With cloud off, Little Snitch or nettop shows no Google traffic.
+
+**Activity Center (T32)**
+
+- The sidebar "Activity" row selects and deselects.
+- The Activity sidebar row shows its icon.
+- VoiceOver reads the Activity sidebar row.
+- The Activity view opens quickly with many jobs (Q59).
+- The newest day is expanded and older days are collapsed.
+- Sections toggle by click.
+- Sections toggle by keyboard.
+- Two Daily runs on the same day appear as two separate jobs.
+- Daily and Backlog jobs both appear, newest first.
+- The All/Daily/Backlog filter resets and reloads.
+- The All/Local/Cloud filter resets and reloads.
+- An empty filter combination shows "No jobs match these filters".
+- Scrolling to the end auto-loads the next page once.
+- Collapsing all sections auto-loads the next page once.
+- "Load Earlier Activity" loads more jobs.
+- A running job updates live without losing scroll position.
+- A running job updates live without losing its expansion state.
+- Elapsed time ticks for a running job.
+- A paused job shows its pause reason.
+- Expanding a job shows lifecycle events (Created, Started, Paused, Resumed, Completed…).
+- A job from before this update shows "Lifecycle history not recorded".
+- Item rows show both badges in light mode.
+- Item rows show both badges in dark mode.
+- Item rows show both badges with VoiceOver.
+- Item rows show both badges with Increase Contrast.
+- Items from before this update show "Not recorded" for both badges.
+- The routing info popover shows the right lines for Private rule.
+- The routing info popover shows the right lines for System One public.
+- The routing info popover shows the right lines for uncertain results.
+- The routing info popover shows the right lines for Gemini fallback.
+- The routing info popover shows the right lines for uninspected examples.
+- The routing info popover shows the score disclaimer.
+- Day headers read "Today" and "Yesterday" following the Brisbane time zone around local midnight.
+- Activity history survives an app restart.
+
+**Job status popover (T32)**
+
+- The popover shows the job name, progress, Pause/Resume and Stop.
+- The popover shows 3 recent rows.
+- The popover shows Retry Failed when failures exist.
+- The popover shows "View All Activity".
+- The popover has no blank space.
+- The popover does not cover the review canvas.
+- "View All Activity" opens the review window on Activity when the window is open.
+- "View All Activity" opens the review window on Activity when the window was closed (menu bar flow).

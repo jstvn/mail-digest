@@ -214,3 +214,19 @@ Each item says what the spec leaves open and the interim choice the build uses, 
    - **Decision:** Keep `gemini-3.5-flash-lite` as the configurable default for predictable extraction, even though newer models exist. Structured output uses `responseMimeType` + `responseJsonSchema`; live availability and schema acceptance are a MAC_TODO check with synthetic emails. Comparing a newer model is a future iteration.
 66. **Content inspection is strict.**
    - **Decision:** Only `.complete` inspection can qualify for cloud. EMLX messages with attachments or non-text parts and every JXA-fallback message stay local, shown as "Local only · Content not fully inspected". Broader eligibility must come from better MIME inspection, never a relaxed policy.
+67. **Measurements on the Intel i7-9750H, 32 GB (2026-11-08, synthetic emails only).**
+   - **System One** (`kev:0.8b-q8_0`, Ollama 0.40.14, 3 cold and 10 warm calls per sample, machine idle):
+
+     | Input | Cold median (max) | Warm median | Warm p95 |
+     | --- | --- | --- | --- |
+     | ~300 chars, newsletter | 5.3 s (5.7) | 3.8 s | 4.9 s |
+     | ~300 chars, transactional | 7.9 s (9.8) | 3.5 s | 3.9 s |
+     | ~300 chars, ambiguous | 6.4 s (7.0) | 3.2 s | 3.5 s |
+     | ~1,500 chars, newsletter | 8.7 s (9.2) | 5.8 s | 6.4 s |
+     | ~1,500 chars, transactional | 9.8 s (10.4) | 5.9 s | 6.4 s |
+     | ~1,500 chars, ambiguous | 9.0 s (10.3) | 6.0 s | 6.4 s |
+
+   - **Residency:** under the serial runner, Kev → Qwen3 4B alternation keeps both models loaded (Kev 2.6 GB at its 73,728-token default context, Qwen 3.2 GB, both 100% CPU) with Ollama's default 5-minute keep-alive; after the first round neither reloads (Kev ≈ warm latency again by round 3). A 200-token Qwen call took 28 s warm. **Decision:** no residency or unload policy; memory pressure is low on 32 GB.
+   - **Pre-filter** (release build): median 1.0 ms at 1.5k chars, 6.8 ms at 10k, 20 ms at 24k, 68 ms at 100k.
+   - **Activity paging** (GRDB, 5,000 jobs and 100,000 items): first page of 30 in 2 ms; 50 sequential keyset pages in 44 ms; Cloud filter page 0.9 ms; expanding a job (20 items) 1.4 ms.
+   - **Coverage finding (open, for Justin):** System One's public-category scores on the synthetic newsletter were 0.76 (short) and 0.82 (near limit), below the fixed 0.85 floor, while non-sensitive scores were 0.88–0.90 around the 0.90 threshold. With the 0.8B model, triage will rarely make an email cloud-eligible; nearly all Gemini traffic will come from the built-in trusted-sender allowlist, and each ambiguous email pays roughly 3–6 s of triage before staying local. The policy stays unchanged (fail closed). Options to consider later, none implemented: evaluate `kev:4b-q4_K_M` or `tev1:0.8b` on a labelled synthetic set; skip triage when it cannot plausibly pass; or accept the current coverage.

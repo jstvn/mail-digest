@@ -907,6 +907,7 @@ Input: sender, subject, full body, filter headers, inspection. Output: class plu
 - **Fail closed** (local, reason recorded): Ollama unreachable, version too old or unknown, model missing, HTTP error, timeout (90 s), malformed or missing scores, below either threshold.
 - Scores are model confidences, not accuracy guarantees; the UI never presents them as such.
 - Triage models offered: `kev:0.8b-q8_0` (default, llama.cpp runner, verified on this Intel Mac), `tev1:0.8b`, `kev:4b-q4_K_M`. MLX-only tags are not offered.
+- Measured latency, residency and coverage on the Intel Mac are recorded in Q67.
 
 ### Gemini provider
 
