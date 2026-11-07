@@ -60,6 +60,14 @@ struct DigestCanvasView: View {
         }
     }
 
+    private func provider(for emailID: String) -> ExecutionProvider? {
+        switch kind {
+        case .today: return todayModel.provider(for: emailID)
+        case .day: return coordinator.day.providers[emailID]
+        case .backlog: return coordinator.backlog.providers[emailID]
+        }
+    }
+
     /// Today's carry-over; empty elsewhere.
     private var carryOver: [SuggestionRecord] {
         kind == .today ? todayModel.carryOver.records.filter(\.isActionable) : []
@@ -297,7 +305,7 @@ struct DigestCanvasView: View {
     private func infoCards(_ items: [InfoItem]) -> some View {
         LazyVStack(alignment: .leading, spacing: 6) {
             ForEach(items) { item in
-                InfoCard(item: item, email: email(for: item.emailID),
+                InfoCard(item: item, email: email(for: item.emailID), provider: provider(for: item.emailID),
                          notesState: coordinator.notes.states[item.id] ?? .idle,
                          onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: item.emailID)) },
                          onTogglePin: { Task { await coordinator.setPinned(!item.pinned, item: item) } },

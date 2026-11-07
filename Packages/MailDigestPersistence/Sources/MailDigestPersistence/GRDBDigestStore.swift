@@ -736,6 +736,19 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         }
     }
 
+    public func providers(job jobID: UUID) async throws -> [String: ExecutionProvider] {
+        try await writer.read { db in
+            var out: [String: ExecutionProvider] = [:]
+            let rows = try Row.fetchAll(db, sql: "SELECT message_id, provider FROM job_item WHERE job_id = ? AND provider IS NOT NULL ORDER BY position",
+                                        arguments: [jobID.uuidString])
+            for row in rows {
+                let id: String = row["message_id"]
+                if out[id] == nil, let p = (row["provider"] as String?).flatMap(ExecutionProvider.init(rawValue:)) { out[id] = p }
+            }
+            return out
+        }
+    }
+
     private static func item(_ row: Row) throws -> JobItem {
         JobItem(id: UUID(uuidString: row["id"]) ?? UUID(), jobID: UUID(uuidString: row["job_id"]) ?? UUID(),
                 messageID: row["message_id"],

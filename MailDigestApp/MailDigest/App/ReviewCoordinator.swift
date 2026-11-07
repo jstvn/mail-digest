@@ -15,6 +15,7 @@ final class ReviewCoordinator {
     let backlog: BacklogCanvasModel
     let reviewQueue: PagedRecordsModel
     let logbook: PagedRecordsModel
+    let activity: ActivityModel
     /// Shared with the latest-digest panel, so there is one notice and one Notes progress.
     @ObservationIgnored let notes: NotesSaver
     @ObservationIgnored let ignore: IgnoreSuggestionModel
@@ -44,6 +45,7 @@ final class ReviewCoordinator {
         self.backlog = BacklogCanvasModel()
         self.reviewQueue = PagedRecordsModel(pageSize: 50)
         self.logbook = PagedRecordsModel(pageSize: 50)
+        self.activity = ActivityModel()
         self.notes = review.notes
         self.ignore = review.ignore
         library.onDayChanged = { [weak self] in await self?.loadSelected() }
@@ -54,6 +56,7 @@ final class ReviewCoordinator {
          day: DayCanvasModel = DayCanvasModel(), backlog: BacklogCanvasModel = BacklogCanvasModel(),
          reviewQueue: PagedRecordsModel = PagedRecordsModel(pageSize: 50),
          logbook: PagedRecordsModel = PagedRecordsModel(pageSize: 50),
+         activity: ActivityModel = ActivityModel(),
          selection: SidebarItem = .today, writer: (any ReminderWriter)? = nil) {
         self.library = library
         self.review = review
@@ -62,6 +65,7 @@ final class ReviewCoordinator {
         self.backlog = backlog
         self.reviewQueue = reviewQueue
         self.logbook = logbook
+        self.activity = activity
         self.notes = review.notes
         self.ignore = review.ignore
         self.selection = selection
@@ -111,6 +115,8 @@ final class ReviewCoordinator {
             await reviewQueue.load(.reviewQueue, store: store, calendar: calendar)
         case .logbook:
             await logbook.load(.logbook, store: store, calendar: calendar)
+        case .activity:
+            await activity.load(store: store)
         case .mailCleanup:
             break // Mail Cleanup keeps its latest-digest model (Q55).
         }

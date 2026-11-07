@@ -102,6 +102,8 @@ public protocol DigestStore: Sendable {
     func nextQueued(job jobID: UUID, limit: Int) async throws -> [JobItem]
     /// All items of a job, by position.
     func items(job jobID: UUID) async throws -> [JobItem]
+    /// The final executor per message id for the job's items that ran a model; items without one are absent.
+    func providers(job jobID: UUID) async throws -> [String: ExecutionProvider]
     /// Sets an item's state and stores `error` as lastError. Attempts count genuine item failures only
     /// (Q22): moving to `.queued` or `.failed` with a non-nil `error` increments them. Starting an item,
     /// pausing, stopping, recovery and provider-wide outages (requeued with `error: nil`) do not.
@@ -126,6 +128,15 @@ public protocol DigestStore: Sendable {
 }
 
 public extension DigestStore {
+    /// Default for fakes: derived from `items(job:)`. The SQLite store reads only the two columns.
+    func providers(job jobID: UUID) async throws -> [String: ExecutionProvider] {
+        var out: [String: ExecutionProvider] = [:]
+        for item in try await items(job: jobID) {
+            if let p = item.provider, out[item.messageID] == nil { out[item.messageID] = p }
+        }
+        return out
+    }
+
     /// Replaces a job by id without recording an event.
     func updateJob(_ job: Job) async throws { try await updateJob(job, event: nil) }
 

@@ -53,6 +53,7 @@ struct ReviewWindow: View {
         case .reviewQueue: ReviewQueueView(run: run, access: access)
         case .logbook: LogbookView(run: run, access: access)
         case .mailCleanup: MailCleanupView(run: run, access: access)
+        case .activity: ActivityView(run: run, access: access)
         }
     }
 
@@ -65,6 +66,7 @@ struct ReviewWindow: View {
         case .reviewQueue: return "Review Queue"
         case .logbook: return "Logbook"
         case .mailCleanup: return "Mail Cleanup"
+        case .activity: return "Activity"
         }
     }
 }

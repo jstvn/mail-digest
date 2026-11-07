@@ -9,6 +9,7 @@ enum SidebarItem: Hashable, Sendable {
     case reviewQueue
     case logbook
     case mailCleanup
+    case activity
     case day(DigestDay)
     case backlog(UUID)
 }
@@ -130,7 +131,7 @@ final class ReviewLibrary {
     /// Whether the sidebar still lists this item; a selection that vanished (retention cleanup) falls back to Today.
     func contains(_ item: SidebarItem) -> Bool {
         switch item {
-        case .today, .reviewQueue, .logbook, .mailCleanup: return true
+        case .today, .reviewQueue, .logbook, .mailCleanup, .activity: return true
         case .day(let day): return !archive.digestIDs(for: day).isEmpty
         case .backlog(let id): return archive.hasBacklog(id)
         }

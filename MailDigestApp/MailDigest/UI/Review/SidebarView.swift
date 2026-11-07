@@ -28,6 +28,7 @@ struct SidebarView: View {
                 row(.reviewQueue, badge: archive.reviewQueueCount) { Label("Review Queue", systemImage: "tray.full") }
                 row(.logbook) { Label("Logbook", systemImage: "checkmark.circle") }
                 row(.mailCleanup) { Label("Mail Cleanup", systemImage: "archivebox") }
+                row(.activity) { Label("Activity", systemImage: "clock.arrow.circlepath") }
             }
 
             if !archive.months.isEmpty {
@@ -131,7 +132,7 @@ struct SidebarView: View {
             .help("Show job progress")
             .accessibilityLabel("\(name) job")
             .accessibilityValue(counts)
-            .accessibilityHint("Shows progress, recent emails and the activity log")
+            .accessibilityHint("Shows progress and recent emails")
         }
     }
 
@@ -146,14 +147,17 @@ struct SidebarView: View {
     }
 
     private func jobPopover(_ progress: JobProgress) -> some View {
-        ScrollView {
-            JobProgressView(run: run, progress: progress) { emailID in
-                showsJob = false
-                Task { await coordinator.reveal(emailID: emailID, jobID: progress.jobID, kind: progress.kind) }
-            }
-            .padding(14)
-        }
-        .frame(width: 440, height: 480)
+        JobProgressView(run: run, progress: progress, onReveal: { emailID in
+            showsJob = false
+            Task { await coordinator.reveal(emailID: emailID, jobID: progress.jobID, kind: progress.kind) }
+        }, onViewAll: {
+            showsJob = false
+            openWindow(id: "review")
+            NSApp.activate()
+            coordinator.select(.activity)
+        })
+        .padding(14)
+        .frame(width: 440)
     }
 
     /// "12 of 23", "Paused · 412 of 2,960", "Looking for new mail…".

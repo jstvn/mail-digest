@@ -24,16 +24,19 @@ enum CanvasLoading {
     /// The digests with these ids (missing ones skipped) and the email context of everything they mention.
     /// A job's items are read only when its digest mentions an email not already known (Q18).
     static func digests(ids: [UUID], store: any DigestStore, known: [String: EmailContext])
-        async throws -> (digests: [Digest], emails: [String: EmailContext]) {
+        async throws -> (digests: [Digest], emails: [String: EmailContext], providers: [String: ExecutionProvider]) {
         var context = known
+        var providers: [String: ExecutionProvider] = [:]
         var out: [Digest] = []
         for id in ids {
             guard let digest = try await store.digest(id: id) else { continue }
+            // One light query per digest: which emails Gemini processed (for the info card's cloud glyph).
+            providers.merge(try await store.providers(job: id)) { a, _ in a }
             let mentioned = Set(digest.info.map(\.emailID) + digest.suggestions.map(\.emailID))
             if !mentioned.isSubset(of: context.keys) { merge(try await store.items(job: id), into: &context) }
             out.append(digest)
         }
-        return (out, context)
+        return (out, context, providers)
     }
 
     static func owners(of digests: [Digest]) -> [String: InfoOwner] {
@@ -66,6 +69,8 @@ final class DayCanvasModel {
     /// Sender, subject and mailbox per email id, from the digests' job items.
     private(set) var emails: [String: EmailContext] = [:]
     private(set) var infoOwners: [String: InfoOwner] = [:]
+    /// Final executor per email id, for the "Summarised by Gemini" glyph.
+    private(set) var providers: [String: ExecutionProvider] = [:]
     private(set) var loadFailed = false
     /// Q16: shows the 25 highest-confidence actionable suggestions first; this reveals the rest.
     var showAll = false
@@ -108,6 +113,7 @@ final class DayCanvasModel {
                 let loaded = try await CanvasLoading.digests(ids: ids, store: store, known: emails)
                 guard requested == ids else { return }
                 emails = loaded.emails
+                providers = loaded.providers
                 content = DayContent(digests: loaded.digests, kind: .daily, emails: loaded.emails)
                 infoOwners = CanvasLoading.owners(of: loaded.digests)
                 loadFailed = false
@@ -230,6 +236,7 @@ final class TodayCanvasModel {
     /// Pinned info from earlier digests, newest first; today's own pins stay in its categories.
     private(set) var carriedPins: [PinnedInfo] = []
     private(set) var pinEmails: [String: EmailContext] = [:]
+    private(set) var pinProviders: [String: ExecutionProvider] = [:]
 
     @ObservationIgnored private let gate = ReloadGate()
     @ObservationIgnored private var requested: (ids: [UUID], start: Date)?
@@ -271,6 +278,11 @@ final class TodayCanvasModel {
                 CanvasLoading.merge(try await store.items(job: digestID), into: &context)
             }
             pinEmails = context
+            var providers: [String: ExecutionProvider] = [:]
+            for digestID in Set(carried.map(\.digestID)) {
+                providers.merge(try await store.providers(job: digestID)) { a, _ in a }
+            }
+            pinProviders = providers
             carriedPins = carried
         } catch {
             canvasLog.error("could not load pins: \(String(describing: error), privacy: .public)")
@@ -279,6 +291,8 @@ final class TodayCanvasModel {
 
     /// Email context for an info item or record on this canvas.
     func email(for emailID: String) -> EmailContext? { digests.emails[emailID] ?? pinEmails[emailID] }
+
+    func provider(for emailID: String) -> ExecutionProvider? { digests.providers[emailID] ?? pinProviders[emailID] }
 
     func patch(_ suggestions: [Suggestion]) {
         digests.patch(suggestions)
@@ -303,6 +317,7 @@ final class BacklogCanvasModel {
     private(set) var content: DayContent?
     private(set) var emails: [String: EmailContext] = [:]
     private(set) var infoOwners: [String: InfoOwner] = [:]
+    private(set) var providers: [String: ExecutionProvider] = [:]
     private(set) var batching: BacklogBatching?
     /// The batch on screen, zero-based.
     private(set) var batchIndex = 0
@@ -348,7 +363,7 @@ final class BacklogCanvasModel {
 
     func load(jobID: UUID, store: any DigestStore) async {
         if requested != jobID {
-            digest = nil; content = nil; batching = nil; batchIndex = 0; emails = [:]
+            digest = nil; content = nil; batching = nil; batchIndex = 0; emails = [:]; providers = [:]
         }
         requested = jobID
         await gate.run {
@@ -365,6 +380,8 @@ final class BacklogCanvasModel {
                 var context = emails
                 CanvasLoading.merge(items, into: &context)
                 emails = context
+                providers = try await store.providers(job: id)
+                guard requested == id else { return }
                 let resultIDs = Set(loaded.info.map(\.emailID) + loaded.suggestions.map(\.emailID)).union(loaded.skipped.map(\.id))
                 batching = BacklogBatching(jobOrder: items.sorted { $0.position < $1.position }.map(\.messageID),
                                            resultIDs: resultIDs)

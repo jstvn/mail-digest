@@ -181,6 +181,10 @@ private func pathFilter(_ store: any DigestStore) async throws {
     #expect(try await store.activityJobs(ActivityQuery(path: .cloud)).map(\.id) == [cloud.id])
     #expect(try await store.activityJobs(ActivityQuery(path: .local)).map(\.id) == [local.id])
     #expect(try await store.activityJobs(ActivityQuery()).count == 3)
+    // providers(job:) lists only items that ran a model.
+    let cloudItem = try #require(try await store.items(job: cloud.id).first)
+    #expect(try await store.providers(job: cloud.id) == [cloudItem.messageID: .cloud])
+    #expect(try await store.providers(job: none.id).isEmpty)
     #expect(try await store.activityJobs(ActivityQuery(kind: .daily, path: .cloud)).isEmpty)
 }
 

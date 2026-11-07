@@ -5,6 +5,8 @@ import SwiftUI
 struct InfoCard: View {
     let item: InfoItem
     let email: EmailContext?
+    /// Only `.cloud` shows a glyph; local and unknown show nothing.
+    var provider: ExecutionProvider?
     var notesState: NotesSaveState = .idle
     var onOpen: () -> Void = {}
     var onTogglePin: () -> Void = {}
@@ -28,12 +30,21 @@ struct InfoCard: View {
                     }
                     .foregroundStyle(.secondary)
                 }
-                if let email {
-                    Text("\(ReviewPresentation.senderName(email.sender)) · \(email.subject)")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                if email != nil || provider == .cloud {
+                    HStack(spacing: 4) {
+                        if provider == .cloud {
+                            Image(systemName: "cloud")
+                                .help("Summarised by Gemini")
+                                .accessibilityLabel("Summarised by Gemini")
+                        }
+                        if let email {
+                            Text("\(ReviewPresentation.senderName(email.sender)) · \(email.subject)")
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
                 }
                 if case .failed(let reason) = notesState {
                     Label(reason, systemImage: "exclamationmark.triangle.fill")
