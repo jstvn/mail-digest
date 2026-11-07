@@ -11,9 +11,10 @@ public enum AssessmentMethod: String, Codable, Sendable, Equatable {
 }
 
 /// Why System One triage did not yield scores. Codes only, never message text.
-public enum TriageFailure: String, Codable, Sendable, Equatable {
+/// Below-threshold scores are a valid `uncertain` outcome, not a failure.
+public enum TriageFailure: String, Codable, Sendable, Equatable, Error {
     case unreachable, versionTooOld, versionUnknown, modelMissing, httpError, timedOut
-    case malformedResponse, belowThreshold
+    case malformedResponse, unsupportedModel
 }
 
 /// Raw System One scores plus the thresholds in force at decision time.

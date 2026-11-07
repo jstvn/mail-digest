@@ -44,7 +44,8 @@ private func expectSnapshot(_ request: URLRequest, _ name: String, sourceFile: S
 }
 
 // Serialized: StubURLProtocol keeps global state.
-@Suite(.serialized) struct OllamaClientTests {
+extension StubNetworkTests {
+@Suite struct OllamaClientTests {
     @Test func requestSnapshotFull() throws {
         let request = try client().makeExtractionRequest(assessmentEmail(), tier: .full, today: today, timeZone: tz)
         try expectSnapshot(request, "request-snapshot.json")
@@ -256,4 +257,5 @@ private final class Counter: @unchecked Sendable {
     private let lock = NSLock()
     private var n = 0
     func next() -> Int { lock.lock(); defer { lock.unlock() }; n += 1; return n }
+}
 }

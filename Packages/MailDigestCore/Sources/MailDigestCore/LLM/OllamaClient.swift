@@ -183,7 +183,7 @@ public struct OllamaClient: LLMClient {
     }
 
     /// Wraps `dataTask` so cancellation behaves the same on Linux and macOS.
-    private static func perform(_ request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
+    static func perform(_ request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
         let box = TaskBox()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (cont: CheckedContinuation<(Data, URLResponse), Error>) in

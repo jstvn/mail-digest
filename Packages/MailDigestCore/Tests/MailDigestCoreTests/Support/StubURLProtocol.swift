@@ -1,7 +1,11 @@
 import Foundation
+import Testing
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+
+/// Parent of every suite that uses `StubURLProtocol`: its state is global, so they must not run in parallel.
+@Suite(.serialized) enum StubNetworkTests {}
 
 /// A request as seen by the stub, with the body already read.
 struct StubRequest: Sendable {
