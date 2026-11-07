@@ -57,6 +57,10 @@ final class DigestRunModel {
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "run")
 
     @ObservationIgnored private let source = AppleMailSource()
+    /// The Gemini API key lives only in the Keychain; Settings saves and removes it here.
+    @ObservationIgnored let credentials = KeychainCredentialStore()
+    @ObservationIgnored private(set) lazy var cloudRouting = CloudRoutingProvider(
+        credentials: credentials, snapshot: { [settings] in settings.settings })
     /// The SQLite store, opened lazily off the main actor. Nil until opened; there is deliberately no
     /// in-memory fallback, so a failure is shown instead of silently losing results.
     @ObservationIgnored private var store: GRDBDigestStore?
@@ -580,6 +584,8 @@ final class DigestRunModel {
     /// The runner for the current settings, created on demand (for example to resume an old job at launch).
     private func ensureRunner() async -> JobRunner? {
         guard let store = await openStore() else { return nil }
+        // Every job start or resume comes through here: one System One preflight per job, fresh key read.
+        if !Self.isActive(progress?.state, includePaused: false) { await cloudRouting.resetForNewJob() }
         return await runner(for: mailboxes.filter { $0.kind == .inbox }.map(\.ref), store: store)
     }
 
@@ -704,11 +710,21 @@ final class DigestRunModel {
         relevant.autoFileEnabledAt = nil
         relevant.pauseBacklogOnBattery = true
         relevant.quietHoursEnabled = false
+        // Cloud settings are read live for every email, so they never need a new runner.
+        let cloudDefaults = DigestSettings()
+        relevant.cloudDigestEnabled = cloudDefaults.cloudDigestEnabled
+        relevant.geminiModel = cloudDefaults.geminiModel
+        relevant.triageModel = cloudDefaults.triageModel
+        relevant.privacyThreshold = cloudDefaults.privacyThreshold
+        relevant.cloudPrivacyAcknowledgedRevision = nil
         let key = RunnerKey(settings: relevant, inboxes: Set(inboxes))
         if let runner, key == runnerKey { return runner }
         progressTask?.cancel()
+        let provider = cloudRouting
         let new = JobRunner(source: source, llm: llm, store: store, notifier: notifier, clock: clock,
-                            settings: settings.settings.runnerSettings(inboxes: inboxes))
+                            settings: settings.settings.runnerSettings(inboxes: inboxes),
+                            localModel: settings.settings.resolvedModel,
+                            routingConfig: { await provider.config() })
         runner = new
         runnerKey = key
         if !didRecoverJobs {

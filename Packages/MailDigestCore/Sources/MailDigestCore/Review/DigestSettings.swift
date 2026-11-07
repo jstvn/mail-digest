@@ -34,7 +34,18 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     /// The allowed window, minutes after midnight in the app's time zone (default 10pm to 7am).
     public var quietHoursStartMinute: Int
     public var quietHoursEndMinute: Int
+    /// Hybrid routing: send emails System One confirms as non-sensitive to Gemini. Off by default (Q63).
+    public var cloudDigestEnabled: Bool
+    public var geminiModel: String
+    /// Local Ollama model that runs System One triage.
+    public var triageModel: String
+    /// Minimum non-sensitive confidence for cloud eligibility (`SystemOneSpec.thresholdRange`).
+    public var privacyThreshold: Double
+    /// The `CloudPrivacyPolicy` revision the user accepted; nil until they accept.
+    public var cloudPrivacyAcknowledgedRevision: Int?
 
+    public static let defaultTriageModel = "kev:0.8b-q8_0"
+    public static let defaultPrivacyThreshold = 0.90
     public static let defaultOllamaURL = "http://localhost:11434"
     public static let defaultModel = "qwen3:4b"
     public static let defaultListName = "Mail Digest"
@@ -47,7 +58,16 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 declinedIgnoreSuggestions: [String] = [], dailyMailboxes: [MailboxRef] = [],
                 autoFileProcessed: Bool = false, autoFileEnabledAt: Date? = nil, pauseBacklogOnBattery: Bool = true,
                 quietHoursEnabled: Bool = false, quietHoursStartMinute: Int = 22 * 60,
-                quietHoursEndMinute: Int = 7 * 60) {
+                quietHoursEndMinute: Int = 7 * 60,
+                cloudDigestEnabled: Bool = false, geminiModel: String = GeminiDefaults.model,
+                triageModel: String = DigestSettings.defaultTriageModel,
+                privacyThreshold: Double = DigestSettings.defaultPrivacyThreshold,
+                cloudPrivacyAcknowledgedRevision: Int? = nil) {
+        self.cloudDigestEnabled = cloudDigestEnabled
+        self.geminiModel = geminiModel
+        self.triageModel = triageModel
+        self.privacyThreshold = privacyThreshold
+        self.cloudPrivacyAcknowledgedRevision = cloudPrivacyAcknowledgedRevision
         self.pauseBacklogOnBattery = pauseBacklogOnBattery
         self.quietHoursEnabled = quietHoursEnabled
         self.quietHoursStartMinute = quietHoursStartMinute
@@ -75,6 +95,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         case retention, vipSenders, blockedSenders, ignoredSenders, trustedNewsletterSenders, declinedIgnoreSuggestions
         case dailyMailboxes, autoFileProcessed, autoFileEnabledAt
         case pauseBacklogOnBattery, quietHoursEnabled, quietHoursStartMinute, quietHoursEndMinute
+        case cloudDigestEnabled, geminiModel, triageModel, privacyThreshold, cloudPrivacyAcknowledgedRevision
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
@@ -103,7 +124,33 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   quietHoursStartMinute: try c.decodeIfPresent(Int.self, forKey: .quietHoursStartMinute)
                       ?? d.quietHoursStartMinute,
                   quietHoursEndMinute: try c.decodeIfPresent(Int.self, forKey: .quietHoursEndMinute)
-                      ?? d.quietHoursEndMinute)
+                      ?? d.quietHoursEndMinute,
+                  cloudDigestEnabled: try c.decodeIfPresent(Bool.self, forKey: .cloudDigestEnabled)
+                      ?? d.cloudDigestEnabled,
+                  geminiModel: try c.decodeIfPresent(String.self, forKey: .geminiModel) ?? d.geminiModel,
+                  triageModel: try c.decodeIfPresent(String.self, forKey: .triageModel) ?? d.triageModel,
+                  privacyThreshold: try c.decodeIfPresent(Double.self, forKey: .privacyThreshold)
+                      ?? d.privacyThreshold,
+                  cloudPrivacyAcknowledgedRevision: try c.decodeIfPresent(Int.self,
+                                                                          forKey: .cloudPrivacyAcknowledgedRevision))
+    }
+
+    /// The Gemini model, or the default when blank.
+    public var resolvedGeminiModel: String {
+        let m = geminiModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        return m.isEmpty ? GeminiDefaults.model : m
+    }
+
+    /// The triage model, or the default when blank.
+    public var resolvedTriageModel: String {
+        let m = triageModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        return m.isEmpty ? Self.defaultTriageModel : m
+    }
+
+    /// The threshold clamped into the allowed range (a non-finite value falls back to the default).
+    public var resolvedPrivacyThreshold: Double {
+        guard privacyThreshold.isFinite else { return Self.defaultPrivacyThreshold }
+        return min(max(privacyThreshold, SystemOneSpec.thresholdRange.lowerBound), SystemOneSpec.thresholdRange.upperBound)
     }
 
     /// The resource rules these settings describe. Low Power Mode and serious heat always pause Backlog.

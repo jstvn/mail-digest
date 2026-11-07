@@ -255,6 +255,7 @@ private struct ModelSettingsTab: View {
             } footer: {
                 Text("Approved reminders go into this list.").foregroundStyle(.secondary)
             }
+            CloudSettingsSection(run: run)
         }
         .formStyle(.grouped)
     }

@@ -121,3 +121,49 @@ import Testing
         #expect(policy.timeZone.identifier == "Australia/Brisbane")
     }
 }
+
+@Suite struct CloudSettingsTests {
+    @Test func olderBlobGetsCloudDefaults() throws {
+        let old = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"runHour":8}"#.utf8))
+        #expect(old.runHour == 8 && !old.cloudDigestEnabled)
+        #expect(old.geminiModel == GeminiDefaults.model && old.triageModel == "kev:0.8b-q8_0")
+        #expect(old.privacyThreshold == 0.90 && old.cloudPrivacyAcknowledgedRevision == nil)
+    }
+
+    @Test func cloudSettingsRoundTrip() throws {
+        var s = DigestSettings()
+        s.cloudDigestEnabled = true
+        s.geminiModel = "m"
+        s.triageModel = "tev1:0.8b"
+        s.privacyThreshold = 0.95
+        s.cloudPrivacyAcknowledgedRevision = 1
+        #expect(try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s)) == s)
+    }
+
+    @Test func resolvedValuesFallBackAndClamp() {
+        var s = DigestSettings()
+        s.geminiModel = "  "; s.triageModel = ""; s.privacyThreshold = 0.5
+        #expect(s.resolvedGeminiModel == GeminiDefaults.model && s.resolvedTriageModel == "kev:0.8b-q8_0")
+        #expect(s.resolvedPrivacyThreshold == 0.80)
+        s.privacyThreshold = .nan
+        #expect(s.resolvedPrivacyThreshold == 0.90)
+    }
+
+    @Test func offReasonOrder() {
+        var s = DigestSettings()
+        #expect(CloudPrivacyPolicy.offReason(settings: s, hasKey: true) == .cloudDisabled)
+        s.cloudDigestEnabled = true
+        #expect(CloudPrivacyPolicy.offReason(settings: s, hasKey: true) == .acknowledgementRequired)
+        s.cloudPrivacyAcknowledgedRevision = 0
+        #expect(CloudPrivacyPolicy.offReason(settings: s, hasKey: true) == .acknowledgementRequired)
+        s.cloudPrivacyAcknowledgedRevision = CloudPrivacyPolicy.currentRevision
+        #expect(CloudPrivacyPolicy.offReason(settings: s, hasKey: false) == .noCredential)
+        #expect(CloudPrivacyPolicy.offReason(settings: s, hasKey: true) == nil)
+        s.cloudPrivacyAcknowledgedRevision = CloudPrivacyPolicy.currentRevision + 1
+        #expect(CloudPrivacyPolicy.offReason(settings: s, hasKey: true) == nil)
+    }
+
+    @Test func triageModelsListed() {
+        #expect(CloudPrivacyPolicy.triageModels.map(\.tag) == ["kev:0.8b-q8_0", "tev1:0.8b", "kev:4b-q4_K_M"])
+    }
+}
