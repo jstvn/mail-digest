@@ -186,3 +186,31 @@ Each item says what the spec leaves open and the interim choice the build uses, 
      - Opening the window took about 5 s (Debug) or 3 s (Release). It was synchronous SwiftUI/AppKit layout of every row's controls, doubled by `ViewThatFits`, inside `showWindow`.
      - Rows are now built once and lazily, and the window opens in about 0.3 s (Debug, measured).
      - Badged sidebar rows (Today, Review Queue, days, Backlog jobs) could not be selected because `.badge` was applied after `.tag`, which hid the tag from `List(selection:)`. `.tag` is now always outermost, via one helper.
+
+## Hybrid privacy routing and Activity Center (2026-11-08)
+
+60. **Lifecycle history for Activity.** `job` and `job_item` cannot reconstruct pause, resume or stop history.
+   - **Decision:** Add an append-only `job_event` table for job-level lifecycle transitions only (kinds in SPEC > Activity Center).
+     - Responsibilities stay separate: `job` = current state and timestamps, `job_event` = transitions, `job_item` = per-email results, `job_item.routing` = privacy assessment and execution provenance.
+     - Each event is written in the same transaction as its state change; no progress or per-email events; payloads are small and privacy-safe.
+     - Retention follows the owning job. Jobs from before v5 get no fabricated events and show "Lifecycle history not recorded".
+61. **Which senders are deterministically public?**
+   - **Decision:** A conservative built-in allowlist only (exact hosts), plus a valid `List-Unsubscribe`, no sensitive rule hit and complete inspection.
+     - The existing Trusted Newsletter list is **not** reused: trusting a newsletter for suggestion limits is not consent to send it to a cloud provider.
+     - GitHub notifications are never allowlisted. A user-managed "Cloud-Approved Senders" list is out of scope.
+62. **System One request.** Questions and criteria as specified by Justin:
+   - `contains_pii_or_sensitive` (`noul`); `mail_category` (`choice`): `public_newsletter_or_promo` = "Public newsletters, marketing promotions, product updates, or public notifications."; `personal_or_work_private` = "Private correspondence, internal work communication, or personal scheduling."; `sensitive_transactional` = "Bills, receipts, security alerts, account statements, or legal or medical documents."
+   - **Decision:** eligible iff `1 − noul ≥ privacyThreshold` (default 0.90, user range 0.80–0.99) and `probabilities.public_newsletter_or_promo ≥ 0.85` (fixed). Missing, non-finite or out-of-range scores fail closed. Minimum Ollama 0.40.4 (Kev model page; System One itself needs 0.35.0). Verified 2026-11-08: Ollama 0.40.14, `kev:0.8b-q8_0` on the llama.cpp runner answers `/v1/systemone` on the Intel i7-9750H.
+63. **Privacy acknowledgement before Cloud Digest.**
+   - **Decision:** The first attempt to enable Cloud Digest shows a mandatory acknowledgement; cloud stays off unless the user explicitly accepts. Accepting stores `cloudPrivacyAcknowledgedRevision` (current revision 1, based on the Gemini API Additional Terms effective 23 March 2026). A higher revision asks again. A persistent disclosure stays under the setting, with a link to https://ai.google.dev/gemini-api/terms. It says:
+     - Emails the app classifies as eligible have their subject, sender, date and cleaned text sent to Google.
+     - With **unpaid** quota, Google uses submitted content and responses to improve its products, and human reviewers may read and annotate them; Google's terms say not to submit sensitive, confidential or personal information to unpaid services.
+     - With **paid** quota (a Google Cloud project with active billing), Google does not use prompts or responses to improve its products, but logs them for a limited time for abuse prevention, safety, security and legal purposes.
+     - The app cannot tell which quota your project uses, and a successful Test Connection does not show it. Using a project with active billing is recommended for email.
+   - **Flagged, not decided (no compliance claim is made):** the terms (effective 23 Mar 2026) state the APIs are for "professional or business purposes, not for consumer use"; users must be 18+; EEA, Switzerland and UK users may use only paid services; the services may not be used in clinical practice or to give medical advice (medical content is routed locally by the pre-filter). Justin to judge applicability.
+64. **Test Connection.**
+   - **Decision:** Metadata-only `GET v1beta/models/{model}` with the `x-goog-api-key` header. Success requires matching `name` and `generateContent` in `supportedGenerationMethods`. No prompt is sent. New Google AI Studio keys are auth keys (since 28 May 2026) and unrestricted standard keys are rejected; both use the same header, so the app never puts the key in a URL.
+65. **Gemini model.**
+   - **Decision:** Keep `gemini-3.5-flash-lite` as the configurable default for predictable extraction, even though newer models exist. Structured output uses `responseMimeType` + `responseJsonSchema`; live availability and schema acceptance are a MAC_TODO check with synthetic emails. Comparing a newer model is a future iteration.
+66. **Content inspection is strict.**
+   - **Decision:** Only `.complete` inspection can qualify for cloud. EMLX messages with attachments or non-text parts and every JXA-fallback message stay local, shown as "Local only · Content not fully inspected". Broader eligibility must come from better MIME inspection, never a relaxed policy.

@@ -864,6 +864,95 @@ Every email is untrusted input. The approval panel is the main defence; these ru
 - Email content is never sent anywhere except the configured Ollama URL. The settings screen warns if that URL isn't `localhost` or `127.0.0.1`
 - Logs (`os.Logger`, subsystem `dev.pages.justinwang.maildigest`) record ids, tiers, counts and errors, never email bodies
 
+## Hybrid privacy routing (optional Gemini)
+
+Local Qwen3 4B stays the default and the always-available fallback. An email reaches Gemini only when **all** of these hold: Cloud Digest is enabled, the current privacy acknowledgement is accepted, a key is in the Keychain, the email's content was fully inspected, and it passed an explicit privacy assessment (trusted-sender rule or System One above both thresholds). Anything uncertain, incomplete or unavailable stays local. Decisions Q60–Q66.
+
+### Pipeline placement
+
+`JobRunner` (unchanged orchestration, still serial) → `DigestPipeline.process`: `MailFilter.tier` (skipped mail never reaches any model) → `EmailCleaner.clean` → **`DigestRouter`** → `SuggestionValidator` (identical for both providers). The digest `headline` always runs locally because it aggregates info items from every email, including private ones.
+
+`DigestRouter` steps for one email:
+
+1. **Effective cloud off** (toggle off, acknowledgement not current, or no key): assessment from `PrivacyPreFilter` only (no System One call), execution local with reason `cloudDisabled` / `acknowledgementRequired` / `noCredential`. The Ollama request is byte-identical to the pre-routing pipeline.
+2. **Inspection** not `.complete` → local, reason `contentNotInspected` ("Local only · Content not fully inspected").
+3. **`PrivacyPreFilter`** on the full uncleaned body plus subject, sender and headers → `private` (local), `public` (Gemini) or `needsTriage`.
+4. **System One** for `needsTriage` → eligible means Gemini, anything else local.
+5. **Gemini** call; any failure except cancellation falls back to local `OllamaClient` with the same arguments in the same `handle` call. Only the final result is persisted.
+
+### Content inspection
+
+`EmailMessage.contentInspection: ContentInspection` = `.complete`, `.uninspectedParts` or `.unknown` (default, so fixtures and older callers fail closed).
+
+- `EmlxParser` reports `.complete` only when every MIME leaf is `text/plain` or `text/html`, none has `Content-Disposition: attachment`, every part decoded, and nothing was cut short. `text/plain` and `text/html` alternatives inside `multipart/alternative` count as one representation. Any other leaf (images, calendar, PDF, S/MIME, unknown types) or a partial message → `.uninspectedParts`.
+- The JXA fallback always reports `.unknown`.
+- Never relax this to raise cloud coverage; improve MIME inspection instead.
+
+### PrivacyPreFilter (Core, pure, deterministic)
+
+Input: sender, subject, full body, filter headers, inspection. Output: class plus a stable rule id (`kw.otp`, `pattern.card`, `domain.gov`, `allowlist.substack`, …). Matched text and values are never stored or logged.
+
+- **Private** (checked first, always wins): OTP / verification / sign-in-code language; card numbers (Luhn-checked), IBAN, BSB + account, TFN/ABN and similar tax identifiers; password reset and credential language; statement, invoice, receipt, payment, transaction; medical and health; tax. Sensitive sender domains matched on normalised host label boundaries (`*.gov.au`, `*.gov`, a built-in bank list, a built-in health list), so `notgov.au` never matches.
+- **Public** requires all of: sender host on the built-in allowlist (Q61; initially `substack.com` publication senders and Medium digest senders, exact hosts), a non-empty `List-Unsubscribe`, no private rule hit, `.complete` inspection. GitHub is never allowlisted.
+- Everything else → `needsTriage`. No match is not evidence of safety.
+
+### System One triage
+
+`POST {ollamaURL}/v1/systemone` via the existing Ollama base URL. Requires Ollama ≥ 0.40.4 (checked once per job with `GET /api/version`) and the triage model present in `/api/tags` (checked once per job). The app never pulls models.
+
+- **Input:** `EmailCleaner` output with tracking query parameters removed, truncated to 1,500 characters; `state` = `"Subject: …\nFrom: …\nBody: …"`. Questions exactly as below; email text is only ever `state`, never instructions.
+  - `contains_pii_or_sensitive`: `noul`, instructions "Does this email contain personally identifiable information, financial records, medical information, credentials, private personal matters, or confidential work discussions?"
+  - `mail_category`: `choice` with criteria `public_newsletter_or_promo`, `personal_or_work_private`, `sensitive_transactional` (descriptions as in Q62).
+- **Response:** `answers.contains_pii_or_sensitive.noul` = P(sensitive); `answers.mail_category.probabilities[...]`. `pNonSensitive = 1 − pSensitive`. Eligible iff both scores are present, finite and in [0, 1], `pNonSensitive ≥ privacyThreshold` (default 0.90, range 0.80–0.99) **and** `pPublic ≥ 0.85` (fixed).
+- **Fail closed** (local, reason recorded): Ollama unreachable, version too old or unknown, model missing, HTTP error, timeout (90 s), malformed or missing scores, below either threshold.
+- Scores are model confidences, not accuracy guarantees; the UI never presents them as such.
+- Triage models offered: `kev:0.8b-q8_0` (default, llama.cpp runner, verified on this Intel Mac), `tev1:0.8b`, `kev:4b-q4_K_M`. MLX-only tags are not offered.
+
+### Gemini provider
+
+`GeminiClient` implements extraction only (never headline). Model id from settings, default `gemini-3.5-flash-lite`.
+
+- `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`, key in the `x-goog-api-key` header only (never a query string).
+- Body: `systemInstruction` = `Prompts.extractionSystem(...)`, one user content = `Prompts.extractionUser(...)` (sender, subject, date and cleaned body only; no recipients, attachments or tracking data), `generationConfig.responseMimeType = "application/json"` and `responseJsonSchema` = `GeminiSchemaAdapter` output of `ExtractionSchema`. The adapter keeps types, nullable, `enum`, `required`, `minimum`/`maximum`, `minItems`/`maxItems`; constraints Gemini does not enforce are still enforced by the existing decoder and `SuggestionValidator`.
+- Response: concatenated `candidates[0].content.parts[].text`; `finishReason` must be `STOP`; `promptFeedback.blockReason` means blocked. Decoded with the same `ExtractionResult` decoder as Ollama, then the unchanged validator.
+- Errors (`GeminiError`): `invalidCredential` (400 API_KEY_INVALID, 401, 403), `rateLimited` (429), `modelUnavailable` (404), `server` (5xx), `timedOut` (60 s), `network`, `blocked`, `malformedResponse`, `cancelled`. No Gemini retry; fallback is local. Error text never includes headers or the key.
+- **Test Connection:** `GET …/v1beta/models/{model}` with the entered key (or the saved one when the field is empty). Connected iff 200, `name == "models/{model}"`, and `supportedGenerationMethods` contains `generateContent`. Other results: invalid key, model unavailable, model lacks generateContent, rate limited, network error, server error. It sends no prompt or email content, never enables Cloud Digest, and does not prove future requests will succeed or that the project uses paid quota.
+
+### Credentials and settings
+
+- `CredentialStore` protocol in Core (`read`, `save`, `delete`), `InMemoryCredentialStore` fake. App adapter `KeychainCredentialStore`: generic password, service `"<bundle id>.gemini"`, account `"api-key"`, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, not synchronizable, no custom access group. The key is read once at job start and kept only in the client for that job.
+- `DigestSettings` gains `cloudDigestEnabled` (false), `geminiModel` (`gemini-3.5-flash-lite`), `triageModel` (`kev:0.8b-q8_0`), `privacyThreshold` (0.90), `cloudPrivacyAcknowledgedRevision: Int?` (nil). Missing keys decode to defaults. Whether a key exists is read from the Keychain, never stored.
+- **Settings > Model > Cloud AI (Gemini)** section: `SecureField`, Save (Update when a key exists), Remove Key, "API key saved in Keychain" or "No API key" status, Test Connection with status text, the Cloud Digest toggle (disabled without a key), triage model picker with installed or missing status, threshold control, and the persistent disclosure (Q63). Removing the key turns Cloud Digest off.
+- **Acknowledgement (Q63):** turning the toggle on while `cloudPrivacyAcknowledgedRevision < currentRevision` (1) shows a sheet with the disclosure; only "I Understand, Enable" sets the revision and the toggle. Cancel leaves it off. Saving a key never enables cloud.
+
+### Provenance (persisted per `job_item`)
+
+`job_item.routing` (JSON `RoutingProvenance`, schema version 1) and `job_item.provider` (`local` / `cloud`, the final executor; null when no model ran).
+
+- **Assessment:** verdict (`private`, `public`, `uncertain`, `notAssessed`), method (`rule`, `trustedSender`, `systemOne`, `inspection`, `cloudOff`), rule id, System One model, raw `pSensitive`, `pNonSensitive`, category probabilities, threshold and public floor at decision time, triage failure code, assessed-at.
+- **Execution:** provider, generation model id, `cloudAttempted`, fallback or local-only reason code, started and finished times.
+- The assessment is written as soon as it is decided, before generation. The final execution is written in the same transaction as the item outcome, so a cloud success is only recorded once its result is committed.
+- **Resume / retry** reuses a stored assessment (no re-triage) unless its method is `cloudOff`. Cloud use is always re-checked against current settings, so turning cloud off applies immediately. Cancellation (pause now, stop) never triggers fallback. An interrupted Gemini call leaves no result and the item is requeued as today.
+
+## Activity Center
+
+A sidebar item **Activity** (after Mail Cleanup) opens its own canvas in the review window. It shows every retained Daily and Backlog job, each run as its own record.
+
+- **Layout:** toolbar segmented filters All / Daily / Backlog and All / Local / Cloud. Date sections (Today, Yesterday, then "Fri, 6 Nov") in the settings time zone, newest first; the newest section expanded, others collapsible. Each job is a disclosure row: kind, scope or name, start, last update or end, status (Running, Paused, Stopped, Completed, Completed with failures, Failed), processed of total, failed count, elapsed time, live progress while running.
+- **Expanded job:** lifecycle events (from `job_event`) and per-email rows in processing order: time, subject, sender, outcome, duration, a **privacy badge** and a separate **execution badge**, plus an info button whose popover shows scores, threshold, triage model, rule id and fallback reason. Deterministic results show the rule, never an invented score.
+- **Labels:** privacy `Private · Rule`, `Public · Trusted Sender`, `Public · System One`, `Uncertain · System One`, `Local only · Content not fully inspected`, `Not assessed · Cloud off`; execution `Local · Qwen3 4B` (the actual model id), `Cloud · Gemini 3.5 Flash-Lite` (from the model id), `Gemini failed → Local Qwen3 4B`. Rows with no recorded routing show "Not recorded" for both; jobs without events show "Lifecycle history not recorded". Nothing is back-filled.
+- **Loading:** keyset pages of 30 job summaries ordered by `(created_at DESC, id DESC)`; items and events load only when a job is expanded; older pages load at the end of the list or via "Load Earlier Activity". The first page refreshes and merges by id while a job runs.
+- **Job status popover:** keeps job name, progress, Pause/Resume, Stop and the 3 most recent rows; the full activity log moves out. **View All Activity** opens the review window on Activity.
+- **Digest detail:** an info card shows a small `cloud` symbol (with help text) only when the email was processed by Gemini.
+
+### Lifecycle events (`job_event`)
+
+Append-only: `id INTEGER PK`, `job_id` (FK to `job`, cascade delete), `kind`, `at`, `payload` (small JSON: pause reason, trigger, counts, error category; never email content, error strings with email data, or keys). Index `(job_id, at, id)`. Kinds: `created`, `started`, `paused`, `autoPaused`, `resumed`, `stopped`, `completed`, `completedWithFailures`, `failed`, `retryRequested`, `recoveredAfterInterruption`. Written in the same transaction as the job-state change; never for progress updates or per-email work (that is `job_item`). Retention follows the job.
+
+### Migration v5
+
+`job` + `started_at`, `ended_at`, index `(created_at, id)`; `job_item` + `started_at`, `routing`, `provider`, index `(job_id, provider)`; new `job_event`. Existing rows keep nulls.
+
 ## Implementation tasks
 
 Work through these in order. Each task is done only when its acceptance criteria pass. **Linux** tasks are verified with `swift test` in the cloud; **Mac-only** tasks are written in the cloud and verified by Justin.
@@ -895,6 +984,14 @@ Work through these in order. Each task is done only when its acceptance criteria
 | T23 | App review data layer: sidebar summaries model and on-demand canvas loaders; latest digest kept for Mail Cleanup, auto-file and the badge | Mac-only | Builds; existing behaviour preserved |
 | T24 | Two-column review window: `NavigationSplitView`, `SidebarView`, canvases, job status pill and popover, floating triage bar and toast | Mac-only | Matches the Review panel UI section; HIG checks in MAC_TODO |
 | T25 | `SuggestionRow` pills, date popover and evidence quote block; `InfoCard` typography | Mac-only | Keyboard and VoiceOver reach every control |
+| T26 | `ContentInspection` (parser + JXA), routing provenance models, `PrivacyPreFilter` with built-in lists | Linux | Rule, domain-boundary, inspection and override tests; no matched text in output |
+| T27 | `SystemOneClient` (version and model gate, request, decoding, eligibility, fail closed) | Linux | Stubbed tests for decoding, thresholds, malformed and missing scores, timeouts, 404 and old versions |
+| T28 | `CredentialStore`, `GeminiClient`, `GeminiSchemaAdapter`, connection test | Linux | Stubbed tests: header auth, no key in URL or errors, schema adapter, decoding, every error class, models.get checks |
+| T29 | Migration v5, `job_event`, provenance and lifecycle persistence, Activity keyset queries, retention | Linux + Mac | Migration and paging tests on both stores; events atomic with state changes; nothing back-filled |
+| T30 | `DigestRouter` in `DigestPipeline`/`JobRunner`; fallback; resume reuse | Linux | Local-only path unchanged when cloud is off; private, uncertain and incomplete never reach Gemini; one result after fallback |
+| T31 | Settings fields, `KeychainCredentialStore`, Cloud AI section, acknowledgement sheet, app wiring | Mac-only | Builds; Keychain and acknowledgement checks in MAC_TODO |
+| T32 | Activity sidebar and canvas, slim job popover with View All Activity, cloud glyph on info cards | Mac-only | Builds; HIG, VoiceOver and history checks in MAC_TODO |
+| T33 | Benchmarks (pre-filter, System One cold and warm, Activity paging), docs, final verification | Linux + Mac | Measured numbers recorded; full suite and app build pass |
 
 T17 and T20 are Linux-only logic and can be done right after T09, before the Mac checkpoint.
 
