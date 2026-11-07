@@ -1,0 +1,152 @@
+import Foundation
+
+/// Everything the router needs to know about cloud routing for one email. Built by the app
+/// (which owns credentials and caches clients per job); Core never reads credentials.
+public struct CloudRoutingConfig: Sendable {
+    /// The Gemini extractor. `nil` means effective cloud off (toggle off, no acknowledgement or no key).
+    public var cloudExtractor: (any EmailExtractor)?
+    public var cloudModel: String
+    /// Why cloud is off; used as the local reason. Ignored when `cloudExtractor` is set.
+    public var offReason: LocalReason?
+    /// System One client; `nil` while cloud is on means triage is unavailable.
+    public var triage: (any SystemOneClient)?
+    public var triageModel: String
+    public var privacyThreshold: Double
+
+    public init(cloudExtractor: (any EmailExtractor)?, cloudModel: String, offReason: LocalReason?,
+                triage: (any SystemOneClient)?, triageModel: String, privacyThreshold: Double) {
+        self.cloudExtractor = cloudExtractor
+        self.cloudModel = cloudModel
+        self.offReason = offReason
+        self.triage = triage
+        self.triageModel = triageModel
+        self.privacyThreshold = privacyThreshold
+    }
+
+    /// Cloud effectively off; every email stays local.
+    public static func localOnly(reason: LocalReason) -> CloudRoutingConfig {
+        CloudRoutingConfig(cloudExtractor: nil, cloudModel: "", offReason: reason, triage: nil,
+                           triageModel: "", privacyThreshold: SystemOneSpec.thresholdRange.upperBound)
+    }
+}
+
+/// Thrown when the final (local) extraction fails. Carries the provenance of the failed attempt so the
+/// runner can persist it; `underlying` keeps the original error semantics.
+public struct RoutedExecutionFailure: Error, Sendable {
+    public var underlying: any Error
+    public var execution: ExecutionRecord
+
+    public init(underlying: any Error, execution: ExecutionRecord) {
+        self.underlying = underlying
+        self.execution = execution
+    }
+}
+
+/// Decides, per email, whether Gemini or local Qwen3 runs the extraction. Fails closed: Gemini is used
+/// only for fully inspected mail with an explicit `public` verdict.
+public struct DigestRouter: Sendable {
+    public let clock: any Clock
+    private let preFilter = PrivacyPreFilter()
+
+    public init(clock: any Clock) { self.clock = clock }
+
+    /// Step 1: the privacy assessment. Throws only `CancellationError`.
+    public func assess(_ email: EmailMessage, stored: PrivacyAssessment?,
+                       config: CloudRoutingConfig) async throws -> PrivacyAssessment {
+        try Task.checkCancellation()
+        let now = clock.now()
+        // Pre-filter sees the full uncleaned text. It is cheap and deterministic, so it always runs:
+        // a private rule wins even over a stored decision (for example after the rule list grows).
+        let input = PrivacyInput(sender: email.sender, subject: email.subject, body: email.body,
+                                 headers: email.headers, inspection: email.contentInspection)
+        let verdict = preFilter.classify(input)
+        if case .private(let id) = verdict {
+            if let stored, stored.verdict == .private, stored.method == .rule, stored.ruleID == id { return stored }
+            return PrivacyAssessment(verdict: .private, method: .rule, ruleID: id, assessedAt: now)
+        }
+        // Reuse a stored decision on resume/retry (no re-triage); a cloud-off placeholder is re-assessed.
+        if let stored, stored.method != .cloudOff { return stored }
+        if config.cloudExtractor == nil {
+            if case .public(let id) = verdict {
+                return PrivacyAssessment(verdict: .public, method: .trustedSender, ruleID: id, assessedAt: now)
+            }
+            return PrivacyAssessment(verdict: .notAssessed, method: .cloudOff, assessedAt: now)
+        }
+        guard email.contentInspection == .complete else {
+            return PrivacyAssessment(verdict: .notAssessed, method: .inspection, assessedAt: now)
+        }
+        if case .public(let id) = verdict {
+            return PrivacyAssessment(verdict: .public, method: .trustedSender, ruleID: id, assessedAt: now)
+        }
+        func uncertain(_ failure: TriageFailure) -> PrivacyAssessment {
+            PrivacyAssessment(verdict: .uncertain, method: .systemOne, triageFailure: failure, assessedAt: now)
+        }
+        guard let triage = config.triage else { return uncertain(.unreachable) }
+        do {
+            if let failure = try await triage.preflight(model: config.triageModel) { return uncertain(failure) }
+            let scores = try await triage.assess(TriageInputBuilder().build(email), model: config.triageModel)
+            return TriageEvaluator().evaluate(scores, model: config.triageModel,
+                                              threshold: config.privacyThreshold, assessedAt: clock.now())
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let failure as TriageFailure {
+            return uncertain(failure)
+        } catch {
+            return uncertain(.unreachable)
+        }
+    }
+
+    /// Step 2: run the extraction. `email` is the cleaned message. Gemini is re-checked here
+    /// independently of how the assessment was produced.
+    public func execute(_ email: EmailMessage, tier: MailTier, trustedNewsletter: Bool, today: Date,
+                        timeZone: TimeZone, assessment: PrivacyAssessment, config: CloudRoutingConfig,
+                        local: any LLMClient, localModel: String) async throws -> (ExtractionResult, ExecutionRecord) {
+        let started = clock.now()
+        var cloudAttempted = false
+        var cloudFailure: String?
+        var reason: LocalReason
+
+        if let cloud = config.cloudExtractor {
+            if email.contentInspection != .complete {
+                reason = .contentNotInspected
+            } else {
+                switch assessment.verdict {
+                case .public:
+                    reason = .cloudFailed // only used if the call below fails
+                    cloudAttempted = true
+                    do {
+                        let result = try await cloud.extract(email, tier: tier, trustedNewsletter: trustedNewsletter,
+                                                             today: today, timeZone: timeZone)
+                        return (result, ExecutionRecord(provider: .cloud, model: config.cloudModel,
+                                                        cloudAttempted: true, startedAt: started,
+                                                        finishedAt: clock.now()))
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        cloudFailure = (error as? GeminiError)?.code ?? "unknown"
+                    }
+                case .private: reason = .privateContent
+                case .uncertain: reason = assessment.triageFailure != nil ? .triageUnavailable : .notEligible
+                case .notAssessed: reason = .notEligible
+                }
+            }
+        } else {
+            reason = config.offReason ?? .cloudDisabled
+        }
+
+        func record() -> ExecutionRecord {
+            ExecutionRecord(provider: .local, model: localModel, cloudAttempted: cloudAttempted,
+                            localReason: reason, cloudFailure: cloudFailure, startedAt: started,
+                            finishedAt: clock.now())
+        }
+        do {
+            let result = try await local.extract(email, tier: tier, trustedNewsletter: trustedNewsletter,
+                                                 today: today, timeZone: timeZone)
+            return (result, record())
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw RoutedExecutionFailure(underlying: error, execution: record())
+        }
+    }
+}

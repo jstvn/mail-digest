@@ -74,6 +74,7 @@ public actor JobRunner {
     private let settings: RunnerSettings
     private let pipeline: DigestPipeline
     private let llm: any LLMClient
+    private let routingConfig: @Sendable () async -> CloudRoutingConfig
     private let sleep: @Sendable (Duration) async throws -> Void
     private let continuation: AsyncStream<JobProgress>.Continuation
 
@@ -120,11 +121,24 @@ public actor JobRunner {
         }
     }
 
+    /// Carries the routing of a failed extraction attempt out of the processing task.
+    private final class FailedAttemptBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: RoutingProvenance?
+        var routing: RoutingProvenance? {
+            get { lock.lock(); defer { lock.unlock() }; return stored }
+            set { lock.lock(); defer { lock.unlock() }; stored = newValue }
+        }
+    }
+
     private enum LoopOutcome { case finished, paused, failed }
 
     public init(source: any MailSource, llm: any LLMClient, store: any DigestStore, notifier: any Notifier,
                 clock: any Clock, settings: RunnerSettings,
+                localModel: String = DigestSettings.defaultModel,
+                routingConfig: @escaping @Sendable () async -> CloudRoutingConfig = { .localOnly(reason: .cloudDisabled) },
                 sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
+        self.routingConfig = routingConfig
         self.source = source
         self.store = store
         self.notifier = notifier
@@ -132,7 +146,8 @@ public actor JobRunner {
         self.settings = settings
         self.sleep = sleep
         self.llm = llm
-        self.pipeline = DigestPipeline(llm: llm, filter: settings.filter, timeZone: settings.timeZone)
+        self.pipeline = DigestPipeline(llm: llm, filter: settings.filter, timeZone: settings.timeZone,
+                                       clock: clock, localModel: localModel)
         let (stream, continuation) = AsyncStream<JobProgress>.makeStream(bufferingPolicy: .bufferingNewest(256))
         self.progress = stream
         self.continuation = continuation
@@ -836,9 +851,22 @@ public actor JobRunner {
             .contains { $0.action == .approved }
         let pipeline = self.pipeline
         let priority: TaskPriority = run.job.kind == .daily ? .utility : .background
+        // Evaluated per email so turning cloud off mid-job applies to the next email.
+        let config = await routingConfig()
+        let store = self.store
+        let jobID = run.job.id
+        let stored = item.routing?.assessment
+        let failedAttempt = FailedAttemptBox()
         let child = Task(priority: priority) {
             try await pipeline.process(email, today: today, recentSuggestions: recent,
-                                       senderHasApprovedDecision: approved)
+                                       senderHasApprovedDecision: approved, routingConfig: config,
+                                       storedAssessment: stored,
+                                       onAssessment: { assessment in
+                                           try? await store.recordAssessment(
+                                               job: jobID, messageID: email.id,
+                                               routing: RoutingProvenance(assessment: assessment))
+                                       },
+                                       onFailedAttempt: { failedAttempt.routing = $0 })
         }
         inFlight = child
         // Pause-now may have arrived while we were fetching context.
@@ -859,10 +887,11 @@ public actor JobRunner {
                                                          tier: outcome.tier, processedAt: clock.now()))
             try await complete(run, item, state: outcome.tier == .skip ? .skipped : .done,
                                outcome: outcome.summaryText, seconds: seconds, error: nil,
-                               countsTowardSpeed: outcome.tier != .skip)
+                               countsTowardSpeed: outcome.tier != .skip, routing: outcome.routing)
             return false
 
         case .failure(let error):
+            let failedRouting = failedAttempt.routing
             if cancelRequested || error is CancellationError {
                 try await store.setItemState(item.id, .queued, error: nil)
                 run.current = nil
@@ -884,7 +913,8 @@ public actor JobRunner {
                     id: item.messageID, sender: item.sender, subject: item.subject, reason: "failed: \(reason)")),
                                   in: run)
                 try await complete(run, item, state: .failed, outcome: "failed: \(reason)",
-                                   seconds: clock.now().timeIntervalSince(started), error: reason)
+                                   seconds: clock.now().timeIntervalSince(started), error: reason,
+                                   routing: failedRouting)
                 return false
             }
             try await store.setItemState(item.id, .queued, error: reason)
@@ -895,9 +925,10 @@ public actor JobRunner {
 
     /// Records a finished item (done, skipped or failed) and updates counters, job totals and progress.
     private func complete(_ run: RunState, _ item: JobItem, state: JobItemState, outcome: String,
-                          seconds: Double?, error: String?, countsTowardSpeed: Bool = true) async throws {
+                          seconds: Double?, error: String?, countsTowardSpeed: Bool = true,
+                          routing: RoutingProvenance? = nil) async throws {
         try await store.recordItemOutcome(item.id, outcome: outcome, seconds: seconds ?? 0,
-                                          finishedAt: clock.now())
+                                          finishedAt: clock.now(), routing: routing)
         try await store.setItemState(item.id, state, error: error)
         run.job.totals.queued = max(0, run.job.totals.queued - 1)
         switch state {
