@@ -28,6 +28,7 @@ struct MailDigestApp: App {
 
         Window("Mail Digest", id: "review") {
             ReviewWindow(run: run, access: access)
+                .background(DockPresenceModifier())
         }
         .defaultSize(width: 980, height: 680)
 
