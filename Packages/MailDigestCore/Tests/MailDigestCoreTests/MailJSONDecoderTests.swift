@@ -42,6 +42,7 @@ private func fixture(_ name: String) throws -> Data {
         let result = try decoder.decodeFetchOutput(fixture("fetch-mail.json"))
         #expect(result.messages.count == 2)
         #expect(result.missingIDs == ["gone1@example.com"])
+        #expect(result.messages.allSatisfy { $0.contentInspection == .unknown && $0.inspectionGap == .structureUnavailable })
         let first = result.messages[0]
         #expect(first.id == "f1@example.com")
         // Mixed-case names are canonicalised and the folded value is joined with one space.

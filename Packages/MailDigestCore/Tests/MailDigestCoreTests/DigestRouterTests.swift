@@ -28,9 +28,11 @@ private actor RecordingExtractor: EmailExtractor {
 
 private func email(_ id: String = "m1@x", sender: String = "News <news@example.com>", subject: String = "Weekly news",
                    body: String = "Hello, here is this week's newsletter about gardening.",
-                   inspection: ContentInspection = .complete, headers: [String: String] = [:]) -> EmailMessage {
+                   inspection: ContentInspection = .complete, headers: [String: String] = [:],
+                   gap: InspectionGap? = nil) -> EmailMessage {
     EmailMessage(id: id, account: "iCloud", mailbox: "Inbox", sender: sender, subject: subject,
-                 receivedAt: today.addingTimeInterval(-3600), body: body, headers: headers, contentInspection: inspection)
+                 receivedAt: today.addingTimeInterval(-3600), body: body, headers: headers, contentInspection: inspection,
+                 inspectionGap: gap)
 }
 
 private let allowlisted = ("Writer <writer@substack.com>", ["List-Unsubscribe": "<https://substack.com/unsub>"])
@@ -103,6 +105,27 @@ private func run(_ p: DigestPipeline, _ e: EmailMessage, _ c: CloudRoutingConfig
         #expect(out.routing?.assessment.method == .inspection)
         #expect(out.routing?.execution?.localReason == .contentNotInspected)
         #expect(await llm.extractCalls.count == 1)
+    }
+
+    @Test(arguments: InspectionGap.allCases.map { Optional($0) } + [nil])
+    func inspectionAssessmentCarriesTheGapAndRoutingIsUnchanged(gap: InspectionGap?) async throws {
+        let llm = StubLLMClient(), cloud = RecordingExtractor()
+        let triage = StubSystemOneClient(results: [.success(eligibleScores)])
+        let e = email(sender: allowlisted.0, inspection: .uninspectedParts, headers: allowlisted.1, gap: gap)
+        let out = try await run(pipeline(llm), e, config(cloud: cloud, triage: triage))
+        #expect(out.routing?.assessment.inspectionGap == gap)
+        #expect(out.routing?.assessment.method == .inspection && out.routing?.assessment.verdict == .notAssessed)
+        #expect(out.routing?.execution?.localReason == .contentNotInspected)
+        #expect(out.routing?.execution?.provider == .local)
+        #expect(await cloud.calls.isEmpty)
+        #expect((await triage.assessCalls).isEmpty)
+    }
+
+    @Test func completeEmailAssessmentHasNoGap() async throws {
+        let llm = StubLLMClient(), cloud = RecordingExtractor()
+        let e = email(sender: allowlisted.0, headers: allowlisted.1, gap: .attachment)
+        let out = try await run(pipeline(llm), e, config(cloud: cloud, triage: StubSystemOneClient()))
+        #expect(out.routing?.assessment.inspectionGap == nil)
     }
 
     @Test func trustedSenderCompleteGoesToCloudOnly() async throws {

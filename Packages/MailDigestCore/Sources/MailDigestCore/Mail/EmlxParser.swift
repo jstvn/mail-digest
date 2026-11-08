@@ -36,9 +36,14 @@ public struct ParsedEmlx: Sendable, Equatable {
     public var filterHeaders: [String: String]
     /// `.complete` only when every MIME leaf is text/plain or text/html and decoded (Q66).
     public var inspection: ContentInspection
+    /// Why `inspection` is not `.complete`. When several apply the priority is
+    /// attachment, then non-text part, then undecodable part. Nil when complete.
+    public var inspectionGap: InspectionGap?
 
     public init(messageID: String?, sender: String, subject: String, dateHeader: Date?, body: String,
-                rawHeaderBlock: String, filterHeaders: [String: String], inspection: ContentInspection = .unknown) {
+                rawHeaderBlock: String, filterHeaders: [String: String], inspection: ContentInspection = .unknown,
+                inspectionGap: InspectionGap? = nil) {
+        self.inspectionGap = inspectionGap
         self.inspection = inspection
         self.messageID = messageID
         self.sender = sender
@@ -81,8 +86,9 @@ public struct EmlxParser: Sendable {
 
         let text: String
         let inspection: ContentInspection
+        let gap: InspectionGap?
         do {
-            (text, inspection) = try Self.extractBody(entity, charsetDecoder: charsetDecoder)
+            (text, inspection, gap) = try Self.extractBody(entity, charsetDecoder: charsetDecoder)
         } catch let reason as EmlxUnusableReason {
             return .unusable(reason)
         } catch {
@@ -97,7 +103,7 @@ public struct EmlxParser: Sendable {
             messageID: messageID, sender: from, subject: subject,
             dateHeader: entity.header("date").flatMap(Self.parseRFC5322Date), body: text,
             rawHeaderBlock: rawBlock, filterHeaders: MailJSONDecoder.filterHeaders(rawBlock),
-            inspection: inspection))
+            inspection: inspection, inspectionGap: gap))
     }
 
     // MARK: Length prefix
@@ -183,11 +189,11 @@ public struct EmlxParser: Sendable {
 
     private static let maxDepth = 12
 
-    private static func extractBody(_ root: Entity, charsetDecoder: CharsetDecoder?) throws -> (String, ContentInspection) {
+    private static func extractBody(_ root: Entity, charsetDecoder: CharsetDecoder?) throws -> (String, ContentInspection, InspectionGap?) {
         var plain: [Entity] = []
         var html: [Entity] = []
-        var uninspected = false
-        try collect(root, depth: 0, plain: &plain, html: &html, uninspected: &uninspected)
+        var gap: InspectionGap?
+        try collect(root, depth: 0, plain: &plain, html: &html, gap: &gap)
 
         var decodeFailed = false
         var result: String?
@@ -208,17 +214,19 @@ public struct EmlxParser: Sendable {
             if result == nil, !pieces.isEmpty { result = pieces.joined(separator: "\n\n") }
         }
         if let result {
-            return (result, (uninspected || decodeFailed) ? .uninspectedParts : .complete)
+            // Priority: attachment > nonTextPart > undecodablePart (deterministic).
+            if gap == nil, decodeFailed { gap = .undecodablePart }
+            return (result, gap == nil ? .complete : .uninspectedParts, gap)
         }
         throw decodeFailed ? EmlxUnusableReason.undecodableBody : EmlxUnusableReason.noUsableTextPart
     }
 
     private static func collect(_ e: Entity, depth: Int, plain: inout [Entity], html: inout [Entity],
-                                uninspected: inout Bool) throws {
+                                gap: inout InspectionGap?) throws {
         guard depth <= maxDepth else { throw EmlxUnusableReason.mimeStructure }
         let ct = parseParameterised(e.header("content-type") ?? "text/plain")
         let disposition = parseParameterised(e.header("content-disposition") ?? "").main
-        if disposition == "attachment" { uninspected = true; return }
+        if disposition == "attachment" { gap = .attachment; return }
 
         if ct.main.hasPrefix("multipart/") {
             guard let boundary = ct.params["boundary"], !boundary.isEmpty else { throw EmlxUnusableReason.mimeStructure }
@@ -228,7 +236,7 @@ public struct EmlxParser: Sendable {
                 let fields = h.isEmpty ? [] : (parseHeaders(h)?.fields ?? [])
                 if !h.isEmpty && fields.isEmpty { throw EmlxUnusableReason.mimeStructure }
                 try collect(Entity(headers: fields, body: b), depth: depth + 1, plain: &plain, html: &html,
-                                uninspected: &uninspected)
+                                gap: &gap)
             }
         } else if ct.main == "text/plain" {
             plain.append(e)
@@ -236,7 +244,7 @@ public struct EmlxParser: Sendable {
             html.append(e)
         } else {
             // Images, calendar, PDF, S/MIME, message/*, unknown: never read, so never "complete".
-            uninspected = true
+            if gap != .attachment { gap = .nonTextPart }
         }
     }
 

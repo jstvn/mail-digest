@@ -46,9 +46,13 @@ public struct PrivacyAssessment: Codable, Sendable, Equatable {
     public var triage: TriageScores?
     public var triageFailure: TriageFailure?
     public var assessedAt: Date
+    /// Why content was not fully inspected; set only for `.inspection` assessments. Old records decode as nil.
+    public var inspectionGap: InspectionGap?
 
     public init(verdict: PrivacyVerdict, method: AssessmentMethod, ruleID: String? = nil,
-                triage: TriageScores? = nil, triageFailure: TriageFailure? = nil, assessedAt: Date) {
+                triage: TriageScores? = nil, triageFailure: TriageFailure? = nil, assessedAt: Date,
+                inspectionGap: InspectionGap? = nil) {
+        self.inspectionGap = inspectionGap
         self.verdict = verdict
         self.method = method
         self.ruleID = ruleID

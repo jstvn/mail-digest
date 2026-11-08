@@ -347,4 +347,35 @@ private func reason(_ data: Data) -> EmlxUnusableReason? {
         """))
         #expect(p.inspection == .uninspectedParts)
     }
+
+    // MARK: Inspection gap
+
+    @Test func completeMessageHasNoGap() throws {
+        #expect(try usable(emlx("\(baseHeaders)\nContent-Type: text/plain\n\nHi")).inspectionGap == nil)
+    }
+
+    private func multipart(_ parts: String...) -> Data {
+        emlx("\(baseHeaders)\nContent-Type: multipart/mixed; boundary=\"b1\"\n\n"
+             + parts.map { "--b1\n\($0)\n" }.joined() + "--b1--\n")
+    }
+
+    private static let text = "Content-Type: text/plain; charset=utf-8\n\nHello"
+    private static let attachment = "Content-Type: application/pdf\nContent-Disposition: attachment; filename=\"a.pdf\"\n\nxx"
+    private static let image = "Content-Type: image/png\n\nxx"
+    private static let badHTML = "Content-Type: text/html; charset=x-unknown-charset\n\n<p>x</p>"
+
+    @Test func gapPerCondition() throws {
+        #expect(try usable(multipart(Self.text, Self.attachment)).inspectionGap == .attachment)
+        #expect(try usable(multipart(Self.text, Self.image)).inspectionGap == .nonTextPart)
+        #expect(try usable(multipart(Self.text, Self.badHTML)).inspectionGap == .undecodablePart)
+        #expect(try usable(multipart(Self.text, Self.image)).inspection == .uninspectedParts)
+    }
+
+    @Test func gapPriorityIsAttachmentThenNonTextThenUndecodable() throws {
+        // Order of parts must not matter.
+        #expect(try usable(multipart(Self.image, Self.text, Self.attachment, Self.badHTML)).inspectionGap == .attachment)
+        #expect(try usable(multipart(Self.attachment, Self.image, Self.text)).inspectionGap == .attachment)
+        #expect(try usable(multipart(Self.text, Self.badHTML, Self.image)).inspectionGap == .nonTextPart)
+        #expect(try usable(multipart(Self.badHTML, Self.image, Self.text)).inspectionGap == .nonTextPart)
+    }
 }

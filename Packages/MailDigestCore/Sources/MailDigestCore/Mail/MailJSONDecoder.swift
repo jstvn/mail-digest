@@ -175,7 +175,9 @@ public struct MailJSONDecoder: Sendable {
                      sourceReference: MailMessageReference(
                         messageID: MessageID.canonical(raw.id) ?? raw.id.trimmingCharacters(in: .whitespacesAndNewlines),
                         storeRowID: raw.storeRowID),
-                     contentInspection: .unknown)
+                     contentInspection: .unknown,
+                     // JXA exposes only rendered text, so the structure is reliably unavailable.
+                     inspectionGap: .structureUnavailable)
     }
 
     /// JS `toISOString()` emits milliseconds but other sources do not, so accept both forms.

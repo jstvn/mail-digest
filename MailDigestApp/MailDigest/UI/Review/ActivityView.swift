@@ -215,6 +215,15 @@ private struct ActivityJobDetailView: View {
     var body: some View {
         if let detail, detail.isLoaded {
             events(detail.events)
+            // Only finished items ran a model; skipped ones have no routing to summarise.
+            if let summary = RoutingPresentation.localReasonSummaryText(
+                detail.items.filter { $0.state == .done }.map(\.routing)) {
+                Text(summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("Processed locally. \(summary.dropFirst("Local: ".count))")
+            }
             if detail.items.isEmpty {
                 Text("No emails in this job.").font(.callout).foregroundStyle(.secondary)
             }
@@ -279,6 +288,7 @@ private struct ActivityItemRow: View {
             HStack(spacing: 6) {
                 if let privacy {
                     badge(privacy, label: "Privacy", symbol: Self.privacySymbol(privacy))
+                        .help(inspectionExplanation ?? "")
                 }
                 if let execution {
                     badge(execution, label: "Processed by", symbol: Self.executionSymbol(execution))
@@ -298,6 +308,11 @@ private struct ActivityItemRow: View {
         }
         .padding(.vertical, 3)
         .accessibilityElement(children: .contain)
+    }
+
+    /// Tooltip text when incomplete inspection decided the routing.
+    private var inspectionExplanation: String? {
+        item.routing.flatMap(RoutingPresentation.inspectionExplanation(for:))
     }
 
     private var timeText: String {
@@ -349,6 +364,9 @@ private struct RoutingDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let explanation = RoutingPresentation.inspectionExplanation(for: routing) {
+                Text(explanation).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 4) {
                 ForEach(Array(RoutingPresentation.details(routing).enumerated()), id: \.offset) { _, line in
                     GridRow {

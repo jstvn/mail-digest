@@ -17,6 +17,21 @@ public enum ContentInspection: String, Codable, Sendable, Equatable {
     case complete, uninspectedParts, unknown
 }
 
+/// Why a message was not fully inspected. Metadata only: never content, file names or values.
+/// Only `.complete` content may reach a cloud provider regardless of the gap (Q66).
+public enum InspectionGap: String, Codable, Sendable, Equatable, CaseIterable {
+    /// An attachment (`Content-Disposition: attachment`) that is never read.
+    case attachment
+    /// A non-text part such as an image, calendar data, PDF or S/MIME.
+    case nonTextPart
+    /// A text part could not be decoded although another representation produced text.
+    case undecodablePart
+    /// Only part of the message was downloaded to this Mac.
+    case partialMessage
+    /// The email source did not expose the MIME structure.
+    case structureUnavailable
+}
+
 /// A full message as fetched from Mail, with body and the few headers the filter needs.
 public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     public var id: String              // RFC Message-ID without angle brackets
@@ -30,11 +45,15 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     public var sourceReference: MailMessageReference
     /// Defaults to `.unknown` so fixtures and older callers fail closed.
     public var contentInspection: ContentInspection
+    /// Why the message is not `.complete`; nil when complete or when the reason is unknown.
+    public var inspectionGap: InspectionGap?
 
     public init(id: String, account: String, mailbox: String, sender: String, subject: String,
                 receivedAt: Date, body: String, headers: [String: String],
                 sourceReference: MailMessageReference? = nil,
-                contentInspection: ContentInspection = .unknown) {
+                contentInspection: ContentInspection = .unknown,
+                inspectionGap: InspectionGap? = nil) {
+        self.inspectionGap = inspectionGap
         self.contentInspection = contentInspection
         self.sourceReference = sourceReference ?? MailMessageReference(messageID: id, storeRowID: nil)
         self.id = id
@@ -48,7 +67,7 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, account, mailbox, sender, subject, receivedAt, body, headers, sourceReference, contentInspection
+        case id, account, mailbox, sender, subject, receivedAt, body, headers, sourceReference, contentInspection, inspectionGap
     }
 
     public init(from decoder: Decoder) throws {
@@ -62,7 +81,8 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
                   body: try c.decode(String.self, forKey: .body),
                   headers: try c.decode([String: String].self, forKey: .headers),
                   sourceReference: try c.decodeIfPresent(MailMessageReference.self, forKey: .sourceReference),
-                  contentInspection: try c.decodeIfPresent(ContentInspection.self, forKey: .contentInspection) ?? .unknown)
+                  contentInspection: try c.decodeIfPresent(ContentInspection.self, forKey: .contentInspection) ?? .unknown,
+                  inspectionGap: try c.decodeIfPresent(InspectionGap.self, forKey: .inspectionGap))
     }
 }
 

@@ -396,6 +396,15 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 - The threshold slider steps 1% from 80% to 99%.
 - VoiceOver reads the threshold value.
 
+**Incomplete-inspection reasons (Activity)**
+
+- An email with an attachment shows "Local only · Attachment not inspected"; one with an image or calendar part shows "Local only · Non-text content not inspected"; a JXA-fallback email shows "Local only · Message structure unavailable".
+- Older Activity rows without a recorded reason still show "Local only · Content not fully inspected".
+- Hovering the privacy badge of an inspection row shows the explanation tooltip.
+- The info popover shows the wrapped explanation paragraph above the grid, with separate "Privacy: Not classified" and "Inspection" rows, and stays 340 pt wide.
+- An expanded job with local items shows the caption summary line, for example "Local: 4 not fully inspected · 2 private rule", without clipping.
+- VoiceOver reads the badge, the popover paragraph and the summary line sensibly.
+
 **Routing (T26–T30, needs a real key and Ollama; synthetic emails only)**
 
 - Gemini accepts the adapted `responseJsonSchema` (first real generateContent call).

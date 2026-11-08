@@ -115,7 +115,7 @@ import Testing
             #expect(RoutingPresentation.localReasonText(r).hasSuffix("."))
         }
         #expect(RoutingPresentation.localReasonText(.contentNotInspected)
-                == "Content not fully inspected (attachments or non-text parts), so it stayed on this Mac.")
+                == "Content not fully inspected, so it stayed on this Mac.")
         for f in [TriageFailure.unreachable, .versionTooOld, .versionUnknown, .modelMissing, .httpError, .timedOut,
                   .malformedResponse, .unsupportedModel] {
             #expect(!RoutingPresentation.triageFailureText(f).isEmpty)
@@ -125,5 +125,110 @@ import Testing
             #expect(!RoutingPresentation.cloudFailureText(code).isEmpty)
         }
         #expect(RoutingPresentation.cloudFailureText("server503") == "Gemini server error (503).")
+    }
+
+    // MARK: Inspection gap
+
+    @Test func oldAssessmentJSONWithoutGapDecodesAndShowsGenericLabel() throws {
+        let json = #"{"verdict":"notAssessed","method":"inspection","assessedAt":0}"#
+        let a = try JSONDecoder().decode(PrivacyAssessment.self, from: Data(json.utf8))
+        #expect(a.inspectionGap == nil)
+        #expect(RoutingPresentation.privacyBadge(a).text == "Local only · Content not fully inspected")
+        let round = try JSONDecoder().decode(PrivacyAssessment.self, from: JSONEncoder().encode(
+            PrivacyAssessment(verdict: .notAssessed, method: .inspection, assessedAt: Self.t0, inspectionGap: .attachment)))
+        #expect(round.inspectionGap == .attachment)
+    }
+
+    @Test func emailMessageGapRoundTripsAndDefaultsToNil() throws {
+        var e = EmailMessage(id: "i", account: "a", mailbox: "m", sender: "s", subject: "x", receivedAt: Self.t0,
+                             body: "b", headers: [:])
+        #expect(e.inspectionGap == nil)
+        e.inspectionGap = .nonTextPart
+        #expect(try JSONDecoder().decode(EmailMessage.self, from: JSONEncoder().encode(e)).inspectionGap == .nonTextPart)
+    }
+
+    @Test func gapLabelsAndExplanations() {
+        let labels: [(InspectionGap?, String)] = [
+            (.attachment, "Local only · Attachment not inspected"),
+            (.nonTextPart, "Local only · Non-text content not inspected"),
+            (.structureUnavailable, "Local only · Message structure unavailable"),
+            (.undecodablePart, "Local only · Content not fully inspected"),
+            (.partialMessage, "Local only · Content not fully inspected"),
+            (nil, "Local only · Content not fully inspected"),
+        ]
+        for (gap, text) in labels {
+            let a = PrivacyAssessment(verdict: .notAssessed, method: .inspection, assessedAt: Self.t0, inspectionGap: gap)
+            #expect(RoutingPresentation.privacyBadge(a).text == text)
+        }
+        let base = "This email was processed locally because Mail Digest could not fully inspect all of its content, "
+            + "such as attachments or non-text message parts. To protect your privacy, it was not sent to a cloud provider."
+        #expect(RoutingPresentation.inspectionExplanation(nil) == base)
+        #expect(RoutingPresentation.inspectionExplanation(.attachment)
+                == base + " It has an attachment that Mail Digest doesn't read.")
+        #expect(RoutingPresentation.inspectionExplanation(.nonTextPart)
+                == base + " It contains non-text content, such as images or calendar data, that Mail Digest doesn't read.")
+        #expect(RoutingPresentation.inspectionExplanation(.undecodablePart) == base + " Part of its text couldn't be decoded.")
+        #expect(RoutingPresentation.inspectionExplanation(.partialMessage)
+                == base + " Only part of this message was downloaded to this Mac.")
+        #expect(RoutingPresentation.inspectionExplanation(.structureUnavailable).hasPrefix(
+            "This email was processed locally because the email source didn't expose enough information"))
+    }
+
+    @Test func detailsSeparateInspectionFromPrivacy() {
+        let r = RoutingProvenance(
+            assessment: PrivacyAssessment(verdict: .notAssessed, method: .inspection, assessedAt: Self.t0,
+                                          inspectionGap: .attachment),
+            execution: Self.exec(.local, "qwen3:4b", reason: .contentNotInspected))
+        let lines = RoutingPresentation.details(r)
+        #expect(lines.first { $0.label == "Inspection" }?.value == "Attachment not inspected")
+        #expect(lines.first { $0.label == "Privacy" }?.value == "Not classified")
+        #expect(RoutingPresentation.inspectionExplanation(for: r)?.contains("attachment") == true)
+        let rule = RoutingProvenance(assessment: Self.assessment(.private, .rule, rule: "kw.otp"))
+        #expect(RoutingPresentation.inspectionExplanation(for: rule) == nil)
+        #expect(!RoutingPresentation.details(rule).contains { $0.label == "Inspection" })
+    }
+
+    @Test func localReasonSummaryBuckets() {
+        func local(_ reason: LocalReason?, _ a: PrivacyAssessment) -> RoutingProvenance {
+            RoutingProvenance(assessment: a, execution: Self.exec(.local, "qwen3:4b", reason: reason))
+        }
+        func scores(_ p: Double) -> TriageScores {
+            TriageScores(model: "m", pSensitive: p, pNonSensitive: 1 - p, categoryProbabilities: [:],
+                         threshold: 0.9, publicFloor: 0.85)
+        }
+        let insp = Self.assessment(.notAssessed, .inspection)
+        let items: [RoutingProvenance?] = [
+            local(.contentNotInspected, insp), local(.contentNotInspected, insp), local(.contentNotInspected, insp),
+            local(.privateContent, Self.assessment(.private, .rule, rule: "kw.otp")),
+            local(.privateContent, Self.assessment(.private, .rule, rule: "kw.otp")),
+            local(.notEligible, Self.assessment(.uncertain, .systemOne, triage: scores(0.6))),
+            local(.notEligible, Self.assessment(.uncertain, .systemOne, triage: scores(0.2))),
+            local(.notEligible, Self.assessment(.uncertain, .systemOne)),
+            local(.cloudDisabled, Self.assessment(.notAssessed, .cloudOff)),
+            local(.noCredential, Self.assessment(.notAssessed, .cloudOff)),
+            local(.acknowledgementRequired, Self.assessment(.notAssessed, .cloudOff)),
+            local(.cloudFailed, Self.assessment(.public, .systemOne)),
+            local(.triageUnavailable, Self.assessment(.uncertain, .systemOne, failure: .timedOut)),
+            local(nil, Self.assessment(.private, .rule)),
+            // Cloud items never count; nil provenance is "not recorded".
+            RoutingProvenance(assessment: Self.assessment(.public, .systemOne), execution: Self.exec(.cloud, "gemini-3.5-flash-lite")),
+            nil,
+        ]
+        let summary = RoutingPresentation.localReasonSummary(items)
+        func count(_ b: RoutingPresentation.LocalBucket) -> Int { summary.first { $0.bucket == b }?.count ?? 0 }
+        #expect(count(.contentNotInspected) == 3)
+        #expect(count(.privateRule) == 2)
+        #expect(count(.systemOneSensitive) == 1)
+        #expect(count(.systemOneLowConfidence) == 2)
+        #expect(count(.cloudDisabled) == 1 && count(.noCredential) == 1 && count(.acknowledgementRequired) == 1)
+        #expect(count(.cloudFailed) == 1 && count(.triageUnavailable) == 1)
+        #expect(count(.notRecorded) == 2)
+        #expect(summary.reduce(0) { $0 + $1.count } == 15)
+        #expect(summary.first?.bucket == .contentNotInspected)
+
+        #expect(RoutingPresentation.localReasonSummaryText([insp, insp].map { local(.contentNotInspected, $0) } +
+                [local(.privateContent, Self.assessment(.private, .rule)), local(.notEligible, Self.assessment(.uncertain, .systemOne))])
+                == "Local: 2 not fully inspected · 1 private rule · 1 low confidence")
+        #expect(RoutingPresentation.localReasonSummaryText([]) == nil)
     }
 }

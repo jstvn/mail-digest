@@ -73,7 +73,8 @@ public struct DigestRouter: Sendable {
             return PrivacyAssessment(verdict: .notAssessed, method: .cloudOff, assessedAt: now)
         }
         guard email.contentInspection == .complete else {
-            return PrivacyAssessment(verdict: .notAssessed, method: .inspection, assessedAt: now)
+            return PrivacyAssessment(verdict: .notAssessed, method: .inspection, assessedAt: now,
+                                    inspectionGap: email.inspectionGap)
         }
         if case .public(let id) = verdict {
             return PrivacyAssessment(verdict: .public, method: .trustedSender, ruleID: id, assessedAt: now)

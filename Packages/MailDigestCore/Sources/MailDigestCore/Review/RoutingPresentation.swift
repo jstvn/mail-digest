@@ -47,7 +47,7 @@ public enum RoutingPresentation {
         case (.public, .systemOne): return RoutingBadge(text: "Public · System One", tone: .public)
         case (.uncertain, .systemOne): return RoutingBadge(text: "Uncertain · System One", tone: .uncertain)
         case (.notAssessed, .inspection):
-            return RoutingBadge(text: "Local only · Content not fully inspected", tone: .uncertain)
+            return RoutingBadge(text: "Local only · \(inspectionTitle(a.inspectionGap))", tone: .uncertain)
         case (.notAssessed, .cloudOff): return RoutingBadge(text: "Not assessed · Cloud off", tone: .neutral)
         default:
             let tone: RoutingBadgeTone = a.verdict == .private ? .private : a.verdict == .public ? .public
@@ -88,7 +88,13 @@ public enum RoutingPresentation {
     public static func details(_ routing: RoutingProvenance) -> [RoutingDetailLine] {
         var lines: [RoutingDetailLine] = []
         let a = routing.assessment
-        lines.append(RoutingDetailLine(label: "Privacy", value: privacyBadge(a).text))
+        if a.method == .inspection {
+            // Inspection status is not a privacy classification, so it gets its own row.
+            lines.append(RoutingDetailLine(label: "Privacy", value: "Not classified"))
+            lines.append(RoutingDetailLine(label: "Inspection", value: inspectionTitle(a.inspectionGap)))
+        } else {
+            lines.append(RoutingDetailLine(label: "Privacy", value: privacyBadge(a).text))
+        }
         if let rule = a.ruleID { lines.append(RoutingDetailLine(label: "Rule", value: rule)) }
         if let t = a.triage {
             lines.append(RoutingDetailLine(label: "Triage model", value: t.model))
@@ -108,6 +114,109 @@ public enum RoutingPresentation {
         return lines
     }
 
+    /// Short inspection status; the generic text covers an unknown or non-specific gap.
+    public static func inspectionTitle(_ gap: InspectionGap?) -> String {
+        switch gap {
+        case .attachment: return "Attachment not inspected"
+        case .nonTextPart: return "Non-text content not inspected"
+        case .structureUnavailable: return "Message structure unavailable"
+        case .undecodablePart, .partialMessage, nil: return "Content not fully inspected"
+        }
+    }
+
+    /// Plain-language explanation of an incomplete inspection (an inspection status, not a privacy
+    /// classification). A nil gap (old records, unknown reason) gets the generic text.
+    public static func inspectionExplanation(_ gap: InspectionGap?) -> String {
+        let base = "This email was processed locally because Mail Digest could not fully inspect all of its "
+            + "content, such as attachments or non-text message parts. To protect your privacy, it was not "
+            + "sent to a cloud provider."
+        switch gap {
+        case .attachment: return base + " It has an attachment that Mail Digest doesn't read."
+        case .nonTextPart:
+            return base + " It contains non-text content, such as images or calendar data, that Mail Digest doesn't read."
+        case .undecodablePart: return base + " Part of its text couldn't be decoded."
+        case .partialMessage: return base + " Only part of this message was downloaded to this Mac."
+        case .structureUnavailable:
+            return "This email was processed locally because the email source didn't expose enough information "
+                + "to verify the complete message structure. To protect your privacy, it was not sent to a "
+                + "cloud provider."
+        case nil: return base
+        }
+    }
+
+    /// The explanation for an item's routing when inspection decided it; otherwise nil.
+    public static func inspectionExplanation(for routing: RoutingProvenance) -> String? {
+        let a = routing.assessment
+        guard a.method == .inspection else { return nil }
+        return inspectionExplanation(a.inspectionGap)
+    }
+
+    /// Why an email ran on this Mac, bucketed from persisted provenance only.
+    public enum LocalBucket: String, Sendable, Equatable, CaseIterable {
+        case contentNotInspected, privateRule, systemOneSensitive, systemOneLowConfidence
+        case cloudDisabled, noCredential, acknowledgementRequired, cloudFailed, triageUnavailable, notRecorded
+
+        public var label: String {
+            switch self {
+            case .contentNotInspected: return "not fully inspected"
+            case .privateRule: return "private rule"
+            case .systemOneSensitive: return "likely sensitive"
+            case .systemOneLowConfidence: return "low confidence"
+            case .cloudDisabled: return "cloud off"
+            case .noCredential: return "no API key"
+            case .acknowledgementRequired: return "notice not accepted"
+            case .cloudFailed: return "Gemini failed"
+            case .triageUnavailable: return "privacy check unavailable"
+            case .notRecorded: return "reason not recorded"
+            }
+        }
+    }
+
+    public struct LocalReasonCount: Sendable, Equatable {
+        public var bucket: LocalBucket
+        public var count: Int
+    }
+
+    /// Counts the items that ran locally by reason, largest first (ties in `LocalBucket` order).
+    /// Pass only items that finished; a nil entry or one without an execution counts as not recorded.
+    /// Cloud items are ignored. System One uncertainty is "likely sensitive" when `pSensitive >= 0.5`.
+    public static func localReasonSummary(_ items: [RoutingProvenance?]) -> [LocalReasonCount] {
+        var counts: [LocalBucket: Int] = [:]
+        for item in items {
+            guard let routing = item else { counts[.notRecorded, default: 0] += 1; continue }
+            guard let e = routing.execution else { counts[.notRecorded, default: 0] += 1; continue }
+            guard e.provider == .local else { continue }
+            counts[bucket(for: e.localReason, routing.assessment), default: 0] += 1
+        }
+        let order = LocalBucket.allCases
+        return counts.map { LocalReasonCount(bucket: $0.key, count: $0.value) }
+            .sorted { $0.count != $1.count ? $0.count > $1.count
+                : order.firstIndex(of: $0.bucket)! < order.firstIndex(of: $1.bucket)! }
+    }
+
+    private static func bucket(for reason: LocalReason?, _ a: PrivacyAssessment) -> LocalBucket {
+        switch reason {
+        case .cloudDisabled: return .cloudDisabled
+        case .acknowledgementRequired: return .acknowledgementRequired
+        case .noCredential: return .noCredential
+        case .contentNotInspected: return .contentNotInspected
+        case .privateContent: return .privateRule
+        case .triageUnavailable: return .triageUnavailable
+        case .cloudFailed: return .cloudFailed
+        case .notEligible:
+            guard a.method == .systemOne else { return .notRecorded }
+            if let p = a.triage?.pSensitive, p >= 0.5 { return .systemOneSensitive }
+            return .systemOneLowConfidence
+        case nil: return .notRecorded
+        }
+    }
+
+    /// "Local: 4 not fully inspected · 2 private rule"; nil when nothing ran locally.
+    public static func localReasonSummaryText(_ items: [RoutingProvenance?]) -> String? {
+        let parts = localReasonSummary(items).map { "\($0.count) \($0.bucket.label)" }
+        return parts.isEmpty ? nil : "Local: " + parts.joined(separator: " · ")
+    }
+
     /// True when `details` shows model scores, so the popover adds `scoreNote`.
     public static func showsScores(_ routing: RoutingProvenance) -> Bool { routing.assessment.triage != nil }
 
@@ -120,7 +229,7 @@ public enum RoutingPresentation {
         case .acknowledgementRequired: return "The Cloud Digest privacy notice has not been accepted, so it stayed on this Mac."
         case .noCredential: return "No Gemini API key is saved, so it stayed on this Mac."
         case .contentNotInspected:
-            return "Content not fully inspected (attachments or non-text parts), so it stayed on this Mac."
+            return "Content not fully inspected, so it stayed on this Mac."
         case .privateContent: return "It looks private, so it stayed on this Mac."
         case .notEligible: return "It was not confidently public, so it stayed on this Mac."
         case .triageUnavailable: return "The privacy check was unavailable, so it stayed on this Mac."

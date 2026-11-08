@@ -86,4 +86,21 @@ import MailDigestCore
         #expect(try JSON.decode(RoutingProvenance.self, json) == routing)
         #expect(json.contains("\"schemaVersion\":1"))
     }
+
+    @Test func routingJSONRoundTripsTheInspectionGap() async throws {
+        let store = try GRDBDigestStore.inMemory()
+        let job = makeJob()
+        try await store.createJob(job)
+        try await store.enqueue([makeHeader("a")], job: job.id)
+        let item = try #require(try await store.items(job: job.id).first)
+        let routing = RoutingProvenance(
+            assessment: PrivacyAssessment(verdict: .notAssessed, method: .inspection, assessedAt: t0,
+                                          inspectionGap: .attachment),
+            execution: ExecutionRecord(provider: .local, model: "qwen3:4b", cloudAttempted: false,
+                                       localReason: .contentNotInspected, startedAt: t0, finishedAt: t0))
+        try await store.recordItemOutcome(item.id, outcome: "ok", seconds: 1, finishedAt: t0, routing: routing)
+        let stored = try #require(try await store.items(job: job.id).first?.routing)
+        #expect(stored == routing && stored.assessment.inspectionGap == .attachment)
+        #expect(stored.schemaVersion == 1)
+    }
 }
