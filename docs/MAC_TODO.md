@@ -492,13 +492,13 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 
 **System One model benchmark (Q68; synthetic emails only)**
 
-- `kev:4b-q4_K_M` is now the default (Q69): run a Daily job on a 16 GB Mac with Kev 4B and Qwen3 4B and watch `ollama ps` and memory pressure for swapping or model reloads; if it swaps, Settings should offer Kev 0.8B without other changes.
+- `kev:4b-q4_K_M` is now the default (Q69): run a Daily job on a 16 GB Mac with Kev 4B and Qwen3 4B and watch `ollama ps` and memory pressure for swapping or model reloads; if it swaps, switch to Tev1 0.8B in Settings.
 - Rerun `EvalCLI systemone run` for each model and `eval/systemone/latency.py` on a quiet machine after any Ollama upgrade or model re-pull, and compare digests with Q68.
-- Selecting "Tev1 0.8B" in Settings shows the triage model as installed (tag `tev1:0.8b-q8_0`).
+- Selecting "Tev1 0.8B" in Settings shows the triage model as installed (tag `tev1:0.8b-q8_0`); the status updates when the picker changes.
 
 **Selective privacy routing (Q69; use synthetic or your own test emails only)**
 
-- Settings shows Privacy Triage Model as "Kev 4B (Q4, default)" after upgrade, with the memory caption; choosing "Kev 0.8B (Q8, low memory)" persists across relaunch; "Tev1 0.8B (experimental)" shows the not-recommended caption.
+- Settings shows Privacy Triage Model as "Kev 4B (Q4, default)" after upgrade, with the memory caption; choosing "Tev1 0.8B (Q8, low memory)" persists across relaunch and shows its caption; Kev 0.8B is no longer listed.
 - Activity on a clean Substack/Medium newsletter: "Public · Trusted Sender", Route row and tooltip "Trusted public sender · System One not required", no scores.
 - Trusted newsletter with a reader's diagnosis and home address: Route shows selective System One assessment, Risk signal row shows, real scores shown, stays local unless both thresholds pass.
 - Ambiguous sender: Route "Ambiguous sender · System One assessment".
@@ -507,3 +507,9 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 - "Sensitive · System One" and "Uncertain · System One" badges and the local-reason summary read correctly.
 - Measure a real Daily job's duration with Kev 4B against the Q69 model (20 s per call; 0 for trusted direct) and check `ollama ps` shows Kev 4B and Qwen3 4B both resident.
 - VoiceOver reads the new Route, Risk signal and Text assessed rows and the picker caption.
+
+**Settings and Dock (Q70)**
+
+- Cloud AI shows **Gemini 3.5 Flash-Lite** with no model ID underneath, and the separate Model ID row is unchanged.
+- Opening the review window adds Mail Digest to the Dock; clicking the Dock icon from another app brings it forward; minimising keeps the Dock icon; closing the window removes it; the menu bar icon keeps working throughout, including reopening the window.
+- After a build that had `kev:0.8b-q8_0` saved, Settings shows the migrated model, and Activity rows recorded before the change still show their original model.

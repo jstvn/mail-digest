@@ -359,3 +359,13 @@ Each item says what the spec leaves open and the interim choice the build uses, 
      - Triage time is modelled from fixtures, not measured on a real Daily job: Kev 4B, 95.1 calls per 100 on the original mix against 88.2 under the old policy (bare-keyword mail now reaches System One and long mail may take 2 chunks), about 1,936 s against 1,795 s per 100 emails at the same 20.35 s median. Trusted direct mail costs nothing on either side.
      - With the revised instructions, Kev 0.8B public eligibility fell to 10% on the original items (30% in Q68), so as the low-memory option it keeps most public mail local. Tev1 had no false-cloud this time (fin-02 stayed local), but one clean run does not undo the Q68 result, and it stays experimental.
      - Limits: synthetic English data, labels written by the benchmark author, zero observed false-cloud in 136 non-public items still allows real errors (Wilson 95% upper bound about 2.7%), scores are uncalibrated, 16 GB Macs unverified, no real-mail run.
+
+## System One model strategy (2026-11-09)
+
+70. **Which System One models does the app offer?** (decided)
+   - **Decision (approved by Justin, 2026-11-09):** default `kev:4b-q4_K_M`; low-memory option `tev1:0.8b-q8_0`; `kev:0.8b-q8_0` retired. Qwen3 4B digest generation and thresholds 0.90 / 0.85 are unchanged. This supersedes the Kev 0.8B and Tev1 roles in Q69.
+   - **Evidence (Q69, 220 scored synthetic emails):** Kev 4B 0 false-cloud, 9 false-local, 88.1% public eligibility; Tev1 0 false-cloud, 21 false-local, 73.8%; Kev 0.8B 0 false-cloud, 50 false-local, 39.3%. Tev1 is also faster and uses less memory than Kev 0.8B.
+   - **Limits:** synthetic English email only, so these results don't establish a real-world false-cloud rate. In Q68, with the earlier instructions, Tev1 made one confident false-cloud error (fin-02) that did not recur under the revised instructions.
+   - **Migration:** a stored Kev 0.8B saved before default revision 2 only reflected the old default and becomes Kev 4B. One saved at revision 2 had been kept as the low-memory option and becomes Tev1. Any other stored value, including a custom tag, is left alone.
+   - **There was no automatic low-memory selection or model fallback to replace.** The app sends the configured tag or keeps mail local, so the model in Activity is the one used. Old Activity rows keep the model they recorded.
+   - **Model checks:** a missing model is no longer cached for the app's lifetime, so installing it takes effect on the next job.

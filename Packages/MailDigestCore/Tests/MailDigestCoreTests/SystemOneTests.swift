@@ -5,7 +5,7 @@ import FoundationNetworking
 import Testing
 @testable import MailDigestCore
 
-private let model = "kev:0.8b-q8_0"
+private let model = "kev:4b-q4_K_M"
 private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
 private func client() -> OllamaSystemOneClient {
@@ -110,7 +110,7 @@ extension StubNetworkTests {
 }
 
 @Suite struct SystemOnePreflightTests {
-    private func preflight(version: String, tags: String = #"{"models":[{"name":"kev:0.8b-q8_0"}]}"#, model: String = model) async throws -> TriageFailure? {
+    private func preflight(version: String, tags: String = #"{"models":[{"name":"kev:4b-q4_K_M"}]}"#, model: String = model) async throws -> TriageFailure? {
         StubURLProtocol.install { r in
             r.url.path == "/api/version" ? StubResponse(body: json(version)) : StubResponse(body: json(tags))
         }
@@ -130,9 +130,23 @@ extension StubNetworkTests {
 
     @Test func modelPresence() async throws {
         #expect(try await preflight(version: #"{"version":"0.40.14"}"#, tags: #"{"models":[{"name":"other:1b"}]}"#) == .modelMissing)
-        #expect(try await preflight(version: #"{"version":"0.40.14"}"#, tags: #"{"models":[{"name":"kev:4b-q4_K_M"}]}"#) == .modelMissing)
+        #expect(try await preflight(version: #"{"version":"0.40.14"}"#, tags: #"{"models":[{"name":"kev:0.8b-q8_0"}]}"#) == .modelMissing)
         #expect(try await preflight(version: #"{"version":"0.40.14"}"#, tags: #"{"models":[{"name":"tev1:latest"}]}"#, model: "tev1") == nil)
         #expect(try await preflight(version: #"{"version":"0.40.14"}"#, tags: #"{"models":[{"name":"tev1:latest"}]}"#, model: "tev1:0.8b") == .modelMissing)
+    }
+
+    @Test func missingModelIsRecheckedAfterInstall() async throws {
+        func install(tags: String) {
+            StubURLProtocol.install { r in
+                r.url.path == "/api/version" ? StubResponse(body: json(#"{"version":"0.40.14"}"#))
+                                             : StubResponse(body: json(tags))
+            }
+        }
+        install(tags: #"{"models":[]}"#)
+        let c = client()
+        #expect(try await c.preflight(model: model) == .modelMissing)
+        install(tags: #"{"models":[{"name":"kev:4b-q4_K_M"}]}"#)
+        #expect(try await c.preflight(model: model) == nil)
     }
 
     @Test func unreachableAndCache() async throws {
@@ -141,7 +155,7 @@ extension StubNetworkTests {
 
         StubURLProtocol.install { r in
             r.url.path == "/api/version" ? StubResponse(body: json(#"{"version":"0.40.14"}"#))
-                                         : StubResponse(body: json(#"{"models":[{"name":"kev:0.8b-q8_0"}]}"#))
+                                         : StubResponse(body: json(#"{"models":[{"name":"kev:4b-q4_K_M"}]}"#))
         }
         let c = client()
         #expect(try await c.preflight(model: model) == nil)

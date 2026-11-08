@@ -2,6 +2,8 @@
 
 Measures how well the local System One triage models decide which emails may go to the cloud (Gemini) and which must stay local, with the production request, pre-filter, inspection check and threshold logic.
 
+> **Model strategy (Q70):** `kev:0.8b-q8_0` is retired from the app. It stays in this benchmark and its results as a historical comparison.
+
 ## Dataset
 
 `fixtures.json` holds 150 **fully synthetic** emails. There is no real email content, no real people and no real account data: all hosts are reserved or fictional (`*.example`, plus `substack.com` / `medium.com` for the allowlist), and all numbers and identifiers are made up.

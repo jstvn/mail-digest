@@ -216,7 +216,8 @@ public actor OllamaSystemOneClient: SystemOneClient {
         if let failure = version { return failure }
         if let cached = tagsResult[model] { return cached }
         let result = try await checkModel(model)
-        tagsResult[model] = .some(result)
+        // Only a found model is cached: a missing one may be installed (`ollama pull`) before the next check.
+        if result == nil { tagsResult[model] = .some(nil) }
         return result
     }
 

@@ -241,7 +241,7 @@ private let footer = "\n\nUnsubscribe. Example Media Pty Ltd, 100 Sample Street,
         let prov = RoutingProvenance(
             assessment: PrivacyAssessment(
                 verdict: .public, method: .systemOne, ruleID: nil,
-                triage: TriageScores(model: "kev:0.8b-q8_0", pSensitive: 0.02, pNonSensitive: 0.98,
+                triage: TriageScores(model: "kev:4b-q4_K_M", pSensitive: 0.02, pNonSensitive: 0.98,
                                      categoryProbabilities: ["public_newsletter_or_promo": 0.95],
                                      threshold: 0.9, publicFloor: 0.85),
                 triageFailure: nil, assessedAt: t),

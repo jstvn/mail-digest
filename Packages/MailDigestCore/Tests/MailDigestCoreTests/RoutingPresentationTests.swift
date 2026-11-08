@@ -123,6 +123,7 @@ import Testing
         #expect(RoutingPresentation.executionBadge(for: Self.item(.processing, routing: pending)) == nil)
     }
 
+    /// Rows recorded under the retired Kev 0.8B model still render their stored tag unchanged.
     @Test func detailLines() {
         let scores = TriageScores(model: "kev:0.8b-q8_0", pSensitive: 0.04, pNonSensitive: 0.96,
                                   categoryProbabilities: [SystemOneSpec.publicCategory: 0.874], threshold: 0.9, publicFloor: 0.85)

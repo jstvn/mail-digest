@@ -71,10 +71,14 @@ struct CloudSettingsSection: View {
                 .disabled(!hasKey && !store.settings.cloudDigestEnabled)
             Text(GeminiConnectionMessage.cloudStatusText(settings: store.settings, hasKey: hasKey))
                 .font(.caption).foregroundStyle(.secondary)
-            Picker("Privacy Triage Model", selection: $store.settings.triageModel) {
+            Picker("Privacy Triage Model", selection: triageSelection) {
                 ForEach(CloudPrivacyPolicy.triageModels) { Text($0.displayName).tag($0.tag) }
+                // A hand-edited tag is what really runs, so show it rather than hiding it.
+                if !CloudPrivacyPolicy.triageModels.contains(where: { $0.tag == store.settings.resolvedTriageModel }) {
+                    Text(store.settings.resolvedTriageModel).tag(store.settings.resolvedTriageModel)
+                }
             }
-            if let note = CloudPrivacyPolicy.triageModelNote(for: store.settings.triageModel) {
+            if let note = CloudPrivacyPolicy.triageModelNote(for: store.settings.resolvedTriageModel) {
                 Text(note).font(.caption).foregroundStyle(.secondary)
             }
             triageStatus
@@ -93,7 +97,9 @@ struct CloudSettingsSection: View {
         // A result describes one key and model; drop it when either changes.
         .onChange(of: store.settings.resolvedGeminiModel) { test = .idle }
         .onChange(of: keyInput) { test = .idle }
-        .task(id: store.settings.resolvedOllamaURL) { await loadInstalledTags() }
+        .task(id: "\(store.settings.resolvedOllamaURL.absoluteString)|\(store.settings.resolvedTriageModel)") {
+            await loadInstalledTags()
+        }
         .sheet(isPresented: $showAcknowledgement) {
             CloudAcknowledgementSheet(accept: acceptAcknowledgement, cancel: { showAcknowledgement = false })
         }
@@ -108,17 +114,11 @@ struct CloudSettingsSection: View {
     // MARK: Model
 
     @ViewBuilder private var modelInfoRow: some View {
-        let id = store.settings.resolvedGeminiModel
-        let name = RoutingPresentation.modelDisplayName(id)
         VStack(alignment: .leading, spacing: 4) {
             LabeledContent("Cloud Digest Model") {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(name).font(.headline)
-                    if name != id {
-                        Text(id).font(.caption.monospaced()).foregroundStyle(.secondary)
-                    }
-                }
-                .textSelection(.enabled)
+                Text(RoutingPresentation.modelDisplayName(store.settings.resolvedGeminiModel))
+                    .font(.headline)
+                    .textSelection(.enabled)
             }
             Text("Used for emails that pass Mail Digest's privacy checks when Cloud Digest is enabled.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -145,6 +145,12 @@ struct CloudSettingsSection: View {
                 Button("Remove Key", role: .destructive) { confirmRemove = true }
             }
         }
+    }
+
+    /// Shows the model that is really used, which is the default when the stored value is blank.
+    private var triageSelection: Binding<String> {
+        Binding(get: { store.settings.resolvedTriageModel },
+                set: { store.settings.triageModel = $0 })
     }
 
     private var trimmedInput: String { keyInput.trimmingCharacters(in: .whitespacesAndNewlines) }

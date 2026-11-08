@@ -164,16 +164,18 @@ import Testing
     }
 
     @Test func triageModelsListed() {
-        #expect(CloudPrivacyPolicy.triageModels.map(\.tag) == ["kev:4b-q4_K_M", "kev:0.8b-q8_0", "tev1:0.8b-q8_0"])
+        #expect(CloudPrivacyPolicy.triageModels.map(\.tag) == ["kev:4b-q4_K_M", "tev1:0.8b-q8_0"])
         #expect(CloudPrivacyPolicy.triageModels.map(\.displayName)
-                == ["Kev 4B (Q4, default)", "Kev 0.8B (Q8, low memory)", "Tev1 0.8B (experimental)"])
+                == ["Kev 4B (Q4, default)", "Tev1 0.8B (Q8, low memory)"])
         #expect(DigestSettings.defaultTriageModel == "kev:4b-q4_K_M")
     }
 
     @Test func triageModelNotes() {
-        #expect(CloudPrivacyPolicy.triageModelNote(for: "kev:4b-q4_K_M")?.contains("8.5 GB") == true)
-        #expect(CloudPrivacyPolicy.triageModelNote(for: "kev:0.8b-q8_0")?.contains("Lower memory") == true)
-        #expect(CloudPrivacyPolicy.triageModelNote(for: "tev1:0.8b-q8_0")?.contains("not recommended") == true)
+        #expect(CloudPrivacyPolicy.triageModelNote(for: "kev:4b-q4_K_M")
+                == "Uses about 8.5 GB of memory while loaded, on top of the digest model. On a Mac with 16 GB, choose Tev1 0.8B if the system starts swapping.")
+        #expect(CloudPrivacyPolicy.triageModelNote(for: "tev1:0.8b-q8_0")
+                == "Uses much less memory than Kev 4B, but keeps more public emails on this Mac.")
+        #expect(CloudPrivacyPolicy.triageModelNote(for: "kev:0.8b-q8_0") == nil)
         #expect(CloudPrivacyPolicy.triageModelNote(for: "other") == nil)
     }
 
@@ -181,18 +183,29 @@ import Testing
         try JSONDecoder().decode(DigestSettings.self, from: Data(json.utf8))
     }
 
-    @Test func legacyDefaultTriageModelMigrates() throws {
+    @Test func retiredModelBeforeRevision2MigratesToDefault() throws {
         #expect(try decode(#"{"triageModel":"kev:0.8b-q8_0"}"#).triageModel == "kev:4b-q4_K_M")
         #expect(try decode(#"{"triageModel":"kev:0.8b-q8_0","triageModelDefaultRevision":1}"#).triageModel == "kev:4b-q4_K_M")
     }
 
-    @Test func explicitChoicesSurvive() throws {
-        #expect(try decode(#"{"triageModel":"kev:0.8b-q8_0","triageModelDefaultRevision":2}"#).triageModel == "kev:0.8b-q8_0")
-        #expect(try decode(#"{"triageModel":"tev1:0.8b-q8_0"}"#).triageModel == "tev1:0.8b-q8_0")
-        // A migrated value, then an explicit 0.8B choice, round-trips as 0.8B.
-        var s = try decode(#"{"triageModel":"kev:0.8b-q8_0"}"#)
-        s.triageModel = "kev:0.8b-q8_0"
+    @Test func retiredModelAtRevision2MigratesToTev1() throws {
+        let s = try decode(#"{"triageModel":"kev:0.8b-q8_0","triageModelDefaultRevision":2}"#)
+        #expect(s.triageModel == "tev1:0.8b-q8_0" && s.triageModelDefaultRevision == 3)
+    }
+
+    @Test func otherChoicesAreNeverChanged() throws {
+        #expect(try decode(#"{"triageModel":"kev:0.8b-q8_0","triageModelDefaultRevision":3}"#).triageModel == "kev:0.8b-q8_0")
+        for revision in ["null", "1", "2", "3"] {
+            let r = revision == "null" ? "" : #","triageModelDefaultRevision":\#(revision)"#
+            for tag in ["kev:4b-q4_K_M", "tev1:0.8b-q8_0", "", "my:custom"] {
+                #expect(try decode(#"{"triageModel":"\#(tag)"\#(r)}"#).triageModel == tag)
+            }
+        }
+    }
+
+    @Test func migratedSettingsRoundTrip() throws {
+        let s = try decode(#"{"triageModel":"kev:0.8b-q8_0","triageModelDefaultRevision":2}"#)
         let again = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s))
-        #expect(again.triageModel == "kev:0.8b-q8_0" && again.triageModelDefaultRevision == 2)
+        #expect(again == s && again.triageModel == "tev1:0.8b-q8_0" && again.triageModelDefaultRevision == 3)
     }
 }

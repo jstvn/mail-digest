@@ -44,11 +44,15 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     /// The `CloudPrivacyPolicy` revision the user accepted; nil until they accept.
     public var cloudPrivacyAcknowledgedRevision: Int?
 
-    /// Which default-triage-model generation the stored value was written under. Revision 2 made Kev 4B the default.
+    /// Which triage-model strategy generation the stored value was written under.
+    /// Revision 2 made Kev 4B the default (Kev 0.8B stayed as the low-memory option); revision 3 retired
+    /// Kev 0.8B in favour of Tev1 0.8B. Values stored at revision 3 or later are never migrated.
     public var triageModelDefaultRevision: Int?
 
-    public static let currentTriageModelDefaultRevision = 2
-    static let legacyDefaultTriageModel = "kev:0.8b-q8_0"
+    public static let currentTriageModelDefaultRevision = 3
+    /// The retired Kev 0.8B tag; only used to migrate stored settings.
+    static let retiredTriageModel = "kev:0.8b-q8_0"
+    static let lowMemoryTriageModel = "tev1:0.8b-q8_0"
     public static let defaultTriageModel = "kev:4b-q4_K_M"
     public static let defaultPrivacyThreshold = 0.90
     public static let defaultOllamaURL = "http://localhost:11434"
@@ -110,12 +114,17 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let d = DigestSettings()
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        // A stored 0.8B model from before revision 2 only reflects the old default, not a choice: migrate it.
-        // The decoded value always carries the current revision, so a later explicit 0.8B choice survives.
+        // Kev 0.8B is retired. Before revision 2 it only reflected the old default, so it becomes the new default;
+        // at revision 2 the user had kept it as the low-memory option, so it becomes Tev1. Anything else, and
+        // anything stored at revision 3 or later, is left alone. The decoded value carries the current revision.
         var triage = try c.decodeIfPresent(String.self, forKey: .triageModel) ?? d.triageModel
         let storedRevision = try c.decodeIfPresent(Int.self, forKey: .triageModelDefaultRevision)
-        if (storedRevision ?? 0) < Self.currentTriageModelDefaultRevision, triage == Self.legacyDefaultTriageModel {
-            triage = Self.defaultTriageModel
+        if triage == Self.retiredTriageModel {
+            switch storedRevision ?? 0 {
+            case ..<2: triage = Self.defaultTriageModel
+            case 2: triage = Self.lowMemoryTriageModel
+            default: break
+            }
         }
         self.init(runHour: try c.decodeIfPresent(Int.self, forKey: .runHour) ?? d.runHour,
                   runMinute: try c.decodeIfPresent(Int.self, forKey: .runMinute) ?? d.runMinute,
