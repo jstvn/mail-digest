@@ -62,17 +62,20 @@ struct CloudSettingsSection: View {
     var body: some View {
         @Bindable var store = store
         Section {
+            modelInfoRow
+            TextField("Model ID", text: $store.settings.geminiModel, prompt: Text(GeminiDefaults.model))
+                .accessibilityLabel("Gemini model ID")
             keyRows
             testRows
             Toggle("Enable Cloud Digest for Non-Sensitive Emails", isOn: enableBinding)
                 .disabled(!hasKey && !store.settings.cloudDigestEnabled)
+            Text(GeminiConnectionMessage.cloudStatusText(settings: store.settings, hasKey: hasKey))
+                .font(.caption).foregroundStyle(.secondary)
             Picker("Privacy Triage Model", selection: $store.settings.triageModel) {
                 ForEach(CloudPrivacyPolicy.triageModels) { Text($0.displayName).tag($0.tag) }
             }
             triageStatus
             thresholdRow
-            TextField("Gemini Model", text: $store.settings.geminiModel, prompt: Text(GeminiDefaults.model))
-                .accessibilityLabel("Gemini model")
         } header: {
             Text("Cloud AI (Gemini)")
         } footer: {
@@ -84,6 +87,9 @@ struct CloudSettingsSection: View {
             .foregroundStyle(.secondary)
         }
         .task { await refresh() }
+        // A result describes one key and model; drop it when either changes.
+        .onChange(of: store.settings.resolvedGeminiModel) { test = .idle }
+        .onChange(of: keyInput) { test = .idle }
         .task(id: store.settings.resolvedOllamaURL) { await loadInstalledTags() }
         .sheet(isPresented: $showAcknowledgement) {
             CloudAcknowledgementSheet(accept: acceptAcknowledgement, cancel: { showAcknowledgement = false })
@@ -94,6 +100,27 @@ struct CloudSettingsSection: View {
         } message: {
             Text("Cloud Digest will be turned off and every email stays on this Mac.")
         }
+    }
+
+    // MARK: Model
+
+    @ViewBuilder private var modelInfoRow: some View {
+        let id = store.settings.resolvedGeminiModel
+        let name = RoutingPresentation.modelDisplayName(id)
+        VStack(alignment: .leading, spacing: 4) {
+            LabeledContent("Cloud Digest Model") {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(name).font(.headline)
+                    if name != id {
+                        Text(id).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    }
+                }
+                .textSelection(.enabled)
+            }
+            Text("Used for emails that pass Mail Digest's privacy checks when Cloud Digest is enabled.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Key
@@ -165,12 +192,24 @@ struct CloudSettingsSection: View {
             }
         }
         if case .finished(let result) = test {
-            let (symbol, text) = describe(result)
-            Label(text, systemImage: symbol)
-                .textSelection(.enabled)
-                .accessibilityElement(children: .combine)
+            let message = GeminiConnectionMessage(result: result, modelID: store.settings.resolvedGeminiModel)
+            VStack(alignment: .leading, spacing: 2) {
+                if let title = message.title {
+                    Label(title, systemImage: "checkmark.circle.fill")
+                        .font(.body.bold()).foregroundStyle(.green)
+                    Text(message.detail)
+                } else {
+                    Label(message.detail, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+                if let footnote = message.footnote {
+                    Text(footnote).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .textSelection(.enabled)
+            .accessibilityElement(children: .combine)
         }
-        Text("A successful test doesn't guarantee future requests will succeed, and it doesn't show your billing tier. It sends no email content.")
+        Text("A successful test doesn't guarantee future requests will succeed, and it doesn't show your billing tier.")
             .font(.caption).foregroundStyle(.secondary)
     }
 
@@ -183,20 +222,6 @@ struct CloudSettingsSection: View {
             let key = typed.isEmpty ? (((try? run.credentials.read()) ?? nil) ?? "") : typed
             guard !key.isEmpty else { test = .idle; return }
             test = .finished(await GeminiConnectionTester.test(apiKey: key, model: model))
-        }
-    }
-
-    private func describe(_ result: GeminiConnectionResult) -> (String, String) {
-        let model = store.settings.resolvedGeminiModel
-        switch result {
-        case .connected: return ("checkmark.circle.fill", "Connected. models.get confirmed \(model) supports generateContent.")
-        case .invalidKey: return ("xmark.octagon", "Invalid API key.")
-        case .modelUnavailable: return ("questionmark.circle", "Model unavailable: \(model).")
-        case .generateContentUnsupported: return ("xmark.circle", "Model doesn't support generateContent.")
-        case .rateLimited: return ("clock", "Rate limited. Try again later.")
-        case .network: return ("wifi.exclamationmark", "Network error.")
-        case .server(let code): return ("exclamationmark.triangle", "Server error (\(code)).")
-        case .unexpectedResponse: return ("exclamationmark.triangle", "Unexpected response.")
         }
     }
 

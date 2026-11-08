@@ -134,7 +134,7 @@ import Testing
         var s = DigestSettings()
         s.cloudDigestEnabled = true
         s.geminiModel = "m"
-        s.triageModel = "tev1:0.8b"
+        s.triageModel = "tev1:0.8b-q8_0"
         s.privacyThreshold = 0.95
         s.cloudPrivacyAcknowledgedRevision = 1
         #expect(try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s)) == s)
@@ -164,6 +164,6 @@ import Testing
     }
 
     @Test func triageModelsListed() {
-        #expect(CloudPrivacyPolicy.triageModels.map(\.tag) == ["kev:0.8b-q8_0", "tev1:0.8b", "kev:4b-q4_K_M"])
+        #expect(CloudPrivacyPolicy.triageModels.map(\.tag) == ["kev:0.8b-q8_0", "tev1:0.8b-q8_0", "kev:4b-q4_K_M"])
     }
 }

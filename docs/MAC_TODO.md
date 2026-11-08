@@ -483,3 +483,9 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 - The popover does not cover the review canvas.
 - "View All Activity" opens the review window on Activity when the window is open.
 - "View All Activity" opens the review window on Activity when the window was closed (menu bar flow).
+
+**Gemini settings copy**
+
+- Cloud Digest Model row shows the display name and, in small monospaced text, the raw id; editing Model ID updates it live.
+- The success block reads "Connection successful" with the model display name and the no-email-content note, and disappears after editing the key or Model ID.
+- The caption under the Cloud Digest toggle changes between disabled, active and inactive-without-key states.

@@ -220,6 +220,17 @@ extension StubNetworkTests {
         #expect(req.headers["x-goog-api-key"] == key)
     }
 
+    @Test func customModelIsInURLAndKeyOnlyInHeader() async throws {
+        StubURLProtocol.install { _ in StubResponse(body: Data(#"{"name":"models/gemini-x-y","supportedGenerationMethods":["generateContent"]}"#.utf8)) }
+        let r = await GeminiConnectionTester.test(apiKey: key, model: "gemini-x-y", session: StubURLProtocol.makeSession())
+        #expect(r == .connected)
+        let req = try #require(StubURLProtocol.requests.first)
+        #expect(req.method == "GET" && req.body.isEmpty)
+        #expect(req.url.absoluteString.hasSuffix("/models/gemini-x-y"))
+        #expect(!req.url.absoluteString.contains(key))
+        #expect(req.headers["x-goog-api-key"] == key)
+    }
+
     @Test func outcomes() async {
         #expect(await run(StubResponse(status: 400, body: errorBody(400, status: "INVALID_ARGUMENT", reason: "API_KEY_INVALID"))) == .invalidKey)
         #expect(await run(StubResponse(status: 403)) == .invalidKey)

@@ -907,7 +907,7 @@ Input: sender, subject, full body, filter headers, inspection. Output: class plu
 - **Response:** `answers.contains_pii_or_sensitive.noul` = P(sensitive); `answers.mail_category.probabilities[...]`. `pNonSensitive = 1 − pSensitive`. Eligible iff both scores are present, finite and in [0, 1], `pNonSensitive ≥ privacyThreshold` (default 0.90, range 0.80–0.99) **and** `pPublic ≥ 0.85` (fixed).
 - **Fail closed** (local, reason recorded): Ollama unreachable, version too old or unknown, model missing, HTTP error, timeout (90 s), malformed or missing scores, below either threshold.
 - Scores are model confidences, not accuracy guarantees; the UI never presents them as such.
-- Triage models offered: `kev:0.8b-q8_0` (default, llama.cpp runner, verified on this Intel Mac), `tev1:0.8b`, `kev:4b-q4_K_M`. MLX-only tags are not offered.
+- Triage models offered: `kev:0.8b-q8_0` (default, llama.cpp runner, verified on this Intel Mac), `tev1:0.8b-q8_0`, `kev:4b-q4_K_M`. MLX-only tags are not offered.
 - Measured latency, residency and coverage on the Intel Mac are recorded in Q67.
 
 ### Gemini provider
@@ -924,7 +924,7 @@ Input: sender, subject, full body, filter headers, inspection. Output: class plu
 
 - `CredentialStore` protocol in Core (`read`, `save`, `delete`), `InMemoryCredentialStore` fake. App adapter `KeychainCredentialStore`: generic password, service `"<bundle id>.gemini"`, account `"api-key"`, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, not synchronizable, no custom access group. The key is read once at job start and kept only in the client for that job.
 - `DigestSettings` gains `cloudDigestEnabled` (false), `geminiModel` (`gemini-3.5-flash-lite`), `triageModel` (`kev:0.8b-q8_0`), `privacyThreshold` (0.90), `cloudPrivacyAcknowledgedRevision: Int?` (nil). Missing keys decode to defaults. Whether a key exists is read from the Keychain, never stored.
-- **Settings > Model > Cloud AI (Gemini)** section: `SecureField`, Save (Update when a key exists), Remove Key, "API key saved in Keychain" or "No API key" status, Test Connection with status text, the Cloud Digest toggle (disabled without a key), triage model picker with installed or missing status, threshold control, and the persistent disclosure (Q63). Removing the key turns Cloud Digest off.
+- **Settings > Model > Cloud AI (Gemini)** section: `SecureField`, Save (Update when a key exists), Remove Key, "API key saved in Keychain" or "No API key" status, Test Connection with status text, the Cloud Digest toggle (disabled without a key), triage model picker with installed or missing status, threshold control, and the persistent disclosure (Q63). Removing the key turns Cloud Digest off. The section also shows a "Cloud Digest Model" row (display name of the configured model, raw id in secondary monospaced text when different) with an editable "Model ID" field under it, and a caption under the toggle stating whether cloud processing is actually active. Test Connection shows "Connection successful" with "<Model> is available with this API key." and "No email content was sent during this test.", or short friendly errors (copy in `GeminiConnectionMessage`); it never changes the toggle, and the result clears when the key or model id changes.
 - **Acknowledgement (Q63):** turning the toggle on while `cloudPrivacyAcknowledgedRevision < currentRevision` (1) shows a sheet with the disclosure; only "I Understand, Enable" sets the revision and the toggle. Cancel leaves it off. Saving a key never enables cloud.
 
 ### Provenance (persisted per `job_item`)

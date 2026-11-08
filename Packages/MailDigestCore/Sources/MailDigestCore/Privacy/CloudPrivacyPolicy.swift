@@ -15,7 +15,7 @@ public enum CloudPrivacyPolicy {
     /// System One models the user can pick for triage.
     public static let triageModels: [TriageModel] = [
         TriageModel(tag: "kev:0.8b-q8_0", displayName: "Kev 0.8B (Q8, default)"),
-        TriageModel(tag: "tev1:0.8b", displayName: "Tev1 0.8B"),
+        TriageModel(tag: "tev1:0.8b-q8_0", displayName: "Tev1 0.8B"),
         TriageModel(tag: "kev:4b-q4_K_M", displayName: "Kev 4B (Q4, larger)"),
     ]
 
