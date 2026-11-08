@@ -35,3 +35,38 @@ import Testing
         #expect(v.windowDidOpen(current: .accessory) == .regular)
     }
 }
+
+@Suite struct DockVisibilityCycleTests {
+    @Test func repeatedCyclesRestoreEachTime() {
+        var v = DockVisibility()
+        for _ in 1...6 {
+            #expect(v.windowDidOpen(current: .accessory) == .regular)
+            #expect(v.windowDidClose() == .accessory)
+        }
+    }
+
+    @Test func repeatedCyclesRestoreRememberedRegular() {
+        var v = DockVisibility()
+        for _ in 1...5 {
+            #expect(v.windowDidOpen(current: .regular) == .regular)
+            #expect(v.windowDidClose() == .regular)
+        }
+    }
+
+    @Test func openCloseOpenThenClose() {
+        var v = DockVisibility()
+        #expect(v.windowDidOpen(current: .accessory) == .regular)
+        #expect(v.windowDidClose() == .accessory)
+        #expect(v.windowDidOpen(current: .accessory) == .regular)
+        #expect(v.windowDidClose() == .accessory)
+    }
+
+    @Test func noEventsBetweenOpenAndCloseKeepsState() {
+        // Minimise or in-window navigation produce no events, so the state is unchanged.
+        var v = DockVisibility()
+        _ = v.windowDidOpen(current: .accessory)
+        let snapshot = v
+        #expect(v == snapshot)
+        #expect(v.windowDidClose() == .accessory)
+    }
+}

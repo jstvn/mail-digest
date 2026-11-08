@@ -512,4 +512,5 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 
 - Cloud AI shows **Gemini 3.5 Flash-Lite** with no model ID underneath, and the separate Model ID row is unchanged.
 - Opening the review window adds Mail Digest to the Dock; clicking the Dock icon from another app brings it forward; minimising keeps the Dock icon; closing the window removes it; the menu bar icon keeps working throughout, including reopening the window.
+- Repeat open → close → reopen at least four times in one session, opening from both the menu bar and a notification, and closing with the red button and Cmd-W: the Dock icon appears on every open and disappears on every close. Minimise and restore from the Dock, and move between sidebar views: neither removes the icon. (The cycle logic was checked in a test harness with the same code, not in the app.)
 - After a build that had `kev:0.8b-q8_0` saved, Settings shows the migrated model, and Activity rows recorded before the change still show their original model.

@@ -27,28 +27,44 @@ final class DockPresence {
     }
 }
 
-/// Invisible background view that ties `DockPresence` to the hosting NSWindow's real lifetime
-/// (minimising and in-window navigation do not post willClose).
-struct DockPresenceModifier: NSViewRepresentable {
+/// Ties `DockPresence` to the review window. SwiftUI reuses the same NSWindow and content view across
+/// close and reopen, so open is signalled by the content's `.onAppear` (once per open; not on minimise or
+/// in-window navigation) and close by `willCloseNotification`, which stays observed for the window's lifetime.
+private struct DockPresenceModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .onAppear { DockPresence.shared.windowDidOpen() }
+            .background(WindowCloseObserver { DockPresence.shared.windowDidClose() })
+    }
+}
+
+extension View {
+    /// Shows the Dock icon while this window is open. Apply once to the window's root view.
+    func dockPresence() -> some View { modifier(DockPresenceModifier()) }
+}
+
+/// Invisible view that reports `willClose` of its hosting window. It is not removed on close because
+/// the same window is reused on reopen.
+private struct WindowCloseObserver: NSViewRepresentable {
+    let onClose: @MainActor () -> Void
+
     func makeNSView(context: Context) -> TrackerView { TrackerView() }
-    func updateNSView(_ nsView: TrackerView, context: Context) {}
+    func updateNSView(_ nsView: TrackerView, context: Context) { nsView.onClose = onClose }
 
     final class TrackerView: NSView {
-        private var observer: NSObjectProtocol?
+        var onClose: (@MainActor () -> Void)?
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            guard let window, observer == nil else { return }
-            DockPresence.shared.windowDidOpen()
-            observer = NotificationCenter.default.addObserver(
-                forName: NSWindow.willCloseNotification, object: window, queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    if let o = self?.observer { NotificationCenter.default.removeObserver(o) }
-                    self?.observer = nil
-                    DockPresence.shared.windowDidClose()
-                }
-            }
+            // Selector-based registration: removing first guarantees a single registration, NotificationCenter
+            // holds no strong reference to self, and it is dropped automatically on deinit.
+            NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: nil)
+            guard let window else { return }
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(windowWillClose(_:)),
+                name: NSWindow.willCloseNotification, object: window)
         }
+
+        @objc private func windowWillClose(_ note: Notification) { onClose?() }
     }
 }
