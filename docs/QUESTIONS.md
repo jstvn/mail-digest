@@ -233,7 +233,7 @@ Each item says what the spec leaves open and the interim choice the build uses, 
 
 ## System One model benchmark (2026-11-08)
 
-68. **Which System One model and thresholds should production use?** (open, for Justin; nothing changed)
+68. **Which System One model and thresholds should production use?** (decided 2026-11-09; see Q69)
    - **Setup:** 150 hand-labelled synthetic emails in `eval/systemone/fixtures.json`: 12 categories × 12 (6 calibration + 6 held-out), plus 6 inspection-only items. Raw responses, per-item routes and the full report are in `eval/systemone/results/`. Rerun with `EvalCLI systemone run|report` and `eval/systemone/latency.py`.
      - All three models received the identical production request (`OllamaSystemOneClient.requestBody`, `TriageInputBuilder`, 1,500-character state, no options).
      - The production route comes from the real `DigestRouter.assess` with cloud on, 0.90 / 0.85, replaying the recorded scores.
@@ -298,7 +298,7 @@ Each item says what the spec leaves open and the interim choice the build uses, 
      - 40 public and 104 non-public items in total, and only 20 public per split.
      - Zero observed System One false-clouds for Kev 4B still allows up to about 3.6% (Wilson 95% upper bound, 0 of 104). Including pws-08, the route-level bound is 5.2%.
      - Scores are uncalibrated confidences, the data is synthetic and English, and labels were written by the benchmark author. This is evidence, not proof.
-   - **Recommendation (not implemented; needs approval):**
+   - **Recommendation (superseded by Decision in Q69):**
      1. **Triage model:** switch the default to `kev:4b-q4_K_M`.
         - Gains: public eligibility rises from 30% to 72.5%, false-local drops from 28 to 11, sensitive recall is 0.99, and there are no System One false-clouds.
         - Costs: about 3× triage latency (10–20 s warm, 18–27 s cold) and about 8.5 GB resident.
@@ -313,3 +313,49 @@ Each item says what the spec leaves open and the interim choice the build uses, 
         - Measured upside with Kev 4B: up to 6 fewer false-locals here. Each would still need to pass System One.
      4. **Trusted-sender allowlist (SPEC change, needs approval):** also run System One on allowlisted mail as a veto, so it goes to cloud only if triage also passes. That would have caught pws-08 with every model, at the cost of one triage call per allowlisted email.
    - **Other production observations (unchanged, for review):** `EmailCleaner` drops text after the first "On … wrote:" or "--" line, so content written below a quote or signature never reaches System One. The pre-filter still sees the full body.
+
+## Selective System One routing (2026-11-09)
+
+69. **What routing policy and System One default does production use?**
+   - **Decision (approved by Justin, 2026-11-09):**
+     - Default triage model `kev:4b-q4_K_M`; low-memory alternative `kev:0.8b-q8_0`; `tev1:0.8b-q8_0` stays selectable, labelled experimental, not recommended as the default. Qwen3 4B digest generation unchanged. No automatic model selection, download, or unload policy.
+     - Thresholds confirmed unchanged: privacy 0.90 (configurable), public 0.85 (fixed).
+     - Strong deterministic private evidence goes directly to local and overrides any allowlist.
+     - Trusted public newsletters (exact built-in allowlist, valid List-Unsubscribe, complete inspection, no strong rule, no contextual risk signal, cloud on with a key) go directly to Gemini with no System One call. The allowlist is evidence, not a guarantee.
+     - Trusted newsletters with a specific risk signal, ambiguous senders and bulk mail from sensitive domains get System One.
+     - Broad topic keywords (invoice, statement, payment, medical, health, tax) are context-aware and no longer force local on their own.
+     - Quoted replies and signatures are preserved for privacy triage; digest-generation cleaning is unchanged.
+     - The general Trusted Newsletter list grants no cloud permission; GitHub is not allowlisted; incomplete inspection stays local.
+   - **Implementation choices made under that decision (for review):**
+     - Sensitive sender domains: one-to-one mail (no valid List-Unsubscribe) or mail with a strong indicator stays local; bulk mail without either goes to System One, never directly to Gemini.
+     - Bare "prescription" and generic doctor-appointment phrases are a risk signal, so they trigger triage on a trusted sender. They are no longer an unconditional private match.
+     - Record phrases such as "amount due" or "invoice number" count as strong only when a digit-bearing value follows within 6 tokens; without one they are a risk signal or nothing.
+     - Risk signals combine a diagnosis or sensitive term with an identifier within 300 characters, because newsletter footers print a company street address.
+     - Long text: at most 6 overlapping chunks of a 1,500-character state; every chunk must pass; first failing chunk stops; over 6 chunks stays local (`contentTooLong`).
+     - `pSensitive >= 0.5` without eligibility is recorded as `private` / "Sensitive · System One", separate from uncertain.
+     - A stored `kev:0.8b-q8_0` written before settings default revision 2 is migrated once to Kev 4B, because it only reflected the old default; a later explicit 0.8B choice is kept.
+     - A `text/html` part outside `multipart/alternative` is now read with the plain parts, so its text is no longer unseen while inspection reports complete. This also adds that text to the digest body for those rare messages.
+     - System One instructions were revised to ask about actual disclosure risk, not sensitive subject matter (`SystemOneSpec`).
+   - **Evaluation (`eval/systemone/results-selective/`, real `DigestRouter`, 0.90 / 0.85, identical revised request for all models; separate from the Q68 benchmark, whose 72.5% does not describe this policy):** 150 original + 81 new synthetic fixtures. Scored items exclude inspection-only ones: 220 scored items (84 public, 122 private, 14 ambiguous); the 11 inspection-only items are reported separately.
+
+     | Metric | Kev 4B Q4_K_M | Kev 0.8B Q8_0 | Tev1 0.8B Q8_0 |
+     | --- | ---: | ---: | ---: |
+     | False-cloud | 0 | 0 | 0 |
+     | False-local (excludes the one over-budget item) | 9 | 50 | 21 |
+     | Public-email Gemini eligibility, all | 74/84 (88.1%) | 33/84 (39.3%) | 62/84 (73.8%) |
+     | ... original 40 public | 34/40 (85.0%) | 4/40 (10.0%) | 24/40 (60.0%) |
+     | ... new 44 public | 40/44 (90.9%) | 29/44 (65.9%) | 38/44 (86.4%) |
+     | Private emails kept local | 122/122 | 122/122 | 122/122 |
+     | System One latency per call, median / p95 | 20.4 / 30.7 s | 5.7 / 11.5 s | 5.1 / 7.2 s |
+
+     - Digests verified from `/api/tags` during the run: `818b6cdb957c…` (Kev 4B), `a2f47e09befb…` (Kev 0.8B), `abc31fdb0bf5…` (Tev1), matching Q68.
+     - Kev 4B paths over all 231 fixtures: trusted direct 33, trusted selective 12, ambiguous System One 152, sensitive-sender System One 3, deterministic private 20, inspection local 11. Messages needing System One 72.3%; calls per message 0.76; 10 messages needed 2 chunks; no triage errors.
+     - Trusted newsletters needing System One: 12 of 47 (25.5%), in a set deliberately enriched with risky cases. All 20 ordinary, medical-research, tax-policy and invoice-software trusted newsletters went direct with no call.
+     - Pre-filter alone (Kev 4B run, deterministic): 0 public items routed deterministic-private (was 6 false-private), and 0 non-public items routed direct (pws-08 was the 1 false-public).
+     - pws-08 now goes to selective assessment and stays local with all three models (Kev 4B pSensitive 0.33, pPublic 0.73). All five new identifiable-sensitive newsletters stayed local.
+     - Sensitive details after a quoted reply, a signature or beyond 1,500 characters stayed local in all scenarios with Kev 4B (e.g. rt-long-01: first chunk would have passed, second chunk had pSensitive 0.57).
+     - Remaining Kev 4B false-locals, all below threshold: news-02, notif-05, notif-09, inj-03, inj-05, inj-09, rt-case-04, rt-amb-02, rt-sig-05. Over budget, fail closed: rt-over-01. Inspection exclusion: 11 of 231 (all intended).
+     - Failure routes verified by the real router: all cloud-off runs made no call; every eligible email with a failing Gemini call fell back to local (`cloudFailed`).
+     - Triage time is modelled from fixtures, not measured on a real Daily job: Kev 4B, 95.1 calls per 100 on the original mix against 88.2 under the old policy (bare-keyword mail now reaches System One and long mail may take 2 chunks), about 1,936 s against 1,795 s per 100 emails at the same 20.35 s median. Trusted direct mail costs nothing on either side.
+     - With the revised instructions, Kev 0.8B public eligibility fell to 10% on the original items (30% in Q68), so as the low-memory option it keeps most public mail local. Tev1 had no false-cloud this time (fin-02 stayed local), but one clean run does not undo the Q68 result, and it stays experimental.
+     - Limits: synthetic English data, labels written by the benchmark author, zero observed false-cloud in 136 non-public items still allows real errors (Wilson 95% upper bound about 2.7%), scores are uncalibrated, 16 GB Macs unverified, no real-mail run.

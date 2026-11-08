@@ -492,6 +492,18 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 
 **System One model benchmark (Q68; synthetic emails only)**
 
-- Before any default change to `kev:4b-q4_K_M`, run a Daily job on a 16 GB Mac with Kev 4B and Qwen3 4B and watch `ollama ps` and memory pressure for swapping or model reloads.
+- `kev:4b-q4_K_M` is now the default (Q69): run a Daily job on a 16 GB Mac with Kev 4B and Qwen3 4B and watch `ollama ps` and memory pressure for swapping or model reloads; if it swaps, Settings should offer Kev 0.8B without other changes.
 - Rerun `EvalCLI systemone run` for each model and `eval/systemone/latency.py` on a quiet machine after any Ollama upgrade or model re-pull, and compare digests with Q68.
 - Selecting "Tev1 0.8B" in Settings shows the triage model as installed (tag `tev1:0.8b-q8_0`).
+
+**Selective privacy routing (Q69; use synthetic or your own test emails only)**
+
+- Settings shows Privacy Triage Model as "Kev 4B (Q4, default)" after upgrade, with the memory caption; choosing "Kev 0.8B (Q8, low memory)" persists across relaunch; "Tev1 0.8B (experimental)" shows the not-recommended caption.
+- Activity on a clean Substack/Medium newsletter: "Public · Trusted Sender", Route row and tooltip "Trusted public sender · System One not required", no scores.
+- Trusted newsletter with a reader's diagnosis and home address: Route shows selective System One assessment, Risk signal row shows, real scores shown, stays local unless both thresholds pass.
+- Ambiguous sender: Route "Ambiguous sender · System One assessment".
+- A reply with sensitive text only below the signature or in the quoted part stays local, while its digest still omits the quoted text.
+- A long test email (over 1,500 characters, sensitive detail near the end): Activity shows "Text assessed" sections and it stays local; an over-long one shows "Too long to assess completely".
+- "Sensitive · System One" and "Uncertain · System One" badges and the local-reason summary read correctly.
+- Measure a real Daily job's duration with Kev 4B against the Q69 model (20 s per call; 0 for trusted direct) and check `ollama ps` shows Kev 4B and Qwen3 4B both resident.
+- VoiceOver reads the new Route, Risk signal and Text assessed rows and the picker caption.
