@@ -188,7 +188,8 @@ public actor OllamaSystemOneClient: SystemOneClient {
 
     // MARK: Request / response
 
-    static func requestBody(_ input: TriageInput, model: String) -> JSONValue {
+    /// The exact JSON body POSTed to `/v1/systemone`; public so the eval harness sends the production request.
+    public static func requestBody(_ input: TriageInput, model: String) -> JSONValue {
         var criteria: [String: JSONValue] = [:]
         for c in SystemOneSpec.categoryCriteria { criteria[c.key] = .string(c.text) }
         return .object([
@@ -211,7 +212,8 @@ public actor OllamaSystemOneClient: SystemOneClient {
     private struct Answer: Decodable { var noul: Double?; var probabilities: [String: Double]? }
     private struct Envelope: Decodable { var answers: [String: Answer] }
 
-    static func decode(_ data: Data) throws -> SystemOneScores {
+    /// Parses a `/v1/systemone` response body into scores; throws `TriageFailure.malformedResponse`.
+    public static func decode(_ data: Data) throws -> SystemOneScores {
         guard let env = try? JSONDecoder().decode(Envelope.self, from: data) else {
             throw TriageFailure.malformedResponse
         }

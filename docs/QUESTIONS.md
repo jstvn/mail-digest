@@ -213,7 +213,7 @@ Each item says what the spec leaves open and the interim choice the build uses, 
 65. **Gemini model.**
    - **Decision:** Keep `gemini-3.5-flash-lite` as the configurable default for predictable extraction, even though newer models exist. Structured output uses `responseMimeType` + `responseJsonSchema`; live availability and schema acceptance are a MAC_TODO check with synthetic emails. Comparing a newer model is a future iteration.
 66. **Content inspection is strict.**
-   - **Decision:** Only `.complete` inspection can qualify for cloud. EMLX messages with attachments or non-text parts and every JXA-fallback message stay local, shown as "Local only · Content not fully inspected". Broader eligibility must come from better MIME inspection, never a relaxed policy.
+   - **Decision:** Only `.complete` inspection can qualify for cloud. EMLX messages with attachments or non-text parts and every JXA-fallback message stay local, shown as "Local only · Content not fully inspected" (or, when the parser knows why, "Attachment not inspected", "Non-text content not inspected" or "Message structure unavailable"; see SPEC > Content inspection). Broader eligibility must come from better MIME inspection, never a relaxed policy.
 67. **Measurements on the Intel i7-9750H, 32 GB (2026-11-08, synthetic emails only).**
    - **System One** (`kev:0.8b-q8_0`, Ollama 0.40.14, 3 cold and 10 warm calls per sample, machine idle):
 
@@ -229,4 +229,87 @@ Each item says what the spec leaves open and the interim choice the build uses, 
    - **Residency:** under the serial runner, Kev → Qwen3 4B alternation keeps both models loaded (Kev 2.6 GB at its 73,728-token default context, Qwen 3.2 GB, both 100% CPU) with Ollama's default 5-minute keep-alive; after the first round neither reloads (Kev ≈ warm latency again by round 3). A 200-token Qwen call took 28 s warm. **Decision:** no residency or unload policy; memory pressure is low on 32 GB.
    - **Pre-filter** (release build): median 1.0 ms at 1.5k chars, 6.8 ms at 10k, 20 ms at 24k, 68 ms at 100k.
    - **Activity paging** (GRDB, 5,000 jobs and 100,000 items): first page of 30 in 2 ms; 50 sequential keyset pages in 44 ms; Cloud filter page 0.9 ms; expanding a job (20 items) 1.4 ms.
-   - **Coverage finding (open, for Justin):** System One's public-category scores on the synthetic newsletter were 0.76 (short) and 0.82 (near limit), below the fixed 0.85 floor, while non-sensitive scores were 0.88–0.90 around the 0.90 threshold. With the 0.8B model, triage will rarely make an email cloud-eligible; nearly all Gemini traffic will come from the built-in trusted-sender allowlist, and each ambiguous email pays roughly 3–6 s of triage before staying local. The policy stays unchanged (fail closed). Options to consider later, none implemented: evaluate `kev:4b-q4_K_M` or `tev1:0.8b` on a labelled synthetic set; skip triage when it cannot plausibly pass; or accept the current coverage.
+   - **Coverage finding (open, for Justin):** System One's public-category scores on the synthetic newsletter were 0.76 (short) and 0.82 (near limit), below the fixed 0.85 floor, while non-sensitive scores were 0.88–0.90 around the 0.90 threshold. With the 0.8B model, triage will rarely make an email cloud-eligible; nearly all Gemini traffic will come from the built-in trusted-sender allowlist, and each ambiguous email pays roughly 3–6 s of triage before staying local. The policy stays unchanged (fail closed). Options to consider later, none implemented: evaluate `kev:4b-q4_K_M` or `tev1:0.8b` on a labelled synthetic set; skip triage when it cannot plausibly pass; or accept the current coverage. Superseded by the labelled benchmark in Q68.
+
+## System One model benchmark (2026-11-08)
+
+68. **Which System One model and thresholds should production use?** (open, for Justin; nothing changed)
+   - **Setup:** 150 hand-labelled synthetic emails in `eval/systemone/fixtures.json`: 12 categories × 12 (6 calibration + 6 held-out), plus 6 inspection-only items. Raw responses, per-item routes and the full report are in `eval/systemone/results/`. Rerun with `EvalCLI systemone run|report` and `eval/systemone/latency.py`.
+     - All three models received the identical production request (`OllamaSystemOneClient.requestBody`, `TriageInputBuilder`, 1,500-character state, no options).
+     - The production route comes from the real `DigestRouter.assess` with cloud on, 0.90 / 0.85, replaying the recorded scores.
+     - Mac: Intel i7-9750H, 32 GB, Ollama 0.40.14.
+   - **Models (verified with `/api/tags` and `/api/show`, all `decision` capability, gguf, llama.cpp runner):**
+
+     | Model | Quant | Params | Size on disk | Digest |
+     | --- | --- | --- | --- | --- |
+     | `kev:0.8b-q8_0` | Q8_0 | 0.75B | 812 MB | `a2f47e09befb…` |
+     | `kev:4b-q4_K_M` | Q4_K_M | 4.2B | 2.7 GB | `818b6cdb957c…` |
+     | `tev1:0.8b-q8_0` | Q8_0 | 0.77B | 834 MB | `abc31fdb0bf5…` |
+
+   - **Results at production thresholds (144 scored items: 40 public, 92 private, 12 ambiguous; all splits):**
+
+     | Metric | Kev 0.8B Q8_0 | Kev 4B Q4_K_M | Tev1 0.8B Q8_0 |
+     | --- | ---: | ---: | ---: |
+     | Routing accuracy (eligible ⇔ public) | 79.9% | 91.7% | 89.6% |
+     | Strict model-only accuracy | 54.2% | 86.1% | 68.1% |
+     | Sensitive/private recall (model-only) | 0.761 | 0.989 | 0.728 |
+     | Public precision / recall (route) | 0.923 / 0.300 | 0.967 / 0.725 | 0.931 / 0.675 |
+     | False-cloud-eligible, total | 1 | 1 | 2 |
+     | False-cloud caused by System One | 0 | 0 | 1 (fin-02) |
+     | False-local-routing | 28 | 11 | 13 |
+     | … of which pre-filter keyword | 6 | 6 | 6 |
+     | Public eligibility rate | 30.0% | 72.5% | 67.5% |
+     | Private items kept local | 98.9% | 98.9% | 97.8% |
+     | Model-only uncertainty rate | 36.1% | 5.6% | 26.4% |
+     | Warm median, ~300 / ~1,500 chars | 3.4 / 6.0 s | 10.2 / 19.7 s | 3.3 / 5.0 s |
+     | Warm p95, ~300 / ~1,500 chars | 4.4 / 6.4 s | 11.6 / 20.9 s | 3.9 / 5.6 s |
+     | Cold median, ~300 / ~1,500 chars | 8.2 / 11.3 s | 18.1 / 27.2 s | 6.3 / 7.5 s |
+     | Load time (until listed in `/api/ps`) | ~4 s | ~9 s | ~3 s |
+     | Ollama size (`/api/ps`), context | 2.6 GB, 73,728 | 6.6 GB, 73,728 | 1.3 GB, 8,192 |
+     | Runner resident memory (RSS) | 2.1 GB | 8.5 GB | 1.3 GB |
+
+     - Latency comes from `latency.py`: 3 cold and 10 warm calls per input size.
+     - Accuracy-run timings are not used: other apps were busy, and the Mac slept once during the Kev 0.8B run, so one request (insp-01) recorded about 7,200 s. It completed normally and its scores are valid.
+     - Inspection-only items: 0 of 6 eligible for every model.
+     - Nothing caused a model reload. All three triage models stayed resident alongside Qwen3 4B (3.2 GB) with the default 5-minute keep-alive.
+   - **False-cloud review (every case):**
+     - **pws-08, all models.** An allowlisted Substack issue that prints a reader's diagnosis and home address. The trusted-sender rule decides before System One runs, so content is checked only by the keyword and pattern rules. No model is involved.
+       - System One would have kept it local with every model: pSensitive was 0.48 (Kev 0.8B), 0.55 (Kev 4B) and 0.28 (Tev1), all below 0.90 pNonSensitive.
+     - **fin-02, Tev1 only (calibration split).** A shipping notice with the recipient's name, street address and tracking number.
+       - Tev1 scored pSensitive 0.063 and pPublic 0.941. This is a confident System One error, so it is unaffected by threshold choice anywhere at or below 0.93 / 0.90.
+   - **False-local review.**
+     - **Pre-filter keywords.** In all three models, 6 public items are false-private because of keyword rules: news-04 (invoice software), news-06 (payments industry), news-09 (tax policy), news-11 (medical research), mkt-04 (health/fitness promo), and inj-03 ("medical" appears in the injection text).
+       - Kev 4B scored all six public with high confidence (pPublic 0.85–0.98, pSensitive ≤ 0.14).
+     - **Kev 0.8B.** The remaining 22 are System One misses, mostly public-category scores below the floor (newsletters 0.45–0.73, notifications 0.57–0.85); a few have pNonSensitive just under 0.90.
+     - **Kev 4B.** Only 5 System One false-locals remain: news-02, mkt-10, notif-08, notif-09, inj-09.
+     - **Tev1.** 7 System One false-locals.
+     - Incomplete-inspection items are reported separately and never counted as false-local.
+   - **Threshold sensitivity.** Grid: privacy threshold 0.85–0.98 × public floor 0.70–0.95. Configurations were chosen on calibration with zero false-cloud as the gate, then evaluated on held-out, n = 20 public per split. Held-out false-cloud is always pws-08, which thresholds cannot affect.
+     - **Kev 0.8B:**
+       - Calibration false-cloud appears at t = 0.85 with floor ≤ 0.80, and t ≤ 0.87 with floor ≤ 0.80 is the boundary.
+       - The best safe choice, t = 0.88 / floor 0.70, lifts held-out eligibility from 6 to 8 of 20. That is still poor, and it sits next to the failure boundary.
+     - **Kev 4B:**
+       - No System One false-cloud at any grid point on either split, including t = 0.85 / floor 0.70.
+       - Held-out eligibility is 14 of 20 at production values and 15 of 20 at floor ≤ 0.80. The gain is one email and inside sampling noise.
+     - **Tev1:**
+       - fin-02 stays eligible unless t ≥ 0.95, and t = 0.95 cuts held-out eligibility to 6 of 20.
+       - The calibration-chosen t = 0.90 / floor 0.95 is worse on held-out (10 of 20) than production (12 of 20).
+   - **Statistical limits:**
+     - 40 public and 104 non-public items in total, and only 20 public per split.
+     - Zero observed System One false-clouds for Kev 4B still allows up to about 3.6% (Wilson 95% upper bound, 0 of 104). Including pws-08, the route-level bound is 5.2%.
+     - Scores are uncalibrated confidences, the data is synthetic and English, and labels were written by the benchmark author. This is evidence, not proof.
+   - **Recommendation (not implemented; needs approval):**
+     1. **Triage model:** switch the default to `kev:4b-q4_K_M`.
+        - Gains: public eligibility rises from 30% to 72.5%, false-local drops from 28 to 11, sensitive recall is 0.99, and there are no System One false-clouds.
+        - Costs: about 3× triage latency (10–20 s warm, 18–27 s cold) and about 8.5 GB resident.
+        - Resident memory is fine on this 32 GB Mac. On the 16 GB performance-target Mac, Kev 4B plus Qwen3 4B (about 11.7 GB together) may cause swapping or reloads; that needs a check before Kev 4B becomes a universal default.
+        - Keep Kev 0.8B as the low-memory option.
+        - Don't adopt Tev1: it is fast and small but has a confident private-to-cloud error.
+     2. **Thresholds:** keep 0.90 / 0.85. Lowering them buys at most one held-out email for Kev 4B, and lowering Kev 0.8B approaches its failure boundary.
+     3. **Pre-filter keywords (SPEC change, needs approval):** make the bare words statement(s), invoice(s), receipt(s), payment(s), transaction(s), medical, health, tax and taxes context-dependent. Two possible approaches:
+        - Treat them as private only alongside personal or transactional context ("your statement", "invoice #/number", "amount due", "tax return", "your prescription") or a sensitive sender domain.
+        - Otherwise send the message to triage, not to cloud. It goes to System One, never straight to cloud.
+        - Keep these private unconditionally: OTP and credential phrases, every checksum pattern, sensitive domains, and "prescription".
+        - Measured upside with Kev 4B: up to 6 fewer false-locals here. Each would still need to pass System One.
+     4. **Trusted-sender allowlist (SPEC change, needs approval):** also run System One on allowlisted mail as a veto, so it goes to cloud only if triage also passes. That would have caught pws-08 with every model, at the cost of one triage call per allowlisted email.
+   - **Other production observations (unchanged, for review):** `EmailCleaner` drops text after the first "On … wrote:" or "--" line, so content written below a quote or signature never reaches System One. The pre-filter still sees the full body.

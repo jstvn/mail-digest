@@ -489,3 +489,9 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 - Cloud Digest Model row shows the display name and, in small monospaced text, the raw id; editing Model ID updates it live.
 - The success block reads "Connection successful" with the model display name and the no-email-content note, and disappears after editing the key or Model ID.
 - The caption under the Cloud Digest toggle changes between disabled, active and inactive-without-key states.
+
+**System One model benchmark (Q68; synthetic emails only)**
+
+- Before any default change to `kev:4b-q4_K_M`, run a Daily job on a 16 GB Mac with Kev 4B and Qwen3 4B and watch `ollama ps` and memory pressure for swapping or model reloads.
+- Rerun `EvalCLI systemone run` for each model and `eval/systemone/latency.py` on a quiet machine after any Ollama upgrade or model re-pull, and compare digests with Q68.
+- Selecting "Tev1 0.8B" in Settings shows the triage model as installed (tag `tev1:0.8b-q8_0`).

@@ -909,6 +909,7 @@ Input: sender, subject, full body, filter headers, inspection. Output: class plu
 - Scores are model confidences, not accuracy guarantees; the UI never presents them as such.
 - Triage models offered: `kev:0.8b-q8_0` (default, llama.cpp runner, verified on this Intel Mac), `tev1:0.8b-q8_0`, `kev:4b-q4_K_M`. MLX-only tags are not offered.
 - Measured latency, residency and coverage on the Intel Mac are recorded in Q67.
+- Model comparison (`kev:0.8b-q8_0`, `kev:4b-q4_K_M`, `tev1:0.8b-q8_0`) on a labelled synthetic set, with threshold sensitivity: `eval/systemone/` and Q68. The default model and thresholds stay unchanged until Q68 is decided.
 
 ### Gemini provider
 

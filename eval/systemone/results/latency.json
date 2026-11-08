@@ -1,0 +1,116 @@
+{
+ "kev:0.8b-q8_0": {
+  "short": {
+   "chars": 300,
+   "cold_median_s": 8.21,
+   "cold_max_s": 8.94,
+   "load_visible_median_s": 4.29,
+   "warm_median_s": 3.43,
+   "warm_p95_s": 4.42,
+   "warm_min_s": 3.21,
+   "ps_size_gb": 2.65,
+   "context": 73728,
+   "runner_rss_mb": {}
+  },
+  "near-1500": {
+   "chars": 1500,
+   "cold_median_s": 11.3,
+   "cold_max_s": 11.32,
+   "load_visible_median_s": 4.05,
+   "warm_median_s": 6.01,
+   "warm_p95_s": 6.37,
+   "warm_min_s": 5.68,
+   "ps_size_gb": 2.65,
+   "context": 73728,
+   "runner_rss_mb": {}
+  }
+ },
+ "kev:4b-q4_K_M": {
+  "short": {
+   "chars": 300,
+   "cold_median_s": 18.1,
+   "cold_max_s": 27.41,
+   "load_visible_median_s": 9.29,
+   "warm_median_s": 10.19,
+   "warm_p95_s": 11.57,
+   "warm_min_s": 8.68,
+   "ps_size_gb": 6.59,
+   "context": 73728,
+   "runner_rss_mb": {}
+  },
+  "near-1500": {
+   "chars": 1500,
+   "cold_median_s": 27.21,
+   "cold_max_s": 27.94,
+   "load_visible_median_s": 9.26,
+   "warm_median_s": 19.71,
+   "warm_p95_s": 20.87,
+   "warm_min_s": 18.51,
+   "ps_size_gb": 6.59,
+   "context": 73728,
+   "runner_rss_mb": {}
+  }
+ },
+ "tev1:0.8b-q8_0": {
+  "short": {
+   "chars": 300,
+   "cold_median_s": 6.29,
+   "cold_max_s": 7.14,
+   "load_visible_median_s": 3.0,
+   "warm_median_s": 3.3,
+   "warm_p95_s": 3.85,
+   "warm_min_s": 3.26,
+   "ps_size_gb": 1.32,
+   "context": 8192,
+   "runner_rss_mb": {}
+  },
+  "near-1500": {
+   "chars": 1500,
+   "cold_median_s": 7.47,
+   "cold_max_s": 7.78,
+   "load_visible_median_s": 2.71,
+   "warm_median_s": 5.04,
+   "warm_p95_s": 5.61,
+   "warm_min_s": 4.62,
+   "ps_size_gb": 1.32,
+   "context": 8192,
+   "runner_rss_mb": {}
+  }
+ },
+ "residency": [
+  {
+   "model": "kev:0.8b-q8_0",
+   "triage_s": 10.29,
+   "qwen_s": 43.27,
+   "triage_after_qwen_s": 5.35,
+   "resident": [
+    "kev:0.8b-q8_0",
+    "qwen3:4b"
+   ]
+  },
+  {
+   "model": "kev:4b-q4_K_M",
+   "triage_s": 35.97,
+   "qwen_s": 29.87,
+   "triage_after_qwen_s": 19.08,
+   "resident": [
+    "kev:0.8b-q8_0",
+    "kev:4b-q4_K_M",
+    "qwen3:4b"
+   ]
+  },
+  {
+   "model": "tev1:0.8b-q8_0",
+   "triage_s": 8.98,
+   "qwen_s": 46.67,
+   "triage_after_qwen_s": 5.46,
+   "resident": [
+    "kev:4b-q4_K_M",
+    "qwen3:4b",
+    "tev1:0.8b-q8_0"
+   ]
+  }
+ ],
+ "final_ps": "NAME              ID              SIZE      PROCESSOR    CONTEXT    RUNNER      UNTIL              \ntev1:0.8b-q8_0    abc31fdb0bf5    1.3 GB    100% CPU     8192       llamacpp    4 minutes from now    \nqwen3:4b          359d7dd4bcda    3.2 GB    100% CPU     4096       llamacpp    4 minutes from now    \nkev:4b-q4_K_M     818b6cdb957c    6.6 GB    100% CPU     73728      llamacpp    3 minutes from now    \n",
+ "vm_stat": "Mach Virtual Memory Statistics: (page size of 4096 bytes)\nPages free:                                     5452.\nPages active:                                3177061.\nPages inactive:                              3170403.\n"
+}

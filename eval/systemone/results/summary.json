@@ -1,0 +1,5105 @@
+{
+  "fixtureCount" : 150,
+  "models" : [
+    {
+      "all" : {
+        "confusion" : {
+          "ambiguous" : {
+            "private" : 12
+          },
+          "private" : {
+            "private" : 70,
+            "uncertain" : 22
+          },
+          "public" : {
+            "private" : 2,
+            "public" : 8,
+            "uncertain" : 30
+          }
+        },
+        "evaluated" : 144,
+        "falseCloudEligible" : [
+          {
+            "category" : "public_with_sensitive",
+            "fixtureID" : "pws-08",
+            "label" : "private",
+            "pPublic" : 0.39436074338182936,
+            "pSensitive" : 0.47655548135879167,
+            "route" : {
+              "method" : "trustedSender",
+              "ruleID" : "allowlist.substack",
+              "verdict" : "public"
+            }
+          }
+        ],
+        "falseCloudRateWilsonUpper" : 0.05246900667694733,
+        "falseLocal" : [
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-02",
+            "label" : "public",
+            "pPublic" : 0.45546228358635743,
+            "pSensitive" : 0.14488072058844184,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-04",
+            "label" : "public",
+            "pPublic" : 0.8184961949609547,
+            "pSensitive" : 0.1578446596532466,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.financial",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-05",
+            "label" : "public",
+            "pPublic" : 0.7248117211666344,
+            "pSensitive" : 0.11594417815417758,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-06",
+            "label" : "public",
+            "pPublic" : 0.7842701674493118,
+            "pSensitive" : 0.28876985839246644,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.financial",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-07",
+            "label" : "public",
+            "pPublic" : 0.5965993216696504,
+            "pSensitive" : 0.06214403185575869,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-09",
+            "label" : "public",
+            "pPublic" : 0.6666676406557093,
+            "pSensitive" : 0.2794359528044257,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.tax",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-10",
+            "label" : "public",
+            "pPublic" : 0.6247373658284651,
+            "pSensitive" : 0.12987511666662502,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-11",
+            "label" : "public",
+            "pPublic" : 0.4489773907803294,
+            "pSensitive" : 0.2375798297958876,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.medical",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-01",
+            "label" : "public",
+            "pPublic" : 0.9147913883730662,
+            "pSensitive" : 0.10465499812631265,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-03",
+            "label" : "public",
+            "pPublic" : 0.8528736735084008,
+            "pSensitive" : 0.12377338468414008,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-04",
+            "label" : "public",
+            "pPublic" : 0.9369750357718366,
+            "pSensitive" : 0.1478958327954449,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.medical",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-05",
+            "label" : "public",
+            "pPublic" : 0.8378531335647873,
+            "pSensitive" : 0.16074674314925763,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-08",
+            "label" : "public",
+            "pPublic" : 0.7452557888088823,
+            "pSensitive" : 0.14610543474645887,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-10",
+            "label" : "public",
+            "pPublic" : 0.8850109575453097,
+            "pSensitive" : 0.3302240773747774,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-11",
+            "label" : "public",
+            "pPublic" : 0.8296646287473006,
+            "pSensitive" : 0.1748682400326942,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-01",
+            "label" : "public",
+            "pPublic" : 0.7016414896714823,
+            "pSensitive" : 0.08873998542160683,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-02",
+            "label" : "public",
+            "pPublic" : 0.8303772291843066,
+            "pSensitive" : 0.11250991793606359,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-04",
+            "label" : "public",
+            "pPublic" : 0.7581000791419105,
+            "pSensitive" : 0.10625119857643518,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-05",
+            "label" : "public",
+            "pPublic" : 0.7587264150990584,
+            "pSensitive" : 0.09520608773951342,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-07",
+            "label" : "public",
+            "pPublic" : 0.6858965674925497,
+            "pSensitive" : 0.0936726564000105,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-08",
+            "label" : "public",
+            "pPublic" : 0.5663586934464151,
+            "pSensitive" : 0.10534604011278259,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-09",
+            "label" : "public",
+            "pPublic" : 0.6910711663236712,
+            "pSensitive" : 0.09152687027673177,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-11",
+            "label" : "public",
+            "pPublic" : 0.8519103094069364,
+            "pSensitive" : 0.11547814120204225,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-12",
+            "label" : "public",
+            "pPublic" : 0.8135140210119531,
+            "pSensitive" : 0.13972467043086573,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "prompt_injection",
+            "fixtureID" : "inj-03",
+            "label" : "public",
+            "pPublic" : 0.2617692598894096,
+            "pSensitive" : 0.7554571123529997,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.medical",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "prompt_injection",
+            "fixtureID" : "inj-05",
+            "label" : "public",
+            "pPublic" : 0.812511950007694,
+            "pSensitive" : 0.34816333523640797,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "prompt_injection",
+            "fixtureID" : "inj-09",
+            "label" : "public",
+            "pPublic" : 0.7787355646878892,
+            "pSensitive" : 0.47925621316894035,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "prompt_injection",
+            "fixtureID" : "inj-11",
+            "label" : "public",
+            "pPublic" : 0.8233022969414939,
+            "pSensitive" : 0.1166929705142766,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          }
+        ],
+        "falsePrivate" : 2,
+        "falsePublic" : 0,
+        "inspectionItems" : 6,
+        "inspectionItemsEligible" : 0,
+        "localReasons" : {
+          "System One below thresholds" : 119,
+          "pre-filter private: kw.financial" : 6,
+          "pre-filter private: kw.medical" : 4,
+          "pre-filter private: kw.tax" : 1,
+          "pre-filter private: pattern.otp" : 1
+        },
+        "model" : "kev:0.8b-q8_0",
+        "nonPublicCount" : 104,
+        "perCategory" : [
+          {
+            "category" : "ambiguous",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "confidential_work",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "financial_transactional",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "medical",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "personal_identifiers",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "personal_scheduling",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "private_personal",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "prompt_injection",
+            "routingCorrect" : 8,
+            "total" : 12
+          },
+          {
+            "category" : "public_marketing",
+            "routingCorrect" : 5,
+            "total" : 12
+          },
+          {
+            "category" : "public_newsletter",
+            "routingCorrect" : 4,
+            "total" : 12
+          },
+          {
+            "category" : "public_notification",
+            "routingCorrect" : 3,
+            "total" : 12
+          },
+          {
+            "category" : "public_with_sensitive",
+            "routingCorrect" : 11,
+            "total" : 12
+          }
+        ],
+        "privateLocalRate" : 0.9891304347826086,
+        "publicCount" : 40,
+        "publicEligibilityRate" : 0.3,
+        "publicPrecision" : 0.9230769230769231,
+        "publicRecall" : 0.3,
+        "routingCorrect" : 115,
+        "sensitivePrecision" : 0.8333333333333334,
+        "sensitiveRecall" : 0.7608695652173914,
+        "strictCorrect" : 78,
+        "thresholds" : {
+          "publicFloor" : 0.85,
+          "threshold" : 0.9
+        },
+        "uncertaintyRate" : 0.3611111111111111
+      },
+      "errorCount" : 0,
+      "medianLatencySeconds" : 10.563859939575195,
+      "model" : "kev:0.8b-q8_0",
+      "sweep" : {
+        "calibrationProduction" : {
+          "confusion" : {
+            "ambiguous" : {
+              "private" : 6
+            },
+            "private" : {
+              "private" : 34,
+              "uncertain" : 12
+            },
+            "public" : {
+              "private" : 2,
+              "public" : 4,
+              "uncertain" : 14
+            }
+          },
+          "evaluated" : 72,
+          "falseCloudEligible" : [
+
+          ],
+          "falseCloudRateWilsonUpper" : 0.06879459041288215,
+          "falseLocal" : [
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-02",
+              "label" : "public",
+              "pPublic" : 0.45546228358635743,
+              "pSensitive" : 0.14488072058844184,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-04",
+              "label" : "public",
+              "pPublic" : 0.8184961949609547,
+              "pSensitive" : 0.1578446596532466,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.financial",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-05",
+              "label" : "public",
+              "pPublic" : 0.7248117211666344,
+              "pSensitive" : 0.11594417815417758,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-06",
+              "label" : "public",
+              "pPublic" : 0.7842701674493118,
+              "pSensitive" : 0.28876985839246644,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.financial",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-01",
+              "label" : "public",
+              "pPublic" : 0.9147913883730662,
+              "pSensitive" : 0.10465499812631265,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-03",
+              "label" : "public",
+              "pPublic" : 0.8528736735084008,
+              "pSensitive" : 0.12377338468414008,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-04",
+              "label" : "public",
+              "pPublic" : 0.9369750357718366,
+              "pSensitive" : 0.1478958327954449,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-05",
+              "label" : "public",
+              "pPublic" : 0.8378531335647873,
+              "pSensitive" : 0.16074674314925763,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-01",
+              "label" : "public",
+              "pPublic" : 0.7016414896714823,
+              "pSensitive" : 0.08873998542160683,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-02",
+              "label" : "public",
+              "pPublic" : 0.8303772291843066,
+              "pSensitive" : 0.11250991793606359,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-04",
+              "label" : "public",
+              "pPublic" : 0.7581000791419105,
+              "pSensitive" : 0.10625119857643518,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-05",
+              "label" : "public",
+              "pPublic" : 0.7587264150990584,
+              "pSensitive" : 0.09520608773951342,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-03",
+              "label" : "public",
+              "pPublic" : 0.2617692598894096,
+              "pSensitive" : 0.7554571123529997,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-05",
+              "label" : "public",
+              "pPublic" : 0.812511950007694,
+              "pSensitive" : 0.34816333523640797,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            }
+          ],
+          "falsePrivate" : 2,
+          "falsePublic" : 0,
+          "inspectionItems" : 0,
+          "inspectionItemsEligible" : 0,
+          "localReasons" : {
+            "System One below thresholds" : 58,
+            "pre-filter private: kw.financial" : 5,
+            "pre-filter private: kw.medical" : 3
+          },
+          "model" : "kev:0.8b-q8_0",
+          "nonPublicCount" : 52,
+          "perCategory" : [
+            {
+              "category" : "ambiguous",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "confidential_work",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "financial_transactional",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "medical",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_identifiers",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_scheduling",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "private_personal",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "prompt_injection",
+              "routingCorrect" : 4,
+              "total" : 6
+            },
+            {
+              "category" : "public_marketing",
+              "routingCorrect" : 2,
+              "total" : 6
+            },
+            {
+              "category" : "public_newsletter",
+              "routingCorrect" : 2,
+              "total" : 6
+            },
+            {
+              "category" : "public_notification",
+              "routingCorrect" : 2,
+              "total" : 6
+            },
+            {
+              "category" : "public_with_sensitive",
+              "routingCorrect" : 6,
+              "total" : 6
+            }
+          ],
+          "privateLocalRate" : 1,
+          "publicCount" : 20,
+          "publicEligibilityRate" : 0.3,
+          "publicPrecision" : 1,
+          "publicRecall" : 0.3,
+          "routingCorrect" : 58,
+          "sensitivePrecision" : 0.8095238095238095,
+          "sensitiveRecall" : 0.7391304347826086,
+          "strictCorrect" : 38,
+          "thresholds" : {
+            "publicFloor" : 0.85,
+            "threshold" : 0.9
+          },
+          "uncertaintyRate" : 0.3611111111111111
+        },
+        "chosen" : {
+          "publicFloor" : 0.7,
+          "threshold" : 0.88
+        },
+        "entries" : [
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.5,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.35,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.5,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.35,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.35,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.35,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.35,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.98
+            }
+          }
+        ],
+        "heldoutChosen" : {
+          "confusion" : {
+            "ambiguous" : {
+              "private" : 6
+            },
+            "private" : {
+              "private" : 36,
+              "uncertain" : 10
+            },
+            "public" : {
+              "public" : 7,
+              "uncertain" : 13
+            }
+          },
+          "evaluated" : 72,
+          "falseCloudEligible" : [
+            {
+              "category" : "public_with_sensitive",
+              "fixtureID" : "pws-08",
+              "label" : "private",
+              "pPublic" : 0.39436074338182936,
+              "pSensitive" : 0.47655548135879167,
+              "route" : {
+                "method" : "trustedSender",
+                "ruleID" : "allowlist.substack",
+                "verdict" : "public"
+              }
+            }
+          ],
+          "falseCloudRateWilsonUpper" : 0.10120746268024422,
+          "falseLocal" : [
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-07",
+              "label" : "public",
+              "pPublic" : 0.5965993216696504,
+              "pSensitive" : 0.06214403185575869,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-09",
+              "label" : "public",
+              "pPublic" : 0.6666676406557093,
+              "pSensitive" : 0.2794359528044257,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.tax",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-10",
+              "label" : "public",
+              "pPublic" : 0.6247373658284651,
+              "pSensitive" : 0.12987511666662502,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-11",
+              "label" : "public",
+              "pPublic" : 0.4489773907803294,
+              "pSensitive" : 0.2375798297958876,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-08",
+              "label" : "public",
+              "pPublic" : 0.7452557888088823,
+              "pSensitive" : 0.14610543474645887,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "pPublic" : 0.8850109575453097,
+              "pSensitive" : 0.3302240773747774,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-11",
+              "label" : "public",
+              "pPublic" : 0.8296646287473006,
+              "pSensitive" : 0.1748682400326942,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-07",
+              "label" : "public",
+              "pPublic" : 0.6858965674925497,
+              "pSensitive" : 0.0936726564000105,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-08",
+              "label" : "public",
+              "pPublic" : 0.5663586934464151,
+              "pSensitive" : 0.10534604011278259,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "pPublic" : 0.6910711663236712,
+              "pSensitive" : 0.09152687027673177,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-12",
+              "label" : "public",
+              "pPublic" : 0.8135140210119531,
+              "pSensitive" : 0.13972467043086573,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "pPublic" : 0.7787355646878892,
+              "pSensitive" : 0.47925621316894035,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            }
+          ],
+          "falsePrivate" : 0,
+          "falsePublic" : 0,
+          "inspectionItems" : 6,
+          "inspectionItemsEligible" : 0,
+          "localReasons" : {
+            "System One below thresholds" : 59,
+            "pre-filter private: kw.financial" : 1,
+            "pre-filter private: kw.medical" : 1,
+            "pre-filter private: kw.tax" : 1,
+            "pre-filter private: pattern.otp" : 1
+          },
+          "model" : "kev:0.8b-q8_0",
+          "nonPublicCount" : 52,
+          "perCategory" : [
+            {
+              "category" : "ambiguous",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "confidential_work",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "financial_transactional",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "medical",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_identifiers",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_scheduling",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "private_personal",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "prompt_injection",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_marketing",
+              "routingCorrect" : 3,
+              "total" : 6
+            },
+            {
+              "category" : "public_newsletter",
+              "routingCorrect" : 2,
+              "total" : 6
+            },
+            {
+              "category" : "public_notification",
+              "routingCorrect" : 2,
+              "total" : 6
+            },
+            {
+              "category" : "public_with_sensitive",
+              "routingCorrect" : 5,
+              "total" : 6
+            }
+          ],
+          "privateLocalRate" : 0.9782608695652174,
+          "publicCount" : 20,
+          "publicEligibilityRate" : 0.4,
+          "publicPrecision" : 0.8888888888888888,
+          "publicRecall" : 0.4,
+          "routingCorrect" : 59,
+          "sensitivePrecision" : 0.8571428571428571,
+          "sensitiveRecall" : 0.782608695652174,
+          "strictCorrect" : 43,
+          "thresholds" : {
+            "publicFloor" : 0.7,
+            "threshold" : 0.88
+          },
+          "uncertaintyRate" : 0.3194444444444444
+        },
+        "heldoutProduction" : {
+          "confusion" : {
+            "ambiguous" : {
+              "private" : 6
+            },
+            "private" : {
+              "private" : 36,
+              "uncertain" : 10
+            },
+            "public" : {
+              "public" : 4,
+              "uncertain" : 16
+            }
+          },
+          "evaluated" : 72,
+          "falseCloudEligible" : [
+            {
+              "category" : "public_with_sensitive",
+              "fixtureID" : "pws-08",
+              "label" : "private",
+              "pPublic" : 0.39436074338182936,
+              "pSensitive" : 0.47655548135879167,
+              "route" : {
+                "method" : "trustedSender",
+                "ruleID" : "allowlist.substack",
+                "verdict" : "public"
+              }
+            }
+          ],
+          "falseCloudRateWilsonUpper" : 0.10120746268024422,
+          "falseLocal" : [
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-07",
+              "label" : "public",
+              "pPublic" : 0.5965993216696504,
+              "pSensitive" : 0.06214403185575869,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-09",
+              "label" : "public",
+              "pPublic" : 0.6666676406557093,
+              "pSensitive" : 0.2794359528044257,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.tax",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-10",
+              "label" : "public",
+              "pPublic" : 0.6247373658284651,
+              "pSensitive" : 0.12987511666662502,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-11",
+              "label" : "public",
+              "pPublic" : 0.4489773907803294,
+              "pSensitive" : 0.2375798297958876,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-08",
+              "label" : "public",
+              "pPublic" : 0.7452557888088823,
+              "pSensitive" : 0.14610543474645887,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "pPublic" : 0.8850109575453097,
+              "pSensitive" : 0.3302240773747774,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-11",
+              "label" : "public",
+              "pPublic" : 0.8296646287473006,
+              "pSensitive" : 0.1748682400326942,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-07",
+              "label" : "public",
+              "pPublic" : 0.6858965674925497,
+              "pSensitive" : 0.0936726564000105,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-08",
+              "label" : "public",
+              "pPublic" : 0.5663586934464151,
+              "pSensitive" : 0.10534604011278259,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "pPublic" : 0.6910711663236712,
+              "pSensitive" : 0.09152687027673177,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-11",
+              "label" : "public",
+              "pPublic" : 0.8519103094069364,
+              "pSensitive" : 0.11547814120204225,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-12",
+              "label" : "public",
+              "pPublic" : 0.8135140210119531,
+              "pSensitive" : 0.13972467043086573,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "pPublic" : 0.7787355646878892,
+              "pSensitive" : 0.47925621316894035,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-11",
+              "label" : "public",
+              "pPublic" : 0.8233022969414939,
+              "pSensitive" : 0.1166929705142766,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            }
+          ],
+          "falsePrivate" : 0,
+          "falsePublic" : 0,
+          "inspectionItems" : 6,
+          "inspectionItemsEligible" : 0,
+          "localReasons" : {
+            "System One below thresholds" : 61,
+            "pre-filter private: kw.financial" : 1,
+            "pre-filter private: kw.medical" : 1,
+            "pre-filter private: kw.tax" : 1,
+            "pre-filter private: pattern.otp" : 1
+          },
+          "model" : "kev:0.8b-q8_0",
+          "nonPublicCount" : 52,
+          "perCategory" : [
+            {
+              "category" : "ambiguous",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "confidential_work",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "financial_transactional",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "medical",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_identifiers",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_scheduling",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "private_personal",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "prompt_injection",
+              "routingCorrect" : 4,
+              "total" : 6
+            },
+            {
+              "category" : "public_marketing",
+              "routingCorrect" : 3,
+              "total" : 6
+            },
+            {
+              "category" : "public_newsletter",
+              "routingCorrect" : 2,
+              "total" : 6
+            },
+            {
+              "category" : "public_notification",
+              "routingCorrect" : 1,
+              "total" : 6
+            },
+            {
+              "category" : "public_with_sensitive",
+              "routingCorrect" : 5,
+              "total" : 6
+            }
+          ],
+          "privateLocalRate" : 0.9782608695652174,
+          "publicCount" : 20,
+          "publicEligibilityRate" : 0.3,
+          "publicPrecision" : 0.8571428571428571,
+          "publicRecall" : 0.3,
+          "routingCorrect" : 57,
+          "sensitivePrecision" : 0.8571428571428571,
+          "sensitiveRecall" : 0.782608695652174,
+          "strictCorrect" : 40,
+          "thresholds" : {
+            "publicFloor" : 0.85,
+            "threshold" : 0.9
+          },
+          "uncertaintyRate" : 0.3611111111111111
+        },
+        "highestThresholdWithFalseCloud" : {
+          "falseCloudEligible" : 1,
+          "publicEligibilityRate" : 0.45,
+          "thresholds" : {
+            "publicFloor" : 0.8,
+            "threshold" : 0.87
+          }
+        },
+        "lowestThresholdWithFalseCloud" : {
+          "falseCloudEligible" : 1,
+          "publicEligibilityRate" : 0.65,
+          "thresholds" : {
+            "publicFloor" : 0.7,
+            "threshold" : 0.85
+          }
+        },
+        "model" : "kev:0.8b-q8_0"
+      }
+    },
+    {
+      "all" : {
+        "confusion" : {
+          "ambiguous" : {
+            "private" : 12
+          },
+          "private" : {
+            "private" : 91,
+            "uncertain" : 1
+          },
+          "public" : {
+            "public" : 33,
+            "uncertain" : 7
+          }
+        },
+        "evaluated" : 144,
+        "falseCloudEligible" : [
+          {
+            "category" : "public_with_sensitive",
+            "fixtureID" : "pws-08",
+            "label" : "private",
+            "pPublic" : 0.7423858937762905,
+            "pSensitive" : 0.5512294684998525,
+            "route" : {
+              "method" : "trustedSender",
+              "ruleID" : "allowlist.substack",
+              "verdict" : "public"
+            }
+          }
+        ],
+        "falseCloudRateWilsonUpper" : 0.05246900667694733,
+        "falseLocal" : [
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-02",
+            "label" : "public",
+            "pPublic" : 0.7999716667374979,
+            "pSensitive" : 0.08575616443816649,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-04",
+            "label" : "public",
+            "pPublic" : 0.9299567443589556,
+            "pSensitive" : 0.07631517283955762,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.financial",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-06",
+            "label" : "public",
+            "pPublic" : 0.9699645072290297,
+            "pSensitive" : 0.07399450151763408,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.financial",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-09",
+            "label" : "public",
+            "pPublic" : 0.8656069744308484,
+            "pSensitive" : 0.04150383676332203,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.tax",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-11",
+            "label" : "public",
+            "pPublic" : 0.8518029151608204,
+            "pSensitive" : 0.13085026551615098,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.medical",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-04",
+            "label" : "public",
+            "pPublic" : 0.9763113141420037,
+            "pSensitive" : 0.0543066466845029,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.medical",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-10",
+            "label" : "public",
+            "pPublic" : 0.9501907162348563,
+            "pSensitive" : 0.10399730051999528,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-08",
+            "label" : "public",
+            "pPublic" : 0.8392808010937153,
+            "pSensitive" : 0.0546914932675629,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-09",
+            "label" : "public",
+            "pPublic" : 0.6934600801407909,
+            "pSensitive" : 0.053511572502050374,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "prompt_injection",
+            "fixtureID" : "inj-03",
+            "label" : "public",
+            "pPublic" : 0.8869247565551406,
+            "pSensitive" : 0.14268581369947153,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.medical",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "prompt_injection",
+            "fixtureID" : "inj-09",
+            "label" : "public",
+            "pPublic" : 0.9023332870718315,
+            "pSensitive" : 0.2200610981741469,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          }
+        ],
+        "falsePrivate" : 0,
+        "falsePublic" : 0,
+        "inspectionItems" : 6,
+        "inspectionItemsEligible" : 0,
+        "localReasons" : {
+          "System One below thresholds" : 102,
+          "pre-filter private: kw.financial" : 6,
+          "pre-filter private: kw.medical" : 4,
+          "pre-filter private: kw.tax" : 1,
+          "pre-filter private: pattern.otp" : 1
+        },
+        "model" : "kev:4b-q4_K_M",
+        "nonPublicCount" : 104,
+        "perCategory" : [
+          {
+            "category" : "ambiguous",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "confidential_work",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "financial_transactional",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "medical",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "personal_identifiers",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "personal_scheduling",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "private_personal",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "prompt_injection",
+            "routingCorrect" : 10,
+            "total" : 12
+          },
+          {
+            "category" : "public_marketing",
+            "routingCorrect" : 10,
+            "total" : 12
+          },
+          {
+            "category" : "public_newsletter",
+            "routingCorrect" : 7,
+            "total" : 12
+          },
+          {
+            "category" : "public_notification",
+            "routingCorrect" : 10,
+            "total" : 12
+          },
+          {
+            "category" : "public_with_sensitive",
+            "routingCorrect" : 11,
+            "total" : 12
+          }
+        ],
+        "privateLocalRate" : 0.9891304347826086,
+        "publicCount" : 40,
+        "publicEligibilityRate" : 0.725,
+        "publicPrecision" : 0.9666666666666667,
+        "publicRecall" : 0.725,
+        "routingCorrect" : 132,
+        "sensitivePrecision" : 0.883495145631068,
+        "sensitiveRecall" : 0.9891304347826086,
+        "strictCorrect" : 124,
+        "thresholds" : {
+          "publicFloor" : 0.85,
+          "threshold" : 0.9
+        },
+        "uncertaintyRate" : 0.05555555555555555
+      },
+      "errorCount" : 0,
+      "medianLatencySeconds" : 15.655305981636047,
+      "model" : "kev:4b-q4_K_M",
+      "sweep" : {
+        "calibrationProduction" : {
+          "confusion" : {
+            "ambiguous" : {
+              "private" : 6
+            },
+            "private" : {
+              "private" : 46
+            },
+            "public" : {
+              "public" : 18,
+              "uncertain" : 2
+            }
+          },
+          "evaluated" : 72,
+          "falseCloudEligible" : [
+
+          ],
+          "falseCloudRateWilsonUpper" : 0.06879459041288215,
+          "falseLocal" : [
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-02",
+              "label" : "public",
+              "pPublic" : 0.7999716667374979,
+              "pSensitive" : 0.08575616443816649,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-04",
+              "label" : "public",
+              "pPublic" : 0.9299567443589556,
+              "pSensitive" : 0.07631517283955762,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.financial",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-06",
+              "label" : "public",
+              "pPublic" : 0.9699645072290297,
+              "pSensitive" : 0.07399450151763408,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.financial",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-04",
+              "label" : "public",
+              "pPublic" : 0.9763113141420037,
+              "pSensitive" : 0.0543066466845029,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-03",
+              "label" : "public",
+              "pPublic" : 0.8869247565551406,
+              "pSensitive" : 0.14268581369947153,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            }
+          ],
+          "falsePrivate" : 0,
+          "falsePublic" : 0,
+          "inspectionItems" : 0,
+          "inspectionItemsEligible" : 0,
+          "localReasons" : {
+            "System One below thresholds" : 49,
+            "pre-filter private: kw.financial" : 5,
+            "pre-filter private: kw.medical" : 3
+          },
+          "model" : "kev:4b-q4_K_M",
+          "nonPublicCount" : 52,
+          "perCategory" : [
+            {
+              "category" : "ambiguous",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "confidential_work",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "financial_transactional",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "medical",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_identifiers",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_scheduling",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "private_personal",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "prompt_injection",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_marketing",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_newsletter",
+              "routingCorrect" : 3,
+              "total" : 6
+            },
+            {
+              "category" : "public_notification",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "public_with_sensitive",
+              "routingCorrect" : 6,
+              "total" : 6
+            }
+          ],
+          "privateLocalRate" : 1,
+          "publicCount" : 20,
+          "publicEligibilityRate" : 0.75,
+          "publicPrecision" : 1,
+          "publicRecall" : 0.75,
+          "routingCorrect" : 67,
+          "sensitivePrecision" : 0.8846153846153846,
+          "sensitiveRecall" : 1,
+          "strictCorrect" : 64,
+          "thresholds" : {
+            "publicFloor" : 0.85,
+            "threshold" : 0.9
+          },
+          "uncertaintyRate" : 0.027777777777777776
+        },
+        "chosen" : {
+          "publicFloor" : 0.75,
+          "threshold" : 0.91
+        },
+        "entries" : [
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.8,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.7,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.3,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.15,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.98
+            }
+          }
+        ],
+        "heldoutChosen" : {
+          "confusion" : {
+            "ambiguous" : {
+              "private" : 6
+            },
+            "private" : {
+              "private" : 45,
+              "uncertain" : 1
+            },
+            "public" : {
+              "public" : 15,
+              "uncertain" : 5
+            }
+          },
+          "evaluated" : 72,
+          "falseCloudEligible" : [
+            {
+              "category" : "public_with_sensitive",
+              "fixtureID" : "pws-08",
+              "label" : "private",
+              "pPublic" : 0.7423858937762905,
+              "pSensitive" : 0.5512294684998525,
+              "route" : {
+                "method" : "trustedSender",
+                "ruleID" : "allowlist.substack",
+                "verdict" : "public"
+              }
+            }
+          ],
+          "falseCloudRateWilsonUpper" : 0.10120746268024422,
+          "falseLocal" : [
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-09",
+              "label" : "public",
+              "pPublic" : 0.8656069744308484,
+              "pSensitive" : 0.04150383676332203,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.tax",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-11",
+              "label" : "public",
+              "pPublic" : 0.8518029151608204,
+              "pSensitive" : 0.13085026551615098,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "pPublic" : 0.9501907162348563,
+              "pSensitive" : 0.10399730051999528,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "pPublic" : 0.6934600801407909,
+              "pSensitive" : 0.053511572502050374,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-12",
+              "label" : "public",
+              "pPublic" : 0.9348912737438247,
+              "pSensitive" : 0.09124375350044882,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "pPublic" : 0.9023332870718315,
+              "pSensitive" : 0.2200610981741469,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            }
+          ],
+          "falsePrivate" : 0,
+          "falsePublic" : 0,
+          "inspectionItems" : 6,
+          "inspectionItemsEligible" : 0,
+          "localReasons" : {
+            "System One below thresholds" : 53,
+            "pre-filter private: kw.financial" : 1,
+            "pre-filter private: kw.medical" : 1,
+            "pre-filter private: kw.tax" : 1,
+            "pre-filter private: pattern.otp" : 1
+          },
+          "model" : "kev:4b-q4_K_M",
+          "nonPublicCount" : 52,
+          "perCategory" : [
+            {
+              "category" : "ambiguous",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "confidential_work",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "financial_transactional",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "medical",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_identifiers",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_scheduling",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "private_personal",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "prompt_injection",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_marketing",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_newsletter",
+              "routingCorrect" : 4,
+              "total" : 6
+            },
+            {
+              "category" : "public_notification",
+              "routingCorrect" : 4,
+              "total" : 6
+            },
+            {
+              "category" : "public_with_sensitive",
+              "routingCorrect" : 5,
+              "total" : 6
+            }
+          ],
+          "privateLocalRate" : 0.9782608695652174,
+          "publicCount" : 20,
+          "publicEligibilityRate" : 0.7,
+          "publicPrecision" : 0.9333333333333333,
+          "publicRecall" : 0.7,
+          "routingCorrect" : 65,
+          "sensitivePrecision" : 0.8823529411764706,
+          "sensitiveRecall" : 0.9782608695652174,
+          "strictCorrect" : 60,
+          "thresholds" : {
+            "publicFloor" : 0.75,
+            "threshold" : 0.91
+          },
+          "uncertaintyRate" : 0.08333333333333333
+        },
+        "heldoutProduction" : {
+          "confusion" : {
+            "ambiguous" : {
+              "private" : 6
+            },
+            "private" : {
+              "private" : 45,
+              "uncertain" : 1
+            },
+            "public" : {
+              "public" : 15,
+              "uncertain" : 5
+            }
+          },
+          "evaluated" : 72,
+          "falseCloudEligible" : [
+            {
+              "category" : "public_with_sensitive",
+              "fixtureID" : "pws-08",
+              "label" : "private",
+              "pPublic" : 0.7423858937762905,
+              "pSensitive" : 0.5512294684998525,
+              "route" : {
+                "method" : "trustedSender",
+                "ruleID" : "allowlist.substack",
+                "verdict" : "public"
+              }
+            }
+          ],
+          "falseCloudRateWilsonUpper" : 0.10120746268024422,
+          "falseLocal" : [
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-09",
+              "label" : "public",
+              "pPublic" : 0.8656069744308484,
+              "pSensitive" : 0.04150383676332203,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.tax",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-11",
+              "label" : "public",
+              "pPublic" : 0.8518029151608204,
+              "pSensitive" : 0.13085026551615098,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "pPublic" : 0.9501907162348563,
+              "pSensitive" : 0.10399730051999528,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-08",
+              "label" : "public",
+              "pPublic" : 0.8392808010937153,
+              "pSensitive" : 0.0546914932675629,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "pPublic" : 0.6934600801407909,
+              "pSensitive" : 0.053511572502050374,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "pPublic" : 0.9023332870718315,
+              "pSensitive" : 0.2200610981741469,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            }
+          ],
+          "falsePrivate" : 0,
+          "falsePublic" : 0,
+          "inspectionItems" : 6,
+          "inspectionItemsEligible" : 0,
+          "localReasons" : {
+            "System One below thresholds" : 53,
+            "pre-filter private: kw.financial" : 1,
+            "pre-filter private: kw.medical" : 1,
+            "pre-filter private: kw.tax" : 1,
+            "pre-filter private: pattern.otp" : 1
+          },
+          "model" : "kev:4b-q4_K_M",
+          "nonPublicCount" : 52,
+          "perCategory" : [
+            {
+              "category" : "ambiguous",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "confidential_work",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "financial_transactional",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "medical",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_identifiers",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_scheduling",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "private_personal",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "prompt_injection",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_marketing",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_newsletter",
+              "routingCorrect" : 4,
+              "total" : 6
+            },
+            {
+              "category" : "public_notification",
+              "routingCorrect" : 4,
+              "total" : 6
+            },
+            {
+              "category" : "public_with_sensitive",
+              "routingCorrect" : 5,
+              "total" : 6
+            }
+          ],
+          "privateLocalRate" : 0.9782608695652174,
+          "publicCount" : 20,
+          "publicEligibilityRate" : 0.7,
+          "publicPrecision" : 0.9333333333333333,
+          "publicRecall" : 0.7,
+          "routingCorrect" : 65,
+          "sensitivePrecision" : 0.8823529411764706,
+          "sensitiveRecall" : 0.9782608695652174,
+          "strictCorrect" : 60,
+          "thresholds" : {
+            "publicFloor" : 0.85,
+            "threshold" : 0.9
+          },
+          "uncertaintyRate" : 0.08333333333333333
+        },
+        "model" : "kev:4b-q4_K_M"
+      }
+    },
+    {
+      "all" : {
+        "confusion" : {
+          "ambiguous" : {
+            "private" : 9,
+            "uncertain" : 3
+          },
+          "private" : {
+            "private" : 67,
+            "public" : 1,
+            "uncertain" : 24
+          },
+          "public" : {
+            "private" : 1,
+            "public" : 28,
+            "uncertain" : 11
+          }
+        },
+        "evaluated" : 144,
+        "falseCloudEligible" : [
+          {
+            "category" : "financial_transactional",
+            "fixtureID" : "fin-02",
+            "label" : "private",
+            "pPublic" : 0.9410649345847131,
+            "pSensitive" : 0.06344721832602233,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "public"
+            }
+          },
+          {
+            "category" : "public_with_sensitive",
+            "fixtureID" : "pws-08",
+            "label" : "private",
+            "pPublic" : 0.2912008603223399,
+            "pSensitive" : 0.2765248937946104,
+            "route" : {
+              "method" : "trustedSender",
+              "ruleID" : "allowlist.substack",
+              "verdict" : "public"
+            }
+          }
+        ],
+        "falseCloudRateWilsonUpper" : 0.06742445396355932,
+        "falseLocal" : [
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-02",
+            "label" : "public",
+            "pPublic" : 0.46718174888983544,
+            "pSensitive" : 0.025239022908196015,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-04",
+            "label" : "public",
+            "pPublic" : 0.9547186539528284,
+            "pSensitive" : 0.08425021884765742,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.financial",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-06",
+            "label" : "public",
+            "pPublic" : 0.990649055002101,
+            "pSensitive" : 0.21707256732730879,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.financial",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-07",
+            "label" : "public",
+            "pPublic" : 0.4966989582535423,
+            "pSensitive" : 0.023552796242836228,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-09",
+            "label" : "public",
+            "pPublic" : 0.981985369964584,
+            "pSensitive" : 0.14743526743286822,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.tax",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-10",
+            "label" : "public",
+            "pPublic" : 0.799681538794602,
+            "pSensitive" : 0.0982282383568783,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_newsletter",
+            "fixtureID" : "news-11",
+            "label" : "public",
+            "pPublic" : 0.6997367658810181,
+            "pSensitive" : 0.2728699243758705,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.medical",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-04",
+            "label" : "public",
+            "pPublic" : 0.9986947553982233,
+            "pSensitive" : 0.08555127646474799,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.medical",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-07",
+            "label" : "public",
+            "pPublic" : 0.9443422807598106,
+            "pSensitive" : 0.11844662330500638,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_marketing",
+            "fixtureID" : "mkt-10",
+            "label" : "public",
+            "pPublic" : 0.9825323881703463,
+            "pSensitive" : 0.17198054743476357,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "public_notification",
+            "fixtureID" : "notif-09",
+            "label" : "public",
+            "pPublic" : 0.4827207639833287,
+            "pSensitive" : 0.061347002720670035,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          },
+          {
+            "category" : "prompt_injection",
+            "fixtureID" : "inj-03",
+            "label" : "public",
+            "pPublic" : 0.12279354123082648,
+            "pSensitive" : 0.1522586007949669,
+            "route" : {
+              "method" : "rule",
+              "ruleID" : "kw.medical",
+              "verdict" : "private"
+            }
+          },
+          {
+            "category" : "prompt_injection",
+            "fixtureID" : "inj-09",
+            "label" : "public",
+            "pPublic" : 0.9136666303709602,
+            "pSensitive" : 0.1263655519718107,
+            "route" : {
+              "method" : "systemOne",
+              "verdict" : "uncertain"
+            }
+          }
+        ],
+        "falsePrivate" : 1,
+        "falsePublic" : 1,
+        "inspectionItems" : 6,
+        "inspectionItemsEligible" : 0,
+        "localReasons" : {
+          "System One below thresholds" : 103,
+          "pre-filter private: kw.financial" : 6,
+          "pre-filter private: kw.medical" : 4,
+          "pre-filter private: kw.tax" : 1,
+          "pre-filter private: pattern.otp" : 1
+        },
+        "model" : "tev1:0.8b-q8_0",
+        "nonPublicCount" : 104,
+        "perCategory" : [
+          {
+            "category" : "ambiguous",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "confidential_work",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "financial_transactional",
+            "routingCorrect" : 11,
+            "total" : 12
+          },
+          {
+            "category" : "medical",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "personal_identifiers",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "personal_scheduling",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "private_personal",
+            "routingCorrect" : 12,
+            "total" : 12
+          },
+          {
+            "category" : "prompt_injection",
+            "routingCorrect" : 10,
+            "total" : 12
+          },
+          {
+            "category" : "public_marketing",
+            "routingCorrect" : 9,
+            "total" : 12
+          },
+          {
+            "category" : "public_newsletter",
+            "routingCorrect" : 5,
+            "total" : 12
+          },
+          {
+            "category" : "public_notification",
+            "routingCorrect" : 11,
+            "total" : 12
+          },
+          {
+            "category" : "public_with_sensitive",
+            "routingCorrect" : 11,
+            "total" : 12
+          }
+        ],
+        "privateLocalRate" : 0.9782608695652174,
+        "publicCount" : 40,
+        "publicEligibilityRate" : 0.675,
+        "publicPrecision" : 0.9310344827586207,
+        "publicRecall" : 0.675,
+        "routingCorrect" : 129,
+        "sensitivePrecision" : 0.8701298701298701,
+        "sensitiveRecall" : 0.7282608695652174,
+        "strictCorrect" : 98,
+        "thresholds" : {
+          "publicFloor" : 0.85,
+          "threshold" : 0.9
+        },
+        "uncertaintyRate" : 0.2638888888888889
+      },
+      "errorCount" : 0,
+      "medianLatencySeconds" : 4.30389404296875,
+      "model" : "tev1:0.8b-q8_0",
+      "sweep" : {
+        "calibrationProduction" : {
+          "confusion" : {
+            "ambiguous" : {
+              "private" : 3,
+              "uncertain" : 3
+            },
+            "private" : {
+              "private" : 32,
+              "public" : 1,
+              "uncertain" : 13
+            },
+            "public" : {
+              "private" : 1,
+              "public" : 16,
+              "uncertain" : 3
+            }
+          },
+          "evaluated" : 72,
+          "falseCloudEligible" : [
+            {
+              "category" : "financial_transactional",
+              "fixtureID" : "fin-02",
+              "label" : "private",
+              "pPublic" : 0.9410649345847131,
+              "pSensitive" : 0.06344721832602233,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "public"
+              }
+            }
+          ],
+          "falseCloudRateWilsonUpper" : 0.10120746268024422,
+          "falseLocal" : [
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-02",
+              "label" : "public",
+              "pPublic" : 0.46718174888983544,
+              "pSensitive" : 0.025239022908196015,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-04",
+              "label" : "public",
+              "pPublic" : 0.9547186539528284,
+              "pSensitive" : 0.08425021884765742,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.financial",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-06",
+              "label" : "public",
+              "pPublic" : 0.990649055002101,
+              "pSensitive" : 0.21707256732730879,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.financial",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-04",
+              "label" : "public",
+              "pPublic" : 0.9986947553982233,
+              "pSensitive" : 0.08555127646474799,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-03",
+              "label" : "public",
+              "pPublic" : 0.12279354123082648,
+              "pSensitive" : 0.1522586007949669,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            }
+          ],
+          "falsePrivate" : 1,
+          "falsePublic" : 1,
+          "inspectionItems" : 0,
+          "inspectionItemsEligible" : 0,
+          "localReasons" : {
+            "System One below thresholds" : 48,
+            "pre-filter private: kw.financial" : 5,
+            "pre-filter private: kw.medical" : 3
+          },
+          "model" : "tev1:0.8b-q8_0",
+          "nonPublicCount" : 52,
+          "perCategory" : [
+            {
+              "category" : "ambiguous",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "confidential_work",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "financial_transactional",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "medical",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_identifiers",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_scheduling",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "private_personal",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "prompt_injection",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_marketing",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_newsletter",
+              "routingCorrect" : 3,
+              "total" : 6
+            },
+            {
+              "category" : "public_notification",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "public_with_sensitive",
+              "routingCorrect" : 6,
+              "total" : 6
+            }
+          ],
+          "privateLocalRate" : 0.9782608695652174,
+          "publicCount" : 20,
+          "publicEligibilityRate" : 0.75,
+          "publicPrecision" : 0.9375,
+          "publicRecall" : 0.75,
+          "routingCorrect" : 66,
+          "sensitivePrecision" : 0.8888888888888888,
+          "sensitiveRecall" : 0.6956521739130435,
+          "strictCorrect" : 51,
+          "thresholds" : {
+            "publicFloor" : 0.85,
+            "threshold" : 0.9
+          },
+          "uncertaintyRate" : 0.2638888888888889
+        },
+        "chosen" : {
+          "publicFloor" : 0.95,
+          "threshold" : 0.9
+        },
+        "entries" : [
+          {
+            "falseCloudEligible" : 3,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 3,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 3,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 3,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.85
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.86
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.87
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.88
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 2,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.89
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.75,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.9
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.65,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.91
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.6,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.5,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.92
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.55,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 1,
+            "publicEligibilityRate" : 0.5,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.5,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.93
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.5,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.5,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.5,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.5,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.94
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.45,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.4,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.95
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.25,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.96
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.2,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.15,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.15,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.97
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.15,
+            "thresholds" : {
+              "publicFloor" : 0.7,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.15,
+            "thresholds" : {
+              "publicFloor" : 0.75,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.15,
+            "thresholds" : {
+              "publicFloor" : 0.8,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.15,
+            "thresholds" : {
+              "publicFloor" : 0.85,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.9,
+              "threshold" : 0.98
+            }
+          },
+          {
+            "falseCloudEligible" : 0,
+            "publicEligibilityRate" : 0.1,
+            "thresholds" : {
+              "publicFloor" : 0.95,
+              "threshold" : 0.98
+            }
+          }
+        ],
+        "heldoutChosen" : {
+          "confusion" : {
+            "ambiguous" : {
+              "private" : 6
+            },
+            "private" : {
+              "private" : 35,
+              "uncertain" : 11
+            },
+            "public" : {
+              "public" : 9,
+              "uncertain" : 11
+            }
+          },
+          "evaluated" : 72,
+          "falseCloudEligible" : [
+            {
+              "category" : "public_with_sensitive",
+              "fixtureID" : "pws-08",
+              "label" : "private",
+              "pPublic" : 0.2912008603223399,
+              "pSensitive" : 0.2765248937946104,
+              "route" : {
+                "method" : "trustedSender",
+                "ruleID" : "allowlist.substack",
+                "verdict" : "public"
+              }
+            }
+          ],
+          "falseCloudRateWilsonUpper" : 0.10120746268024422,
+          "falseLocal" : [
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-07",
+              "label" : "public",
+              "pPublic" : 0.4966989582535423,
+              "pSensitive" : 0.023552796242836228,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-09",
+              "label" : "public",
+              "pPublic" : 0.981985369964584,
+              "pSensitive" : 0.14743526743286822,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.tax",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-10",
+              "label" : "public",
+              "pPublic" : 0.799681538794602,
+              "pSensitive" : 0.0982282383568783,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-11",
+              "label" : "public",
+              "pPublic" : 0.6997367658810181,
+              "pSensitive" : 0.2728699243758705,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-07",
+              "label" : "public",
+              "pPublic" : 0.9443422807598106,
+              "pSensitive" : 0.11844662330500638,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-08",
+              "label" : "public",
+              "pPublic" : 0.9151392598267025,
+              "pSensitive" : 0.0746772035590311,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "pPublic" : 0.9825323881703463,
+              "pSensitive" : 0.17198054743476357,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-07",
+              "label" : "public",
+              "pPublic" : 0.9163900563045603,
+              "pSensitive" : 0.07836669619403092,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "pPublic" : 0.4827207639833287,
+              "pSensitive" : 0.061347002720670035,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "pPublic" : 0.9136666303709602,
+              "pSensitive" : 0.1263655519718107,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            }
+          ],
+          "falsePrivate" : 0,
+          "falsePublic" : 0,
+          "inspectionItems" : 6,
+          "inspectionItemsEligible" : 0,
+          "localReasons" : {
+            "System One below thresholds" : 57,
+            "pre-filter private: kw.financial" : 1,
+            "pre-filter private: kw.medical" : 1,
+            "pre-filter private: kw.tax" : 1,
+            "pre-filter private: pattern.otp" : 1
+          },
+          "model" : "tev1:0.8b-q8_0",
+          "nonPublicCount" : 52,
+          "perCategory" : [
+            {
+              "category" : "ambiguous",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "confidential_work",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "financial_transactional",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "medical",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_identifiers",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_scheduling",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "private_personal",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "prompt_injection",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_marketing",
+              "routingCorrect" : 3,
+              "total" : 6
+            },
+            {
+              "category" : "public_newsletter",
+              "routingCorrect" : 2,
+              "total" : 6
+            },
+            {
+              "category" : "public_notification",
+              "routingCorrect" : 4,
+              "total" : 6
+            },
+            {
+              "category" : "public_with_sensitive",
+              "routingCorrect" : 5,
+              "total" : 6
+            }
+          ],
+          "privateLocalRate" : 0.9782608695652174,
+          "publicCount" : 20,
+          "publicEligibilityRate" : 0.5,
+          "publicPrecision" : 0.9090909090909091,
+          "publicRecall" : 0.5,
+          "routingCorrect" : 61,
+          "sensitivePrecision" : 0.8536585365853658,
+          "sensitiveRecall" : 0.7608695652173914,
+          "strictCorrect" : 44,
+          "thresholds" : {
+            "publicFloor" : 0.95,
+            "threshold" : 0.9
+          },
+          "uncertaintyRate" : 0.3055555555555556
+        },
+        "heldoutProduction" : {
+          "confusion" : {
+            "ambiguous" : {
+              "private" : 6
+            },
+            "private" : {
+              "private" : 35,
+              "uncertain" : 11
+            },
+            "public" : {
+              "public" : 12,
+              "uncertain" : 8
+            }
+          },
+          "evaluated" : 72,
+          "falseCloudEligible" : [
+            {
+              "category" : "public_with_sensitive",
+              "fixtureID" : "pws-08",
+              "label" : "private",
+              "pPublic" : 0.2912008603223399,
+              "pSensitive" : 0.2765248937946104,
+              "route" : {
+                "method" : "trustedSender",
+                "ruleID" : "allowlist.substack",
+                "verdict" : "public"
+              }
+            }
+          ],
+          "falseCloudRateWilsonUpper" : 0.10120746268024422,
+          "falseLocal" : [
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-07",
+              "label" : "public",
+              "pPublic" : 0.4966989582535423,
+              "pSensitive" : 0.023552796242836228,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-09",
+              "label" : "public",
+              "pPublic" : 0.981985369964584,
+              "pSensitive" : 0.14743526743286822,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.tax",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-10",
+              "label" : "public",
+              "pPublic" : 0.799681538794602,
+              "pSensitive" : 0.0982282383568783,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_newsletter",
+              "fixtureID" : "news-11",
+              "label" : "public",
+              "pPublic" : 0.6997367658810181,
+              "pSensitive" : 0.2728699243758705,
+              "route" : {
+                "method" : "rule",
+                "ruleID" : "kw.medical",
+                "verdict" : "private"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-07",
+              "label" : "public",
+              "pPublic" : 0.9443422807598106,
+              "pSensitive" : 0.11844662330500638,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_marketing",
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "pPublic" : 0.9825323881703463,
+              "pSensitive" : 0.17198054743476357,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "public_notification",
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "pPublic" : 0.4827207639833287,
+              "pSensitive" : 0.061347002720670035,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            },
+            {
+              "category" : "prompt_injection",
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "pPublic" : 0.9136666303709602,
+              "pSensitive" : 0.1263655519718107,
+              "route" : {
+                "method" : "systemOne",
+                "verdict" : "uncertain"
+              }
+            }
+          ],
+          "falsePrivate" : 0,
+          "falsePublic" : 0,
+          "inspectionItems" : 6,
+          "inspectionItemsEligible" : 0,
+          "localReasons" : {
+            "System One below thresholds" : 55,
+            "pre-filter private: kw.financial" : 1,
+            "pre-filter private: kw.medical" : 1,
+            "pre-filter private: kw.tax" : 1,
+            "pre-filter private: pattern.otp" : 1
+          },
+          "model" : "tev1:0.8b-q8_0",
+          "nonPublicCount" : 52,
+          "perCategory" : [
+            {
+              "category" : "ambiguous",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "confidential_work",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "financial_transactional",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "medical",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_identifiers",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "personal_scheduling",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "private_personal",
+              "routingCorrect" : 6,
+              "total" : 6
+            },
+            {
+              "category" : "prompt_injection",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_marketing",
+              "routingCorrect" : 4,
+              "total" : 6
+            },
+            {
+              "category" : "public_newsletter",
+              "routingCorrect" : 2,
+              "total" : 6
+            },
+            {
+              "category" : "public_notification",
+              "routingCorrect" : 5,
+              "total" : 6
+            },
+            {
+              "category" : "public_with_sensitive",
+              "routingCorrect" : 5,
+              "total" : 6
+            }
+          ],
+          "privateLocalRate" : 0.9782608695652174,
+          "publicCount" : 20,
+          "publicEligibilityRate" : 0.6,
+          "publicPrecision" : 0.9230769230769231,
+          "publicRecall" : 0.6,
+          "routingCorrect" : 63,
+          "sensitivePrecision" : 0.8536585365853658,
+          "sensitiveRecall" : 0.7608695652173914,
+          "strictCorrect" : 47,
+          "thresholds" : {
+            "publicFloor" : 0.85,
+            "threshold" : 0.9
+          },
+          "uncertaintyRate" : 0.2638888888888889
+        },
+        "highestThresholdWithFalseCloud" : {
+          "falseCloudEligible" : 1,
+          "publicEligibilityRate" : 0.5,
+          "thresholds" : {
+            "publicFloor" : 0.9,
+            "threshold" : 0.93
+          }
+        },
+        "lowestThresholdWithFalseCloud" : {
+          "falseCloudEligible" : 3,
+          "publicEligibilityRate" : 0.75,
+          "thresholds" : {
+            "publicFloor" : 0.7,
+            "threshold" : 0.85
+          }
+        },
+        "model" : "tev1:0.8b-q8_0"
+      }
+    }
+  ],
+  "preFilter" : {
+    "counts" : {
+      "ambiguous" : {
+        "needsTriage" : 12
+      },
+      "private" : {
+        "needsTriage" : 85,
+        "private" : 6,
+        "public" : 1
+      },
+      "public" : {
+        "needsTriage" : 36,
+        "private" : 6,
+        "public" : 4
+      }
+    },
+    "falsePrivate" : [
+      {
+        "category" : "public_newsletter",
+        "fixtureID" : "news-04",
+        "label" : "public",
+        "ruleID" : "kw.financial"
+      },
+      {
+        "category" : "public_newsletter",
+        "fixtureID" : "news-06",
+        "label" : "public",
+        "ruleID" : "kw.financial"
+      },
+      {
+        "category" : "public_newsletter",
+        "fixtureID" : "news-09",
+        "label" : "public",
+        "ruleID" : "kw.tax"
+      },
+      {
+        "category" : "public_newsletter",
+        "fixtureID" : "news-11",
+        "label" : "public",
+        "ruleID" : "kw.medical"
+      },
+      {
+        "category" : "public_marketing",
+        "fixtureID" : "mkt-04",
+        "label" : "public",
+        "ruleID" : "kw.medical"
+      },
+      {
+        "category" : "prompt_injection",
+        "fixtureID" : "inj-03",
+        "label" : "public",
+        "ruleID" : "kw.medical"
+      }
+    ],
+    "falsePublic" : [
+      {
+        "category" : "public_with_sensitive",
+        "fixtureID" : "pws-08",
+        "label" : "private",
+        "ruleID" : "allowlist.substack"
+      }
+    ]
+  }
+}
