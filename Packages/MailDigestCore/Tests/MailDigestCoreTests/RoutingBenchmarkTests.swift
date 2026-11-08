@@ -43,9 +43,9 @@ struct RoutingBenchmarkTests {
         let ok = await BenchmarkRouting.productionRoute(email: email(subject: "Weekly digest", body: "Hello"), model: "m",
                                                         scores: good, failure: nil)
         #expect(ok.verdict == .public && ok.method == .systemOne)
-        let rule = await BenchmarkRouting.productionRoute(email: email(subject: "Your invoice", body: "Hello"), model: "m",
+        let rule = await BenchmarkRouting.productionRoute(email: email(subject: "Your invoice number 42", body: "Hello"), model: "m",
                                                           scores: good, failure: nil)
-        #expect(rule.verdict == .private && rule.method == .rule && rule.ruleID == "kw.financial")
+        #expect(rule.verdict == .private && rule.method == .rule && rule.ruleID == "kw.financial.record")
         let insp = await BenchmarkRouting.productionRoute(email: email(subject: "Hi", body: "Hello", inspection: .unknown),
                                                           model: "m", scores: good, failure: nil)
         #expect(insp.method == .inspection && !insp.cloudEligible)
@@ -110,14 +110,14 @@ struct RoutingBenchmarkTests {
 
     @Test func preFilterEvaluationFindsFalseHits() {
         let fixtures = [
-            BenchmarkFixture(id: "a", split: "heldout", category: "public_newsletter", label: .public, subject: "Invoice software tips",
+            BenchmarkFixture(id: "a", split: "heldout", category: "public_newsletter", label: .public, subject: "Your invoice number 42",
                              from: "N <n@x.example>", body: "Hello"),
             BenchmarkFixture(id: "b", split: "heldout", category: "public_with_sensitive", label: .private, subject: "Post",
                              from: "S <s@substack.com>", headers: ["List-Unsubscribe": "<https://x.example/u>"], body: "Hello"),
             BenchmarkFixture(id: "c", split: "heldout", category: "ambiguous", label: .ambiguous, subject: "Hi", from: "J <j@x.example>", body: "ok"),
         ]
         let e = PreFilterEvaluation.evaluate(fixtures)
-        #expect(e.falsePrivate.map(\.fixtureID) == ["a"] && e.falsePrivate.first?.ruleID == "kw.financial")
+        #expect(e.falsePrivate.map(\.fixtureID) == ["a"] && e.falsePrivate.first?.ruleID == "kw.financial.record")
         #expect(e.falsePublic.map(\.fixtureID) == ["b"])
         #expect(e.counts["ambiguous"]?["needsTriage"] == 1)
     }

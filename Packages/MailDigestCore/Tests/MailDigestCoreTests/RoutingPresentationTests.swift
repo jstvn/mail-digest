@@ -28,6 +28,7 @@ import Testing
             (.public, .trustedSender, "Public · Trusted Sender"),
             (.public, .systemOne, "Public · System One"),
             (.uncertain, .systemOne, "Uncertain · System One"),
+            (.private, .systemOne, "Sensitive · System One"),
             (.notAssessed, .inspection, "Local only · Content not fully inspected"),
             (.notAssessed, .cloudOff, "Not assessed · Cloud off"),
         ]
@@ -39,6 +40,51 @@ import Testing
         #expect(RoutingPresentation.privacyBadge(Self.assessment(.uncertain, .systemOne)).tone == .uncertain)
         // An unexpected combination still reads sensibly.
         #expect(RoutingPresentation.privacyBadge(Self.assessment(.private, .cloudOff)).text == "Private · Cloud off")
+    }
+
+    @Test func routeTextsAndRiskRow() {
+        func a(_ m: AssessmentMethod, _ t: TriageTrigger?, signal: String? = nil) -> PrivacyAssessment {
+            var x = Self.assessment(.public, m); x.triageTrigger = t; x.riskSignal = signal; return x
+        }
+        #expect(RoutingPresentation.routeText(a(.trustedSender, nil)) == "Trusted public sender · System One not required")
+        #expect(RoutingPresentation.routeText(a(.systemOne, .trustedSenderRisk))
+                == "Trusted public sender · Selective System One assessment")
+        #expect(RoutingPresentation.routeText(a(.systemOne, .ambiguousSender)) == "Ambiguous sender · System One assessment")
+        #expect(RoutingPresentation.routeText(a(.systemOne, .sensitiveSender))
+                == "Sensitive sender domain · System One assessment")
+        #expect(RoutingPresentation.routeText(a(.rule, nil)) == "Strong private match · System One not required")
+        #expect(RoutingPresentation.routeText(a(.systemOne, nil)) == nil)
+        #expect(RoutingPresentation.routeText(a(.inspection, nil)) == nil)
+
+        let selective = RoutingProvenance(assessment: a(.systemOne, .trustedSenderRisk, signal: "risk.embedded.conversation"))
+        let lines = RoutingPresentation.details(selective)
+        #expect(lines.first?.label == "Route")
+        #expect(lines.map(\.label).firstIndex(of: "Route")! < lines.map(\.label).firstIndex(of: "Privacy")!)
+        #expect(lines.first { $0.label == "Risk signal" }?.value == "Embedded conversation")
+        #expect(RoutingPresentation.riskSignalLabel("risk.unknown") == "risk.unknown")
+        // Old rows (no trigger) have no Route or Risk signal rows.
+        let old = RoutingPresentation.details(RoutingProvenance(assessment: Self.assessment(.uncertain, .systemOne)))
+        #expect(!old.contains { $0.label == "Route" || $0.label == "Risk signal" })
+        let trusted = RoutingProvenance(assessment: a(.trustedSender, nil))
+        #expect(RoutingPresentation.routingExplanation(for: trusted) == "Trusted public sender · System One not required")
+    }
+
+    @Test func systemOneSensitiveIsItsOwnBucket() {
+        func local(_ reason: LocalReason, _ a: PrivacyAssessment) -> RoutingProvenance {
+            RoutingProvenance(assessment: a, execution: Self.exec(.local, "qwen3:4b", reason: reason))
+        }
+        let items: [RoutingProvenance?] = [
+            local(.privateContent, Self.assessment(.private, .systemOne)),
+            local(.privateContent, Self.assessment(.private, .systemOne)),
+            local(.privateContent, Self.assessment(.private, .rule, rule: "kw.otp")),
+            local(.privateContent, Self.assessment(.private, .rule, rule: "kw.financial")),
+            local(.notEligible, Self.assessment(.uncertain, .systemOne)),
+        ]
+        let counts = RoutingPresentation.localReasonSummary(items)
+        #expect(counts.contains(.init(bucket: .systemOneSensitive, count: 2)))
+        #expect(counts.contains(.init(bucket: .privateRule, count: 2)))
+        #expect(counts.contains(.init(bucket: .systemOneLowConfidence, count: 1)))
+        #expect(RoutingPresentation.localReasonSummaryText(items)?.contains("2 classified sensitive") == true)
     }
 
     @Test func executionLabels() {

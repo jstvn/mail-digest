@@ -126,7 +126,7 @@ import Testing
     @Test func olderBlobGetsCloudDefaults() throws {
         let old = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"runHour":8}"#.utf8))
         #expect(old.runHour == 8 && !old.cloudDigestEnabled)
-        #expect(old.geminiModel == GeminiDefaults.model && old.triageModel == "kev:0.8b-q8_0")
+        #expect(old.geminiModel == GeminiDefaults.model && old.triageModel == "kev:4b-q4_K_M")
         #expect(old.privacyThreshold == 0.90 && old.cloudPrivacyAcknowledgedRevision == nil)
     }
 
@@ -143,7 +143,7 @@ import Testing
     @Test func resolvedValuesFallBackAndClamp() {
         var s = DigestSettings()
         s.geminiModel = "  "; s.triageModel = ""; s.privacyThreshold = 0.5
-        #expect(s.resolvedGeminiModel == GeminiDefaults.model && s.resolvedTriageModel == "kev:0.8b-q8_0")
+        #expect(s.resolvedGeminiModel == GeminiDefaults.model && s.resolvedTriageModel == "kev:4b-q4_K_M")
         #expect(s.resolvedPrivacyThreshold == 0.80)
         s.privacyThreshold = .nan
         #expect(s.resolvedPrivacyThreshold == 0.90)
@@ -164,6 +164,35 @@ import Testing
     }
 
     @Test func triageModelsListed() {
-        #expect(CloudPrivacyPolicy.triageModels.map(\.tag) == ["kev:0.8b-q8_0", "tev1:0.8b-q8_0", "kev:4b-q4_K_M"])
+        #expect(CloudPrivacyPolicy.triageModels.map(\.tag) == ["kev:4b-q4_K_M", "kev:0.8b-q8_0", "tev1:0.8b-q8_0"])
+        #expect(CloudPrivacyPolicy.triageModels.map(\.displayName)
+                == ["Kev 4B (Q4, default)", "Kev 0.8B (Q8, low memory)", "Tev1 0.8B (experimental)"])
+        #expect(DigestSettings.defaultTriageModel == "kev:4b-q4_K_M")
+    }
+
+    @Test func triageModelNotes() {
+        #expect(CloudPrivacyPolicy.triageModelNote(for: "kev:4b-q4_K_M")?.contains("8.5 GB") == true)
+        #expect(CloudPrivacyPolicy.triageModelNote(for: "kev:0.8b-q8_0")?.contains("Lower memory") == true)
+        #expect(CloudPrivacyPolicy.triageModelNote(for: "tev1:0.8b-q8_0")?.contains("not recommended") == true)
+        #expect(CloudPrivacyPolicy.triageModelNote(for: "other") == nil)
+    }
+
+    private func decode(_ json: String) throws -> DigestSettings {
+        try JSONDecoder().decode(DigestSettings.self, from: Data(json.utf8))
+    }
+
+    @Test func legacyDefaultTriageModelMigrates() throws {
+        #expect(try decode(#"{"triageModel":"kev:0.8b-q8_0"}"#).triageModel == "kev:4b-q4_K_M")
+        #expect(try decode(#"{"triageModel":"kev:0.8b-q8_0","triageModelDefaultRevision":1}"#).triageModel == "kev:4b-q4_K_M")
+    }
+
+    @Test func explicitChoicesSurvive() throws {
+        #expect(try decode(#"{"triageModel":"kev:0.8b-q8_0","triageModelDefaultRevision":2}"#).triageModel == "kev:0.8b-q8_0")
+        #expect(try decode(#"{"triageModel":"tev1:0.8b-q8_0"}"#).triageModel == "tev1:0.8b-q8_0")
+        // A migrated value, then an explicit 0.8B choice, round-trips as 0.8B.
+        var s = try decode(#"{"triageModel":"kev:0.8b-q8_0"}"#)
+        s.triageModel = "kev:0.8b-q8_0"
+        let again = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s))
+        #expect(again.triageModel == "kev:0.8b-q8_0" && again.triageModelDefaultRevision == 2)
     }
 }

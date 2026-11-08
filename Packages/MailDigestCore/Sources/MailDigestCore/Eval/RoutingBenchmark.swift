@@ -108,7 +108,9 @@ public struct PreFilterResult: Codable, Sendable, Equatable {
         switch verdict {
         case .private(let id): self.init(kind: .private, ruleID: id)
         case .public(let id): self.init(kind: .public, ruleID: id)
-        case .needsTriage: self.init(kind: .needsTriage)
+        // The trigger and signal are recorded in the rule id so reports can group by them.
+        case .needsTriage(let trigger, let signal):
+            self.init(kind: .needsTriage, ruleID: [trigger.rawValue, signal].compactMap { $0 }.joined(separator: ":"))
         }
     }
 }

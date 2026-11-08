@@ -65,7 +65,12 @@ public struct DigestRouter: Sendable {
             return PrivacyAssessment(verdict: .private, method: .rule, ruleID: id, assessedAt: now)
         }
         // Reuse a stored decision on resume/retry (no re-triage); a cloud-off placeholder is re-assessed.
-        if let stored, stored.method != .cloudOff { return stored }
+        // A stored trusted-sender result never bypasses a risk signal that fires today.
+        if let stored, stored.method != .cloudOff {
+            var isPublic = false
+            if case .public = verdict { isPublic = true }
+            if !(stored.method == .trustedSender && !isPublic) { return stored }
+        }
         if config.cloudExtractor == nil {
             if case .public(let id) = verdict {
                 return PrivacyAssessment(verdict: .public, method: .trustedSender, ruleID: id, assessedAt: now)
@@ -79,15 +84,22 @@ public struct DigestRouter: Sendable {
         if case .public(let id) = verdict {
             return PrivacyAssessment(verdict: .public, method: .trustedSender, ruleID: id, assessedAt: now)
         }
+        var trigger: TriageTrigger?
+        var signal: String?
+        if case .needsTriage(let t, let s) = verdict { trigger = t; signal = s }
         func uncertain(_ failure: TriageFailure) -> PrivacyAssessment {
-            PrivacyAssessment(verdict: .uncertain, method: .systemOne, triageFailure: failure, assessedAt: now)
+            PrivacyAssessment(verdict: .uncertain, method: .systemOne, triageFailure: failure, assessedAt: now,
+                              triageTrigger: trigger, riskSignal: signal)
         }
         guard let triage = config.triage else { return uncertain(.unreachable) }
         do {
             if let failure = try await triage.preflight(model: config.triageModel) { return uncertain(failure) }
             let scores = try await triage.assess(TriageInputBuilder().build(email), model: config.triageModel)
-            return TriageEvaluator().evaluate(scores, model: config.triageModel,
-                                              threshold: config.privacyThreshold, assessedAt: clock.now())
+            var result = TriageEvaluator().evaluate(scores, model: config.triageModel,
+                                                    threshold: config.privacyThreshold, assessedAt: clock.now())
+            result.triageTrigger = trigger
+            result.riskSignal = signal
+            return result
         } catch is CancellationError {
             throw CancellationError()
         } catch let failure as TriageFailure {

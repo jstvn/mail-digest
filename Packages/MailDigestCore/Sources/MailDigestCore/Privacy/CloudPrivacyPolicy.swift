@@ -14,10 +14,23 @@ public enum CloudPrivacyPolicy {
 
     /// System One models the user can pick for triage.
     public static let triageModels: [TriageModel] = [
-        TriageModel(tag: "kev:0.8b-q8_0", displayName: "Kev 0.8B (Q8, default)"),
-        TriageModel(tag: "tev1:0.8b-q8_0", displayName: "Tev1 0.8B"),
-        TriageModel(tag: "kev:4b-q4_K_M", displayName: "Kev 4B (Q4, larger)"),
+        TriageModel(tag: "kev:4b-q4_K_M", displayName: "Kev 4B (Q4, default)"),
+        TriageModel(tag: "kev:0.8b-q8_0", displayName: "Kev 0.8B (Q8, low memory)"),
+        TriageModel(tag: "tev1:0.8b-q8_0", displayName: "Tev1 0.8B (experimental)"),
     ]
+
+    /// A short caption for the model picker; nil for an unknown tag.
+    public static func triageModelNote(for tag: String) -> String? {
+        switch tag {
+        case "kev:4b-q4_K_M":
+            return "Uses about 8.5 GB of memory while loaded, on top of the digest model. On a Mac with 16 GB, choose Kev 0.8B if the system starts swapping."
+        case "kev:0.8b-q8_0":
+            return "Lower memory use, but keeps more public emails on this Mac."
+        case "tev1:0.8b-q8_0":
+            return "Experimental and not recommended. In benchmarking it approved a private email for the cloud with high confidence."
+        default: return nil
+        }
+    }
 
     /// Why cloud is effectively off, or nil when it is on. Checked in the order the user would fix them.
     public static func offReason(settings: DigestSettings, hasKey: Bool) -> LocalReason? {

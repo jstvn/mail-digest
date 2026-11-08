@@ -18,12 +18,23 @@ public struct PrivacyInput: Sendable, Equatable {
     }
 }
 
+/// Why a message goes to System One instead of being decided by rules.
+public enum TriageTrigger: String, Codable, Sendable, Equatable {
+    /// Unknown sender with no strong rule.
+    case ambiguousSender
+    /// Allowlisted sender, but a contextual risk signal fired.
+    case trustedSenderRisk
+    /// Sensitive sender domain with bulk-mail headers and no transactional evidence.
+    case sensitiveSender
+}
+
 public enum PreFilterVerdict: Sendable, Equatable {
     /// Stays local; carries the stable rule id.
     case `private`(String)
-    /// Trusted newsletter sender; eligible for the cloud.
+    /// Trusted newsletter sender with no risk signal; eligible for the cloud.
     case `public`(String)
-    case needsTriage
+    /// System One decides. `signal` is the first contextual risk signal id, if any (never matched text).
+    case needsTriage(TriageTrigger, signal: String?)
 }
 
 /// Deterministic, pure rules (Q61, Q66). Private always wins; no match is not evidence of safety.
@@ -51,41 +62,113 @@ public struct PrivacyPreFilter: Sendable {
         ("substack.com", "allowlist.substack"), ("medium.com", "allowlist.medium"),
     ]
 
-    /// Word-boundary phrases (token sequences, lowercase). Plural forms are listed explicitly.
+    /// Unconditional private rules: word-boundary token sequences (lowercase).
     static let phrases: [(ruleID: String, phrases: [[String]])] = [
         ("kw.otp", [["otp"], ["verification", "code"], ["verification", "codes"], ["one", "time", "code"],
                     ["one", "time", "password"], ["sign", "in", "code"], ["signin", "code"],
                     ["security", "code"], ["login", "code"], ["passcode"]]),
         ("kw.credentials", [["password", "reset"], ["reset", "your", "password"], ["credentials"],
                             ["login", "link"], ["magic", "link"]]),
-        ("kw.financial", [["statement"], ["statements"], ["invoice"], ["invoices"], ["receipt"], ["receipts"],
-                          ["payment"], ["payments"], ["transaction"], ["transactions"]]),
-        ("kw.medical", [["medical"], ["health"], ["prescription"], ["prescriptions"],
-                        ["appointment", "with", "a", "doctor"], ["appointment", "with", "your", "doctor"],
-                        ["appointment", "with", "doctor"], ["doctor", "appointment"]]),
-        ("kw.tax", [["tax"], ["taxes"], ["tfn"], ["abn"], ["irs"]]),
     ]
+
+    /// Strong record phrases. `plain` matches alone; `gated` matches only when a token containing a digit
+    /// follows within `valueWindow` tokens ("Amount due: $120.50" yes, "track amount due" no).
+    static let recordRules: [(ruleID: String, plain: [[String]], gated: [[String]])] = [
+        ("kw.financial.record",
+         plain: [
+            ["your", "statement", "is", "ready"], ["your", "statement", "is", "available"],
+            ["your", "bank", "statement"], ["account", "statement"], ["payment", "confirmation"],
+            ["payment", "failed"], ["payment", "declined"], ["statement", "balance"], ["closing", "balance"],
+            ["available", "balance"]],
+         gated: [
+            ["amount", "due"], ["balance", "due"], ["payment", "due"], ["payment", "received"],
+            ["tax", "invoice"], ["invoice", "number"], ["invoice", "no"], ["your", "invoice"],
+            ["your", "receipt"], ["order", "receipt"], ["payment", "receipt"], ["your", "payment"],
+            ["transaction", "id"], ["transaction", "reference"], ["receipt", "number"], ["card", "ending"],
+            ["account", "number"], ["direct", "debit"]]),
+        ("kw.medical.record",
+         plain: [
+            ["your", "appointment", "with", "dr"], ["your", "appointment", "with", "doctor"],
+            ["your", "medical", "record"], ["your", "medical", "records"], ["your", "lab", "results"],
+            ["your", "blood", "test"], ["your", "pathology", "results"], ["your", "scan", "results"],
+            ["your", "biopsy"], ["your", "prescription", "is", "ready"], ["your", "referral", "letter"]],
+         gated: []),
+        ("kw.tax.record",
+         plain: [["notice", "of", "assessment"], ["your", "tfn"]],
+         gated: [["your", "tax", "return"], ["your", "tax", "refund"], ["tax", "file", "number"],
+                 ["tax", "owing"], ["tax", "payable"]]),
+    ]
+    static let valueWindow = 6
+
+    /// Weaker personal-context phrases (token sequences). A hit is a risk signal, not a private match.
+    static let personalSignals: [(ruleID: String, phrases: [[String]])] = [
+        ("risk.financial.personal", [
+            ["your", "invoice"], ["your", "payment"], ["your", "receipt"], ["order", "receipt"],
+            ["your", "statement"], ["your", "transaction"], ["your", "account", "balance"], ["overdue"],
+            ["your", "tax", "return"], ["your", "tax", "refund"], ["tax", "file", "number"]]),
+        ("risk.medical.personal", [
+            ["prescription"], ["prescriptions"], ["appointment", "with", "a", "doctor"],
+            ["appointment", "with", "your", "doctor"], ["appointment", "with", "doctor"],
+            ["doctor", "appointment"]]),
+    ]
+
+    /// Distance in characters within which a diagnosis or sensitive-topic term and an identifier combine.
+    static let proximity = 300
+
+    private static let diagnosisPattern = #"\b(?:diagnosis|diagnosed|cancer|chemotherapy|hiv|leukemia|leukaemia|lymphoma|diabetes|schizophrenia|bipolar|depression|miscarriage|dementia|alzheimer['’]s|parkinson['’]s|epilepsy|biopsy|tumor|tumour|ptsd|psychiatric|treatment for|mental illness)\b"#
+    private static let sensitiveTopicPattern = #"\b(?:divorce|custody|bankruptcy|eviction|arrested|criminal record|immigration status|visa application|domestic violence|salary|debt)\b"#
+
+    private static let diagnosisRegex = try? NSRegularExpression(pattern: diagnosisPattern, options: [.caseInsensitive])
+    private static let sensitiveTopicRegex = try? NSRegularExpression(pattern: sensitiveTopicPattern, options: [.caseInsensitive])
+    private static let addressRegex = try? NSRegularExpression(
+        pattern: #"\b\d{1,5}[A-Za-z]?[ \t]+(?:[A-Z][A-Za-z]+[ \t]+){1,3}(?:St|Street|Rd|Road|Ave|Avenue|Way|Lane|Ln|Dr|Drive|Ct|Court|Pl|Place|Cres|Crescent|Blvd|Boulevard|Tce|Terrace)\b"#)
+    private static let phoneRegex = try? NSRegularExpression(
+        pattern: #"(?<!\d)(?:\+\d{1,3}[ -]?)?(?:\(\d{1,4}\)[ -]?)?\d{2,4}(?:[ -]\d{2,4}){1,4}(?!\d)"#)
+    private static let dobRegex = try? NSRegularExpression(
+        pattern: #"\b(?:date of birth|dob|born on)\b[^\d\n]{0,8}\d"#, options: [.caseInsensitive])
+    private static let selfAddressRegex = try? NSRegularExpression(
+        pattern: #"\b(?:my address|my home address|lives at)\b"#, options: [.caseInsensitive])
+    // Case-sensitive on purpose: "Firstname Lastname". The first word must not be a title or stopword.
+    private static let namedDiagnosedRegex = try? NSRegularExpression(
+        pattern: #"(?<!Dr )(?<!Dr\. )(?<!Prof )(?<!Prof\. )(?<!Professor )\b(?!(?:Dr|Prof|Professor|The|A|An|This|That|Dear|Our|New)\b)[A-Z][a-z]+ [A-Z][a-z]+(?:, \d{1,3},)? (?:was|has been|is being) (?:diagnosed|treated)\b"#)
+    private static let namedPossessiveRegex = try? NSRegularExpression(
+        pattern: #"(?<!Dr )(?<!Dr\. )(?<!Prof )(?<!Prof\. )(?<!Professor )\b(?!(?:Dr|Prof|Professor|The|A|An|This|That|Dear|Our|New)\b)[A-Z][a-z]+ [A-Z][a-z]+['’]s (?i:diagnosis|diagnosed|cancer|chemotherapy|hiv|leukemia|leukaemia|lymphoma|diabetes|schizophrenia|bipolar|depression|miscarriage|dementia|alzheimer['’]s|parkinson['’]s|epilepsy|biopsy|tumor|tumour|ptsd|psychiatric|treatment for|mental illness)\b"#)
 
     private static let otpWords: Set<String> = ["code", "codes", "otp", "pin", "passcode", "verification", "verify"]
 
     public func classify(_ input: PrivacyInput) -> PreFilterVerdict {
-        if let id = privateRule(for: input) { return .private(id) }
-        if input.inspection == .complete, let id = publicRule(for: input) { return .public(id) }
-        return .needsTriage
+        let host = Self.host(of: input.sender)
+        let hasUnsub = Self.hasValidUnsubscribe(input.headers)
+        let strong = strongRule(for: input)
+        if let host, let domain = Self.sensitiveDomainRule(host: host) {
+            // One-to-one mail from a bank, agency or clinic stays private; so does anything with transactional
+            // evidence. A bulk announcement without it goes to System One, never straight to the cloud.
+            if strong != nil || !hasUnsub { return .private(domain) }
+            return .needsTriage(.sensitiveSender, signal: riskSignal(for: input))
+        }
+        if let strong { return .private(strong) }
+        let signal = riskSignal(for: input)
+        if input.inspection == .complete, hasUnsub, let host,
+           let entry = Self.publicHosts.first(where: { $0.host == host }) {
+            if let signal { return .needsTriage(.trustedSenderRisk, signal: signal) }
+            return .public(entry.ruleID)
+        }
+        return .needsTriage(.ambiguousSender, signal: signal)
     }
 
-    // MARK: Private
+    // MARK: Strong rules
 
-    private func privateRule(for input: PrivacyInput) -> String? {
-        if let host = Self.host(of: input.sender) {
-            for d in Self.sensitiveDomains where host == d.suffix || host.hasSuffix("." + d.suffix) {
-                return d.ruleID
-            }
-        }
+    private func strongRule(for input: PrivacyInput) -> String? {
         let text = input.subject + "\n" + input.body
         let tokens = Self.tokens(text)
         for rule in Self.phrases {
             for phrase in rule.phrases where Self.contains(tokens, phrase) { return rule.ruleID }
+        }
+        for rule in Self.recordRules {
+            for phrase in rule.plain where Self.contains(tokens, phrase) { return rule.ruleID }
+            for phrase in rule.gated where Self.contains(tokens, phrase, valueWithin: Self.valueWindow) {
+                return rule.ruleID
+            }
         }
         if Self.hasCardNumber(text) { return "pattern.card" }
         if Self.hasIBAN(text) { return "pattern.iban" }
@@ -95,12 +178,90 @@ public struct PrivacyPreFilter: Sendable {
         return nil
     }
 
-    private func publicRule(for input: PrivacyInput) -> String? {
-        guard let host = Self.host(of: input.sender),
-              let entry = Self.publicHosts.first(where: { $0.host == host }) else { return nil }
-        let unsub = input.headers.first { $0.key.lowercased() == "list-unsubscribe" }?.value.lowercased() ?? ""
-        guard unsub.contains("<https:") || unsub.contains("<mailto:") else { return nil }
-        return entry.ruleID
+    private static func sensitiveDomainRule(host: String) -> String? {
+        sensitiveDomains.first { host == $0.suffix || host.hasSuffix("." + $0.suffix) }?.ruleID
+    }
+
+    private static func hasValidUnsubscribe(_ headers: [String: String]) -> Bool {
+        let unsub = headers.first { $0.key.lowercased() == "list-unsubscribe" }?.value.lowercased() ?? ""
+        return unsub.contains("<https:") || unsub.contains("<mailto:")
+    }
+
+    // MARK: Risk signals
+
+    /// First contextual risk signal id, or nil. Names, addresses and diagnosis words alone never fire.
+    func riskSignal(for input: PrivacyInput) -> String? {
+        if Self.hasEmbeddedConversation(input.body) { return "risk.embedded.conversation" }
+        let text = input.subject + "\n" + input.body
+        if Self.hasMedicalIdentifiable(text) { return "risk.medical.identifiable" }
+        if Self.hasIdentifiableSensitive(text) { return "risk.identifiable.sensitive" }
+        let tokens = Self.tokens(text)
+        for rule in Self.personalSignals {
+            for phrase in rule.phrases where Self.contains(tokens, phrase) { return rule.ruleID }
+        }
+        return nil
+    }
+
+    /// Reply or forward structure: an "On ... wrote:" line (also wrapped over two lines), an original-message
+    /// banner, or at least two quoted lines.
+    static func hasEmbeddedConversation(_ body: String) -> Bool {
+        let lines = body.replacingOccurrences(of: "\r\n", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+        var quoted = 0
+        for (i, line) in lines.enumerated() {
+            if line.hasPrefix(">") { quoted += 1; if quoted >= 2 { return true } }
+            let lower = line.lowercased()
+            if lower.contains("-----original message-----") || lower.contains("forwarded message") { return true }
+            if line.hasPrefix("On ") {
+                if line.hasSuffix("wrote:") { return true }
+                if i + 1 < lines.count, lines[i + 1].hasSuffix("wrote:") { return true }
+            }
+        }
+        return false
+    }
+
+    static func hasMedicalIdentifiable(_ text: String) -> Bool {
+        if matches(namedDiagnosedRegex, in: text) || matches(namedPossessiveRegex, in: text) { return true }
+        let ids = identifierRanges(text, includeSelfReference: true)
+        return anyWithinProximity(termRanges(diagnosisRegex, in: text), ids)
+    }
+
+    static func hasIdentifiableSensitive(_ text: String) -> Bool {
+        anyWithinProximity(termRanges(sensitiveTopicRegex, in: text), identifierRanges(text, includeSelfReference: false))
+    }
+
+    private static func matches(_ regex: NSRegularExpression?, in text: String) -> Bool {
+        regex?.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+    }
+
+    private static func termRanges(_ regex: NSRegularExpression?, in text: String) -> [NSRange] {
+        regex?.matches(in: text, range: NSRange(text.startIndex..., in: text)).map(\.range) ?? []
+    }
+
+    private static func anyWithinProximity(_ a: [NSRange], _ b: [NSRange]) -> Bool {
+        a.contains { x in b.contains { y in abs(x.location - y.location) <= proximity } }
+    }
+
+    /// Street addresses, phone numbers and labelled dates of birth (plus "my address" style phrases).
+    private static func identifierRanges(_ text: String, includeSelfReference: Bool) -> [NSRange] {
+        let ns = text as NSString
+        var out = termRanges(addressRegex, in: text) + termRanges(dobRegex, in: text)
+        for r in termRanges(phoneRegex, in: text) where isPhone(ns.substring(with: r)) { out.append(r) }
+        if includeSelfReference { out += termRanges(selfAddressRegex, in: text) }
+        return out
+    }
+
+    /// 8 to 15 digits, and not a date or a run of years.
+    private static func isPhone(_ s: String) -> Bool {
+        let digits = s.filter { $0.isASCII && $0.isNumber }.count
+        guard (8...15).contains(digits) else { return false }
+        let groups = s.split(whereSeparator: { !$0.isNumber }).map(String.init)
+        let sizes = groups.map(\.count)
+        if sizes == [4, 2, 2] || (sizes.count == 3 && sizes[2] == 4 && sizes[0] <= 2 && sizes[1] <= 2) { return false }
+        if groups.count >= 2, groups.allSatisfy({ $0.count == 4 && ($0.hasPrefix("19") || $0.hasPrefix("20")) }) {
+            return false
+        }
+        return true
     }
 
     // MARK: Helpers
@@ -122,11 +283,16 @@ public struct PrivacyPreFilter: Sendable {
         text.lowercased().split(whereSeparator: { !($0.isLetter || $0.isNumber) }).map(String.init)
     }
 
-    private static func contains(_ tokens: [String], _ phrase: [String]) -> Bool {
+    /// True when `phrase` occurs; with `valueWithin`, also needs a digit-bearing token in the next N tokens.
+    private static func contains(_ tokens: [String], _ phrase: [String], valueWithin: Int? = nil) -> Bool {
         guard let first = phrase.first, tokens.count >= phrase.count else { return false }
         var i = 0
         while i <= tokens.count - phrase.count {
-            if tokens[i] == first, Array(tokens[i..<(i + phrase.count)]) == phrase { return true }
+            if tokens[i] == first, Array(tokens[i..<(i + phrase.count)]) == phrase {
+                guard let n = valueWithin else { return true }
+                let end = min(tokens.count, i + phrase.count + n)
+                if tokens[(i + phrase.count)..<end].contains(where: { $0.contains(where: \.isNumber) }) { return true }
+            }
             i += 1
         }
         return false

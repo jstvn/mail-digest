@@ -45,6 +45,7 @@ public enum RoutingPresentation {
         case (.private, .rule): return RoutingBadge(text: "Private · Rule", tone: .private)
         case (.public, .trustedSender): return RoutingBadge(text: "Public · Trusted Sender", tone: .public)
         case (.public, .systemOne): return RoutingBadge(text: "Public · System One", tone: .public)
+        case (.private, .systemOne): return RoutingBadge(text: "Sensitive · System One", tone: .private)
         case (.uncertain, .systemOne): return RoutingBadge(text: "Uncertain · System One", tone: .uncertain)
         case (.notAssessed, .inspection):
             return RoutingBadge(text: "Local only · \(inspectionTitle(a.inspectionGap))", tone: .uncertain)
@@ -88,6 +89,10 @@ public enum RoutingPresentation {
     public static func details(_ routing: RoutingProvenance) -> [RoutingDetailLine] {
         var lines: [RoutingDetailLine] = []
         let a = routing.assessment
+        if let route = routeText(a) { lines.append(RoutingDetailLine(label: "Route", value: route)) }
+        if let id = a.riskSignal {
+            lines.append(RoutingDetailLine(label: "Risk signal", value: riskSignalLabel(id)))
+        }
         if a.method == .inspection {
             // Inspection status is not a privacy classification, so it gets its own row.
             lines.append(RoutingDetailLine(label: "Privacy", value: "Not classified"))
@@ -112,6 +117,36 @@ public enum RoutingPresentation {
             if let c = e.cloudFailure { lines.append(RoutingDetailLine(label: "Gemini error", value: cloudFailureText(c))) }
         }
         return lines
+    }
+
+    /// How the email reached its privacy decision; nil for old rows and cases with nothing to add.
+    public static func routeText(_ a: PrivacyAssessment) -> String? {
+        switch (a.method, a.triageTrigger) {
+        case (.trustedSender, _): return "Trusted public sender · System One not required"
+        case (.systemOne, .trustedSenderRisk?): return "Trusted public sender · Selective System One assessment"
+        case (.systemOne, .ambiguousSender?): return "Ambiguous sender · System One assessment"
+        case (.systemOne, .sensitiveSender?): return "Sensitive sender domain · System One assessment"
+        case (.rule, _): return "Strong private match · System One not required"
+        default: return nil
+        }
+    }
+
+    /// Friendly name for a risk signal id; unknown ids are shown as-is. Never includes matched text.
+    public static func riskSignalLabel(_ id: String) -> String {
+        switch id {
+        case "risk.embedded.conversation": return "Embedded conversation"
+        case "risk.medical.identifiable": return "Medical details with identifying information"
+        case "risk.identifiable.sensitive": return "Sensitive personal matter with identifying information"
+        case "risk.financial.personal": return "Personal financial wording"
+        case "risk.medical.personal": return "Personal medical wording"
+        default: return id
+        }
+    }
+
+    /// Tooltip text for the privacy badge: the inspection explanation, else the route for a trusted direct send.
+    public static func routingExplanation(for routing: RoutingProvenance) -> String? {
+        if let e = inspectionExplanation(for: routing) { return e }
+        return routing.assessment.method == .trustedSender ? routeText(routing.assessment) : nil
     }
 
     /// Short inspection status; the generic text covers an unknown or non-specific gap.
@@ -160,7 +195,7 @@ public enum RoutingPresentation {
             switch self {
             case .contentNotInspected: return "not fully inspected"
             case .privateRule: return "private rule"
-            case .systemOneSensitive: return "likely sensitive"
+            case .systemOneSensitive: return "classified sensitive"
             case .systemOneLowConfidence: return "low confidence"
             case .cloudDisabled: return "cloud off"
             case .noCredential: return "no API key"
@@ -179,7 +214,7 @@ public enum RoutingPresentation {
 
     /// Counts the items that ran locally by reason, largest first (ties in `LocalBucket` order).
     /// Pass only items that finished; a nil entry or one without an execution counts as not recorded.
-    /// Cloud items are ignored. System One uncertainty is "likely sensitive" when `pSensitive >= 0.5`.
+    /// Cloud items are ignored. System One sensitive results (and old uncertain rows with `pSensitive >= 0.5`) are "classified sensitive".
     public static func localReasonSummary(_ items: [RoutingProvenance?]) -> [LocalReasonCount] {
         var counts: [LocalBucket: Int] = [:]
         for item in items {
@@ -200,7 +235,7 @@ public enum RoutingPresentation {
         case .acknowledgementRequired: return .acknowledgementRequired
         case .noCredential: return .noCredential
         case .contentNotInspected: return .contentNotInspected
-        case .privateContent: return .privateRule
+        case .privateContent: return a.method == .systemOne ? .systemOneSensitive : .privateRule
         case .triageUnavailable: return .triageUnavailable
         case .cloudFailed: return .cloudFailed
         case .notEligible:

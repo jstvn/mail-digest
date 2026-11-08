@@ -288,7 +288,7 @@ private struct ActivityItemRow: View {
             HStack(spacing: 6) {
                 if let privacy {
                     badge(privacy, label: "Privacy", symbol: Self.privacySymbol(privacy))
-                        .help(inspectionExplanation ?? "")
+                        .help(routingExplanation ?? "")
                 }
                 if let execution {
                     badge(execution, label: "Processed by", symbol: Self.executionSymbol(execution))
@@ -310,9 +310,9 @@ private struct ActivityItemRow: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// Tooltip text when incomplete inspection decided the routing.
-    private var inspectionExplanation: String? {
-        item.routing.flatMap(RoutingPresentation.inspectionExplanation(for:))
+    /// Tooltip text: the inspection explanation, or the route for a trusted direct send.
+    private var routingExplanation: String? {
+        item.routing.flatMap(RoutingPresentation.routingExplanation(for:))
     }
 
     private var timeText: String {

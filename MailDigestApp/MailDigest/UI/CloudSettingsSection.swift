@@ -74,6 +74,9 @@ struct CloudSettingsSection: View {
             Picker("Privacy Triage Model", selection: $store.settings.triageModel) {
                 ForEach(CloudPrivacyPolicy.triageModels) { Text($0.displayName).tag($0.tag) }
             }
+            if let note = CloudPrivacyPolicy.triageModelNote(for: store.settings.triageModel) {
+                Text(note).font(.caption).foregroundStyle(.secondary)
+            }
             triageStatus
             thresholdRow
         } header: {

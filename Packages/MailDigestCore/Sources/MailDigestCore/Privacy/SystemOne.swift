@@ -142,8 +142,9 @@ public struct TriageEvaluator: Sendable {
                                      triageFailure: .malformedResponse, assessedAt: assessedAt)
         }
         let eligible = pNon! + Self.epsilon >= t && pPublic! + Self.epsilon >= publicFloor
-        return PrivacyAssessment(verdict: eligible ? .public : .uncertain, method: .systemOne,
-                                 triage: triage, assessedAt: assessedAt)
+        // Confidently sensitive is a decision of its own, distinct from merely not confident enough.
+        let verdict: PrivacyVerdict = eligible ? .public : (pSensitive! >= 0.5 ? .private : .uncertain)
+        return PrivacyAssessment(verdict: verdict, method: .systemOne, triage: triage, assessedAt: assessedAt)
     }
 }
 

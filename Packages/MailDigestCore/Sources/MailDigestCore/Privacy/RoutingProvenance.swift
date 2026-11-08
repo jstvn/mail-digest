@@ -48,10 +48,17 @@ public struct PrivacyAssessment: Codable, Sendable, Equatable {
     public var assessedAt: Date
     /// Why content was not fully inspected; set only for `.inspection` assessments. Old records decode as nil.
     public var inspectionGap: InspectionGap?
+    /// Why System One was consulted (or, for a trusted sender, not needed). Old records decode as nil.
+    public var triageTrigger: TriageTrigger?
+    /// Contextual risk signal id (for example `risk.medical.identifiable`); never matched text.
+    public var riskSignal: String?
 
     public init(verdict: PrivacyVerdict, method: AssessmentMethod, ruleID: String? = nil,
                 triage: TriageScores? = nil, triageFailure: TriageFailure? = nil, assessedAt: Date,
-                inspectionGap: InspectionGap? = nil) {
+                inspectionGap: InspectionGap? = nil, triageTrigger: TriageTrigger? = nil,
+                riskSignal: String? = nil) {
+        self.triageTrigger = triageTrigger
+        self.riskSignal = riskSignal
         self.inspectionGap = inspectionGap
         self.verdict = verdict
         self.method = method

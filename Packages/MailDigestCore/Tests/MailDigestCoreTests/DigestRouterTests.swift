@@ -453,3 +453,89 @@ private func plan() -> JobPlan {
         #expect(result.method == .rule)
     }
 }
+
+@Suite struct DigestRouterSelectiveTests {
+    private let riskBody = "Reader mail. Jane Citizen was diagnosed with lymphoma. Home: 12 Sample Road, Testville."
+    private let sensitiveScores = SystemOneScores(noul: 0.7, categoryProbabilities: ["public_newsletter_or_promo": 0.9])
+
+    @Test func trustedDirectMakesNoTriageCall() async throws {
+        let llm = StubLLMClient(), cloud = RecordingExtractor(), triage = StubSystemOneClient()
+        let out = try await run(pipeline(llm), email(sender: allowlisted.0, headers: allowlisted.1),
+                                config(cloud: cloud, triage: triage))
+        #expect(await triage.preflightCalls.isEmpty)
+        #expect(await triage.assessCalls.isEmpty)
+        #expect(out.routing?.assessment.triage == nil && out.routing?.assessment.triageTrigger == nil)
+        #expect(await cloud.calls.count == 1)
+    }
+
+    @Test func trustedWithRiskCallsTriageAndRecordsTrigger() async throws {
+        let llm = StubLLMClient(), cloud = RecordingExtractor()
+        let triage = StubSystemOneClient(results: [.success(eligibleScores)])
+        let out = try await run(pipeline(llm), email(sender: allowlisted.0, body: riskBody, headers: allowlisted.1),
+                                config(cloud: cloud, triage: triage))
+        let a = try #require(out.routing?.assessment)
+        #expect((await triage.assessCalls).count == 1)
+        #expect(a.method == .systemOne && a.triageTrigger == .trustedSenderRisk && a.riskSignal == "risk.medical.identifiable")
+        #expect(a.triage != nil)
+    }
+
+    @Test func riskBelowThresholdStaysLocal() async throws {
+        let llm = StubLLMClient(), cloud = RecordingExtractor()
+        let triage = StubSystemOneClient(results: [.success(lowScores)])
+        let out = try await run(pipeline(llm), email(sender: allowlisted.0, body: riskBody, headers: allowlisted.1),
+                                config(cloud: cloud, triage: triage))
+        #expect(await cloud.calls.isEmpty)
+        #expect(await llm.extractCalls.count == 1)
+        #expect(out.routing?.assessment.verdict == .uncertain)
+        #expect(out.routing?.assessment.riskSignal == "risk.medical.identifiable")
+    }
+
+    @Test func triageFailureStillRecordsTrigger() async throws {
+        let triage = StubSystemOneClient(results: [.failure(.timedOut)])
+        let out = try await run(pipeline(StubLLMClient()), email(sender: allowlisted.0, body: riskBody, headers: allowlisted.1),
+                                config(cloud: RecordingExtractor(), triage: triage))
+        #expect(out.routing?.assessment.triageFailure == .timedOut)
+        #expect(out.routing?.assessment.triageTrigger == .trustedSenderRisk)
+        let missing = try await run(pipeline(StubLLMClient()), email(), config(cloud: RecordingExtractor(), triage: nil))
+        #expect(missing.routing?.assessment.triageTrigger == .ambiguousSender)
+    }
+
+    @Test func sensitiveScoresAreOwnVerdictAndStayLocal() async throws {
+        let llm = StubLLMClient(), cloud = RecordingExtractor()
+        let triage = StubSystemOneClient(results: [.success(sensitiveScores)])
+        let out = try await run(pipeline(llm), email(), config(cloud: cloud, triage: triage))
+        let a = try #require(out.routing?.assessment)
+        #expect(a.verdict == .private && a.method == .systemOne && a.ruleID == nil && a.triage != nil)
+        #expect(await cloud.calls.isEmpty)
+        #expect(await llm.extractCalls.count == 1)
+        #expect(out.routing?.execution?.localReason == .privateContent)
+    }
+
+    @Test func storedTrustedAssessmentNotReusedAfterRiskSignal() async throws {
+        let stored = PrivacyAssessment(verdict: .public, method: .trustedSender, ruleID: "allowlist.substack",
+                                       assessedAt: today)
+        let triage = StubSystemOneClient(results: [.success(lowScores)])
+        let out = try await run(pipeline(StubLLMClient()),
+                                email(sender: allowlisted.0, body: riskBody, headers: allowlisted.1),
+                                config(cloud: RecordingExtractor(), triage: triage), stored: stored)
+        #expect(out.routing?.assessment.method == .systemOne)
+        // Without a risk signal the stored result is still reused.
+        let plain = try await run(pipeline(StubLLMClient()), email(sender: allowlisted.0, headers: allowlisted.1),
+                                  config(cloud: RecordingExtractor(), triage: triage), stored: stored)
+        #expect(plain.routing?.assessment == stored)
+    }
+
+    @Test func strongRuleAndIncompleteInspectionBeatAllowlist() async throws {
+        let cloud = RecordingExtractor(), triage = StubSystemOneClient()
+        let strong = try await run(pipeline(StubLLMClient()),
+                                   email(sender: allowlisted.0, body: "Use this verification code 123456", headers: allowlisted.1),
+                                   config(cloud: cloud, triage: triage))
+        #expect(strong.routing?.assessment.method == .rule && strong.routing?.assessment.ruleID == "kw.otp")
+        let partial = try await run(pipeline(StubLLMClient()),
+                                    email(sender: allowlisted.0, inspection: .uninspectedParts, headers: allowlisted.1),
+                                    config(cloud: cloud, triage: triage))
+        #expect(partial.routing?.assessment.method == .inspection)
+        #expect(await cloud.calls.isEmpty)
+        #expect(await triage.assessCalls.isEmpty)
+    }
+}

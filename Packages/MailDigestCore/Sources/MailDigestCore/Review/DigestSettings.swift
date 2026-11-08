@@ -44,7 +44,12 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     /// The `CloudPrivacyPolicy` revision the user accepted; nil until they accept.
     public var cloudPrivacyAcknowledgedRevision: Int?
 
-    public static let defaultTriageModel = "kev:0.8b-q8_0"
+    /// Which default-triage-model generation the stored value was written under. Revision 2 made Kev 4B the default.
+    public var triageModelDefaultRevision: Int?
+
+    public static let currentTriageModelDefaultRevision = 2
+    static let legacyDefaultTriageModel = "kev:0.8b-q8_0"
+    public static let defaultTriageModel = "kev:4b-q4_K_M"
     public static let defaultPrivacyThreshold = 0.90
     public static let defaultOllamaURL = "http://localhost:11434"
     public static let defaultModel = "qwen3:4b"
@@ -62,7 +67,9 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 cloudDigestEnabled: Bool = false, geminiModel: String = GeminiDefaults.model,
                 triageModel: String = DigestSettings.defaultTriageModel,
                 privacyThreshold: Double = DigestSettings.defaultPrivacyThreshold,
-                cloudPrivacyAcknowledgedRevision: Int? = nil) {
+                cloudPrivacyAcknowledgedRevision: Int? = nil,
+                triageModelDefaultRevision: Int? = DigestSettings.currentTriageModelDefaultRevision) {
+        self.triageModelDefaultRevision = triageModelDefaultRevision
         self.cloudDigestEnabled = cloudDigestEnabled
         self.geminiModel = geminiModel
         self.triageModel = triageModel
@@ -96,12 +103,20 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         case dailyMailboxes, autoFileProcessed, autoFileEnabledAt
         case pauseBacklogOnBattery, quietHoursEnabled, quietHoursStartMinute, quietHoursEndMinute
         case cloudDigestEnabled, geminiModel, triageModel, privacyThreshold, cloudPrivacyAcknowledgedRevision
+        case triageModelDefaultRevision
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
     public init(from decoder: Decoder) throws {
         let d = DigestSettings()
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        // A stored 0.8B model from before revision 2 only reflects the old default, not a choice: migrate it.
+        // The decoded value always carries the current revision, so a later explicit 0.8B choice survives.
+        var triage = try c.decodeIfPresent(String.self, forKey: .triageModel) ?? d.triageModel
+        let storedRevision = try c.decodeIfPresent(Int.self, forKey: .triageModelDefaultRevision)
+        if (storedRevision ?? 0) < Self.currentTriageModelDefaultRevision, triage == Self.legacyDefaultTriageModel {
+            triage = Self.defaultTriageModel
+        }
         self.init(runHour: try c.decodeIfPresent(Int.self, forKey: .runHour) ?? d.runHour,
                   runMinute: try c.decodeIfPresent(Int.self, forKey: .runMinute) ?? d.runMinute,
                   lookbackHours: try c.decodeIfPresent(Int.self, forKey: .lookbackHours) ?? d.lookbackHours,
@@ -128,7 +143,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   cloudDigestEnabled: try c.decodeIfPresent(Bool.self, forKey: .cloudDigestEnabled)
                       ?? d.cloudDigestEnabled,
                   geminiModel: try c.decodeIfPresent(String.self, forKey: .geminiModel) ?? d.geminiModel,
-                  triageModel: try c.decodeIfPresent(String.self, forKey: .triageModel) ?? d.triageModel,
+                  triageModel: triage,
                   privacyThreshold: try c.decodeIfPresent(Double.self, forKey: .privacyThreshold)
                       ?? d.privacyThreshold,
                   cloudPrivacyAcknowledgedRevision: try c.decodeIfPresent(Int.self,
