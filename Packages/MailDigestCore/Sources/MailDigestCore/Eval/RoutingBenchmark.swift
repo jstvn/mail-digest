@@ -26,10 +26,13 @@ public struct BenchmarkFixture: Codable, Sendable, Equatable {
     public var body: String
     public var inspection: ContentInspection
     public var note: String
+    /// Routing-evaluation scenario (`fixtures-routing.json`); nil in the original fixture set.
+    public var scenario: String?
 
     public init(id: String, split: String, category: String, label: BenchmarkLabel, difficulty: String = "easy",
                 subject: String, from: String, headers: [String: String] = [:], body: String,
-                inspection: ContentInspection = .complete, note: String = "") {
+                inspection: ContentInspection = .complete, note: String = "", scenario: String? = nil) {
+        self.scenario = scenario
         self.id = id; self.split = split; self.category = category; self.label = label
         self.difficulty = difficulty; self.subject = subject; self.from = from; self.headers = headers
         self.body = body; self.inspection = inspection; self.note = note
@@ -45,11 +48,12 @@ public struct BenchmarkFixture: Codable, Sendable, Equatable {
                   headers: try c.decodeIfPresent([String: String].self, forKey: .headers) ?? [:],
                   body: try c.decode(String.self, forKey: .body),
                   inspection: try c.decodeIfPresent(ContentInspection.self, forKey: .inspection) ?? .complete,
-                  note: try c.decodeIfPresent(String.self, forKey: .note) ?? "")
+                  note: try c.decodeIfPresent(String.self, forKey: .note) ?? "",
+                  scenario: try c.decodeIfPresent(String.self, forKey: .scenario))
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, split, category, label, difficulty, subject, from, headers, body, inspection, note
+        case id, split, category, label, difficulty, subject, from, headers, body, inspection, note, scenario
     }
 
     /// The message as production sees it before `DigestRouter.assess` (the body is NOT pre-cleaned:
@@ -62,6 +66,9 @@ public struct BenchmarkFixture: Codable, Sendable, Equatable {
 
     /// True for the `inspection` category, which only demonstrates routing reasons and is excluded from metrics.
     public var isInspectionOnly: Bool { category == BenchmarkFixtures.inspectionCategory }
+
+    /// True when the message was never fully inspected, so it can only ever route locally.
+    public var isInspectionLocal: Bool { isInspectionOnly || inspection != .complete }
 }
 
 /// Fixture set constants and validation.
@@ -91,6 +98,39 @@ public enum BenchmarkFixtures {
         }
         for f in fixtures where !(300...2_500).contains(f.body.count) {
             problems.append("\(f.id): body length \(f.body.count) outside 300-2500")
+        }
+        return problems
+    }
+
+    /// Scenarios of `fixtures-routing.json`. `long_over_budget` is the single item expected to fail closed.
+    public static let routingScenarios = [
+        "trusted_ordinary", "trusted_medical_research", "trusted_tax_policy", "trusted_invoice_software",
+        "anonymised_case_study", "voluntary_reader_story", "identifiable_sensitive_newsletter",
+        "public_figure_contact", "trusted_embedded_private", "private_medical_financial", "ambiguous_sender",
+        "pii_in_quoted_reply", "pii_in_signature", "long_message", "long_over_budget", "bulk_sensitive_domain",
+        "uninspected_parts",
+    ]
+
+    /// Problems with the routing fixture set (empty when valid): unique ids, a known `scenario` and split
+    /// `selective` on every item, at least 5 items per scenario (1 for `long_over_budget`) and sane body sizes.
+    public static func validateRouting(_ fixtures: [BenchmarkFixture]) -> [String] {
+        var problems: [String] = []
+        let ids = fixtures.map(\.id)
+        if Set(ids).count != ids.count { problems.append("duplicate ids") }
+        for f in fixtures {
+            guard let s = f.scenario, routingScenarios.contains(s) else {
+                problems.append("\(f.id): missing or unknown scenario"); continue
+            }
+            if f.split != "selective" { problems.append("\(f.id): split must be selective") }
+            let range = s == "long_message" ? 2_500...9_000 : (s == "long_over_budget" ? 9_000...40_000 : 150...2_500)
+            if !range.contains(f.body.count) { problems.append("\(f.id): body length \(f.body.count) outside \(range)") }
+            if s == "uninspected_parts" && f.inspection == .complete { problems.append("\(f.id): needs non-complete inspection") }
+            if s != "uninspected_parts" && f.inspection != .complete { problems.append("\(f.id): inspection must be complete") }
+        }
+        for s in routingScenarios {
+            let n = fixtures.filter { $0.scenario == s }.count
+            let need = s == "long_over_budget" ? 1 : 5
+            if n < need { problems.append("\(s): expected at least \(need), found \(n)") }
         }
         return problems
     }

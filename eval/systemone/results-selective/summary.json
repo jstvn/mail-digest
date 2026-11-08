@@ -1,0 +1,2698 @@
+{
+  "models" : [
+    {
+      "daily" : {
+        "medianCallSeconds" : 20.353370428085327,
+        "oldCallsPer100Original" : 88.19444444444444,
+        "revisedCallsPer100All" : 76.19047619047619,
+        "revisedCallsPer100Original" : 95.13888888888889,
+        "revisedMeasuredSecondsPer100All" : 1606.3910225253085
+      },
+      "groups" : [
+        {
+          "callsPer100" : 95.13888888888889,
+          "callsPerMessage" : 0.9513888888888888,
+          "chunkDistribution" : {
+            "0" : 14,
+            "1" : 123,
+            "2" : 7
+          },
+          "cloudOffCounts" : {
+            "notAssessed\/cloudOff" : 130,
+            "private\/rule" : 10,
+            "public\/trustedSender" : 4
+          },
+          "eligible" : 34,
+          "evaluationFailures" : [
+
+          ],
+          "falseCloud" : [
+
+          ],
+          "falseLocal" : [
+            {
+              "fixtureID" : "news-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "geminiFallbackCounts" : {
+            "local\/cloudFailed\/network" : 34
+          },
+          "inspectionExclusionRate" : 0,
+          "localReasons" : {
+            "deterministic private" : 10,
+            "sensitive" : 33,
+            "uncertain\/below threshold" : 67
+          },
+          "measuredSecondsPer100" : 2060.5254240334034,
+          "name" : "original 144 scored items",
+          "needsSystemOneRate" : 0.9027777777777778,
+          "overBudget" : [
+
+          ],
+          "pathCounts" : {
+            "ambiguousSystemOne" : 129,
+            "deterministicPrivate" : 10,
+            "trustedDirect" : 4,
+            "trustedSelective" : 1
+          },
+          "perCallMedianSeconds" : 20.90835404396057,
+          "perCallP95Seconds" : 31.324697017669678,
+          "perMessageMedianSeconds" : 20.776857018470764,
+          "perMessageP95Seconds" : 43.6342339515686,
+          "privateLocalRate" : 1,
+          "publicEligibility" : 0.85,
+          "total" : 144,
+          "trustedNeedingSystemOne" : 1,
+          "trustedTotal" : 5
+        },
+        {
+          "callsPer100" : 48.148148148148145,
+          "callsPerMessage" : 0.48148148148148145,
+          "chunkDistribution" : {
+            "0" : 45,
+            "1" : 33,
+            "2" : 3
+          },
+          "cloudOffCounts" : {
+            "notAssessed\/cloudOff" : 42,
+            "private\/rule" : 10,
+            "public\/trustedSender" : 29
+          },
+          "eligible" : 40,
+          "evaluationFailures" : [
+
+          ],
+          "falseCloud" : [
+
+          ],
+          "falseLocal" : [
+            {
+              "fixtureID" : "rt-case-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-amb-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "ambiguous_sender",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-sig-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "pii_in_signature",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "geminiFallbackCounts" : {
+            "local\/cloudFailed\/network" : 40
+          },
+          "inspectionExclusionRate" : 0.06172839506172839,
+          "localReasons" : {
+            "deterministic private" : 10,
+            "inspection" : 5,
+            "sensitive" : 15,
+            "too long" : 1,
+            "uncertain\/below threshold" : 10
+          },
+          "measuredSecondsPer100" : 918.0329029942736,
+          "name" : "new scenarios",
+          "needsSystemOneRate" : 0.4567901234567901,
+          "overBudget" : [
+            {
+              "fixtureID" : "rt-over-01",
+              "label" : "public",
+              "localReason" : "too long",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "long_over_budget",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "pathCounts" : {
+            "ambiguousSystemOne" : 23,
+            "deterministicPrivate" : 10,
+            "inspectionLocal" : 5,
+            "sensitiveSenderSystemOne" : 3,
+            "trustedDirect" : 29,
+            "trustedSelective" : 11
+          },
+          "perCallMedianSeconds" : 17.766381978988647,
+          "perCallP95Seconds" : 26.45335102081299,
+          "perMessageMedianSeconds" : 17.46171349287033,
+          "perMessageP95Seconds" : 49.66621196269989,
+          "privateLocalRate" : 1,
+          "publicEligibility" : 0.9302325581395349,
+          "total" : 81,
+          "trustedNeedingSystemOne" : 11,
+          "trustedTotal" : 42
+        },
+        {
+          "callsPer100" : 76.19047619047619,
+          "callsPerMessage" : 0.7619047619047619,
+          "chunkDistribution" : {
+            "0" : 65,
+            "1" : 156,
+            "2" : 10
+          },
+          "cloudOffCounts" : {
+            "notAssessed\/cloudOff" : 178,
+            "private\/rule" : 20,
+            "public\/trustedSender" : 33
+          },
+          "eligible" : 74,
+          "evaluationFailures" : [
+
+          ],
+          "falseCloud" : [
+
+          ],
+          "falseLocal" : [
+            {
+              "fixtureID" : "news-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-case-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-amb-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "ambiguous_sender",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-sig-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "pii_in_signature",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "geminiFallbackCounts" : {
+            "local\/cloudFailed\/network" : 74
+          },
+          "inspectionExclusionRate" : 0.047619047619047616,
+          "localReasons" : {
+            "deterministic private" : 20,
+            "inspection" : 11,
+            "sensitive" : 48,
+            "too long" : 1,
+            "uncertain\/below threshold" : 77
+          },
+          "measuredSecondsPer100" : 1606.3910225253085,
+          "name" : "combined",
+          "needsSystemOneRate" : 0.7229437229437229,
+          "overBudget" : [
+            {
+              "fixtureID" : "rt-over-01",
+              "label" : "public",
+              "localReason" : "too long",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "long_over_budget",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "pathCounts" : {
+            "ambiguousSystemOne" : 152,
+            "deterministicPrivate" : 20,
+            "inspectionLocal" : 11,
+            "sensitiveSenderSystemOne" : 3,
+            "trustedDirect" : 33,
+            "trustedSelective" : 12
+          },
+          "perCallMedianSeconds" : 20.353370428085327,
+          "perCallP95Seconds" : 30.65530300140381,
+          "perMessageMedianSeconds" : 20.191208481788635,
+          "perMessageP95Seconds" : 43.88548195362091,
+          "privateLocalRate" : 1,
+          "publicEligibility" : 0.891566265060241,
+          "total" : 231,
+          "trustedNeedingSystemOne" : 12,
+          "trustedTotal" : 47
+        }
+      ],
+      "model" : "kev:4b-q4_K_M",
+      "scenarios" : [
+        {
+          "eligible" : 1,
+          "falseCloud" : 0,
+          "falseLocal" : 1,
+          "routes" : {
+            "ambiguousSystemOne" : 5
+          },
+          "scenario" : "ambiguous_sender",
+          "total" : 5
+        },
+        {
+          "eligible" : 4,
+          "falseCloud" : 0,
+          "falseLocal" : 1,
+          "routes" : {
+            "ambiguousSystemOne" : 2,
+            "trustedDirect" : 3
+          },
+          "scenario" : "anonymised_case_study",
+          "total" : 5
+        },
+        {
+          "eligible" : 3,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "deterministicPrivate" : 2,
+            "sensitiveSenderSystemOne" : 3
+          },
+          "scenario" : "bulk_sensitive_domain",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedSelective" : 5
+          },
+          "scenario" : "identifiable_sensitive_newsletter",
+          "total" : 5
+        },
+        {
+          "eligible" : 2,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 3,
+            "trustedDirect" : 1,
+            "trustedSelective" : 1
+          },
+          "scenario" : "long_message",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 1
+          },
+          "scenario" : "long_over_budget",
+          "total" : 1
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:ambiguous",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:confidential_work",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 7,
+            "deterministicPrivate" : 5
+          },
+          "scenario" : "orig:financial_transactional",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "inspectionLocal" : 6
+          },
+          "scenario" : "orig:inspection",
+          "total" : 6
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 9,
+            "deterministicPrivate" : 3
+          },
+          "scenario" : "orig:medical",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 10,
+            "deterministicPrivate" : 2
+          },
+          "scenario" : "orig:personal_identifiers",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:personal_scheduling",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:private_personal",
+          "total" : 12
+        },
+        {
+          "eligible" : 1,
+          "falseCloud" : 0,
+          "falseLocal" : 3,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:prompt_injection",
+          "total" : 12
+        },
+        {
+          "eligible" : 12,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:public_marketing",
+          "total" : 12
+        },
+        {
+          "eligible" : 11,
+          "falseCloud" : 0,
+          "falseLocal" : 1,
+          "routes" : {
+            "ambiguousSystemOne" : 8,
+            "trustedDirect" : 4
+          },
+          "scenario" : "orig:public_newsletter",
+          "total" : 12
+        },
+        {
+          "eligible" : 10,
+          "falseCloud" : 0,
+          "falseLocal" : 2,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:public_notification",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 11,
+            "trustedSelective" : 1
+          },
+          "scenario" : "orig:public_with_sensitive",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 3,
+            "deterministicPrivate" : 1,
+            "trustedSelective" : 1
+          },
+          "scenario" : "pii_in_quoted_reply",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 1,
+          "routes" : {
+            "ambiguousSystemOne" : 4,
+            "deterministicPrivate" : 1
+          },
+          "scenario" : "pii_in_signature",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 1,
+            "deterministicPrivate" : 4
+          },
+          "scenario" : "private_medical_financial",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 2,
+            "trustedDirect" : 2,
+            "trustedSelective" : 1
+          },
+          "scenario" : "public_figure_contact",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "deterministicPrivate" : 2,
+            "trustedSelective" : 3
+          },
+          "scenario" : "trusted_embedded_private",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_invoice_software",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_medical_research",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_ordinary",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_tax_policy",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "inspectionLocal" : 5
+          },
+          "scenario" : "uninspected_parts",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 2,
+            "trustedDirect" : 3
+          },
+          "scenario" : "voluntary_reader_story",
+          "total" : 5
+        }
+      ]
+    },
+    {
+      "daily" : {
+        "medianCallSeconds" : 5.672976493835449,
+        "oldCallsPer100Original" : 88.19444444444444,
+        "revisedCallsPer100All" : 71.86147186147186,
+        "revisedCallsPer100Original" : 90.27777777777777,
+        "revisedMeasuredSecondsPer100All" : 450.9108707502291
+      },
+      "groups" : [
+        {
+          "callsPer100" : 90.27777777777777,
+          "callsPerMessage" : 0.9027777777777778,
+          "chunkDistribution" : {
+            "0" : 14,
+            "1" : 130
+          },
+          "cloudOffCounts" : {
+            "notAssessed\/cloudOff" : 130,
+            "private\/rule" : 10,
+            "public\/trustedSender" : 4
+          },
+          "eligible" : 4,
+          "evaluationFailures" : [
+
+          ],
+          "falseCloud" : [
+
+          ],
+          "falseLocal" : [
+            {
+              "fixtureID" : "news-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-06",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-06",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-08",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-12",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-06",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-08",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-12",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-03",
+              "label" : "public",
+              "localReason" : "sensitive",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "geminiFallbackCounts" : {
+            "local\/cloudFailed\/network" : 4
+          },
+          "inspectionExclusionRate" : 0,
+          "localReasons" : {
+            "deterministic private" : 10,
+            "sensitive" : 6,
+            "uncertain\/below threshold" : 124
+          },
+          "measuredSecondsPer100" : 541.920644376013,
+          "name" : "original 144 scored items",
+          "needsSystemOneRate" : 0.9027777777777778,
+          "overBudget" : [
+
+          ],
+          "pathCounts" : {
+            "ambiguousSystemOne" : 129,
+            "deterministicPrivate" : 10,
+            "trustedDirect" : 4,
+            "trustedSelective" : 1
+          },
+          "perCallMedianSeconds" : 5.537086486816406,
+          "perCallP95Seconds" : 8.822082996368408,
+          "perMessageMedianSeconds" : 5.537086486816406,
+          "perMessageP95Seconds" : 8.822082996368408,
+          "privateLocalRate" : 1,
+          "publicEligibility" : 0.1,
+          "total" : 144,
+          "trustedNeedingSystemOne" : 1,
+          "trustedTotal" : 5
+        },
+        {
+          "callsPer100" : 44.44444444444444,
+          "callsPerMessage" : 0.4444444444444444,
+          "chunkDistribution" : {
+            "0" : 45,
+            "1" : 36
+          },
+          "cloudOffCounts" : {
+            "notAssessed\/cloudOff" : 42,
+            "private\/rule" : 10,
+            "public\/trustedSender" : 29
+          },
+          "eligible" : 29,
+          "evaluationFailures" : [
+
+          ],
+          "falseCloud" : [
+
+          ],
+          "falseLocal" : [
+            {
+              "fixtureID" : "rt-case-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-case-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-reader-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "voluntary_reader_story",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-reader-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "voluntary_reader_story",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-pf-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "public_figure_contact",
+              "signal" : "risk.identifiable.sensitive"
+            },
+            {
+              "fixtureID" : "rt-pf-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "public_figure_contact",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-pf-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "trustedSelective",
+              "scenario" : "public_figure_contact",
+              "signal" : "risk.identifiable.sensitive"
+            },
+            {
+              "fixtureID" : "rt-amb-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "ambiguous_sender",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-amb-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "ambiguous_sender",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-sig-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "pii_in_signature",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-bulk-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "sensitiveSenderSystemOne",
+              "scenario" : "bulk_sensitive_domain",
+              "signal" : "sensitiveSender"
+            },
+            {
+              "fixtureID" : "rt-bulk-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "sensitiveSenderSystemOne",
+              "scenario" : "bulk_sensitive_domain",
+              "signal" : "sensitiveSender"
+            },
+            {
+              "fixtureID" : "rt-bulk-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "sensitiveSenderSystemOne",
+              "scenario" : "bulk_sensitive_domain",
+              "signal" : "sensitiveSender"
+            },
+            {
+              "fixtureID" : "rt-long-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "long_message",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "geminiFallbackCounts" : {
+            "local\/cloudFailed\/network" : 29
+          },
+          "inspectionExclusionRate" : 0.06172839506172839,
+          "localReasons" : {
+            "deterministic private" : 10,
+            "inspection" : 5,
+            "sensitive" : 6,
+            "too long" : 1,
+            "uncertain\/below threshold" : 30
+          },
+          "measuredSecondsPer100" : 322.516522878482,
+          "name" : "new scenarios",
+          "needsSystemOneRate" : 0.4567901234567901,
+          "overBudget" : [
+            {
+              "fixtureID" : "rt-over-01",
+              "label" : "public",
+              "localReason" : "too long",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "long_over_budget",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "pathCounts" : {
+            "ambiguousSystemOne" : 23,
+            "deterministicPrivate" : 10,
+            "inspectionLocal" : 5,
+            "sensitiveSenderSystemOne" : 3,
+            "trustedDirect" : 29,
+            "trustedSelective" : 11
+          },
+          "perCallMedianSeconds" : 6.090212464332581,
+          "perCallP95Seconds" : 13.269722938537598,
+          "perMessageMedianSeconds" : 6.090212464332581,
+          "perMessageP95Seconds" : 13.269722938537598,
+          "privateLocalRate" : 1,
+          "publicEligibility" : 0.6744186046511628,
+          "total" : 81,
+          "trustedNeedingSystemOne" : 11,
+          "trustedTotal" : 42
+        },
+        {
+          "callsPer100" : 71.86147186147186,
+          "callsPerMessage" : 0.7186147186147186,
+          "chunkDistribution" : {
+            "0" : 65,
+            "1" : 166
+          },
+          "cloudOffCounts" : {
+            "notAssessed\/cloudOff" : 178,
+            "private\/rule" : 20,
+            "public\/trustedSender" : 33
+          },
+          "eligible" : 33,
+          "evaluationFailures" : [
+
+          ],
+          "falseCloud" : [
+
+          ],
+          "falseLocal" : [
+            {
+              "fixtureID" : "news-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-06",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-06",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-08",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-12",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-06",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-08",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-12",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-03",
+              "label" : "public",
+              "localReason" : "sensitive",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-case-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-case-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-reader-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "voluntary_reader_story",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-reader-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "voluntary_reader_story",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-pf-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "public_figure_contact",
+              "signal" : "risk.identifiable.sensitive"
+            },
+            {
+              "fixtureID" : "rt-pf-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "public_figure_contact",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-pf-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "trustedSelective",
+              "scenario" : "public_figure_contact",
+              "signal" : "risk.identifiable.sensitive"
+            },
+            {
+              "fixtureID" : "rt-amb-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "ambiguous_sender",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-amb-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "ambiguous_sender",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-sig-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "pii_in_signature",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-bulk-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "sensitiveSenderSystemOne",
+              "scenario" : "bulk_sensitive_domain",
+              "signal" : "sensitiveSender"
+            },
+            {
+              "fixtureID" : "rt-bulk-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "sensitiveSenderSystemOne",
+              "scenario" : "bulk_sensitive_domain",
+              "signal" : "sensitiveSender"
+            },
+            {
+              "fixtureID" : "rt-bulk-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "sensitiveSenderSystemOne",
+              "scenario" : "bulk_sensitive_domain",
+              "signal" : "sensitiveSender"
+            },
+            {
+              "fixtureID" : "rt-long-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "long_message",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "geminiFallbackCounts" : {
+            "local\/cloudFailed\/network" : 33
+          },
+          "inspectionExclusionRate" : 0.047619047619047616,
+          "localReasons" : {
+            "deterministic private" : 20,
+            "inspection" : 11,
+            "sensitive" : 12,
+            "too long" : 1,
+            "uncertain\/below threshold" : 154
+          },
+          "measuredSecondsPer100" : 450.9108707502291,
+          "name" : "combined",
+          "needsSystemOneRate" : 0.7229437229437229,
+          "overBudget" : [
+            {
+              "fixtureID" : "rt-over-01",
+              "label" : "public",
+              "localReason" : "too long",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "long_over_budget",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "pathCounts" : {
+            "ambiguousSystemOne" : 152,
+            "deterministicPrivate" : 20,
+            "inspectionLocal" : 11,
+            "sensitiveSenderSystemOne" : 3,
+            "trustedDirect" : 33,
+            "trustedSelective" : 12
+          },
+          "perCallMedianSeconds" : 5.672976493835449,
+          "perCallP95Seconds" : 11.51052701473236,
+          "perMessageMedianSeconds" : 5.672976493835449,
+          "perMessageP95Seconds" : 11.51052701473236,
+          "privateLocalRate" : 1,
+          "publicEligibility" : 0.39759036144578314,
+          "total" : 231,
+          "trustedNeedingSystemOne" : 12,
+          "trustedTotal" : 47
+        }
+      ],
+      "model" : "kev:0.8b-q8_0",
+      "scenarios" : [
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 2,
+          "routes" : {
+            "ambiguousSystemOne" : 5
+          },
+          "scenario" : "ambiguous_sender",
+          "total" : 5
+        },
+        {
+          "eligible" : 3,
+          "falseCloud" : 0,
+          "falseLocal" : 2,
+          "routes" : {
+            "ambiguousSystemOne" : 2,
+            "trustedDirect" : 3
+          },
+          "scenario" : "anonymised_case_study",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 3,
+          "routes" : {
+            "deterministicPrivate" : 2,
+            "sensitiveSenderSystemOne" : 3
+          },
+          "scenario" : "bulk_sensitive_domain",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedSelective" : 5
+          },
+          "scenario" : "identifiable_sensitive_newsletter",
+          "total" : 5
+        },
+        {
+          "eligible" : 1,
+          "falseCloud" : 0,
+          "falseLocal" : 1,
+          "routes" : {
+            "ambiguousSystemOne" : 3,
+            "trustedDirect" : 1,
+            "trustedSelective" : 1
+          },
+          "scenario" : "long_message",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 1
+          },
+          "scenario" : "long_over_budget",
+          "total" : 1
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:ambiguous",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:confidential_work",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 7,
+            "deterministicPrivate" : 5
+          },
+          "scenario" : "orig:financial_transactional",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "inspectionLocal" : 6
+          },
+          "scenario" : "orig:inspection",
+          "total" : 6
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 9,
+            "deterministicPrivate" : 3
+          },
+          "scenario" : "orig:medical",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 10,
+            "deterministicPrivate" : 2
+          },
+          "scenario" : "orig:personal_identifiers",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:personal_scheduling",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:private_personal",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 4,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:prompt_injection",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 12,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:public_marketing",
+          "total" : 12
+        },
+        {
+          "eligible" : 4,
+          "falseCloud" : 0,
+          "falseLocal" : 8,
+          "routes" : {
+            "ambiguousSystemOne" : 8,
+            "trustedDirect" : 4
+          },
+          "scenario" : "orig:public_newsletter",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 12,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:public_notification",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 11,
+            "trustedSelective" : 1
+          },
+          "scenario" : "orig:public_with_sensitive",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 3,
+            "deterministicPrivate" : 1,
+            "trustedSelective" : 1
+          },
+          "scenario" : "pii_in_quoted_reply",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 1,
+          "routes" : {
+            "ambiguousSystemOne" : 4,
+            "deterministicPrivate" : 1
+          },
+          "scenario" : "pii_in_signature",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 1,
+            "deterministicPrivate" : 4
+          },
+          "scenario" : "private_medical_financial",
+          "total" : 5
+        },
+        {
+          "eligible" : 2,
+          "falseCloud" : 0,
+          "falseLocal" : 3,
+          "routes" : {
+            "ambiguousSystemOne" : 2,
+            "trustedDirect" : 2,
+            "trustedSelective" : 1
+          },
+          "scenario" : "public_figure_contact",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "deterministicPrivate" : 2,
+            "trustedSelective" : 3
+          },
+          "scenario" : "trusted_embedded_private",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_invoice_software",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_medical_research",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_ordinary",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_tax_policy",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "inspectionLocal" : 5
+          },
+          "scenario" : "uninspected_parts",
+          "total" : 5
+        },
+        {
+          "eligible" : 3,
+          "falseCloud" : 0,
+          "falseLocal" : 2,
+          "routes" : {
+            "ambiguousSystemOne" : 2,
+            "trustedDirect" : 3
+          },
+          "scenario" : "voluntary_reader_story",
+          "total" : 5
+        }
+      ]
+    },
+    {
+      "daily" : {
+        "medianCallSeconds" : 5.088619947433472,
+        "oldCallsPer100Original" : 88.19444444444444,
+        "revisedCallsPer100All" : 74.89177489177489,
+        "revisedCallsPer100Original" : 94.44444444444444,
+        "revisedMeasuredSecondsPer100All" : 408.9255679737438
+      },
+      "groups" : [
+        {
+          "callsPer100" : 94.44444444444444,
+          "callsPerMessage" : 0.9444444444444444,
+          "chunkDistribution" : {
+            "0" : 14,
+            "1" : 124,
+            "2" : 6
+          },
+          "cloudOffCounts" : {
+            "notAssessed\/cloudOff" : 130,
+            "private\/rule" : 10,
+            "public\/trustedSender" : 4
+          },
+          "eligible" : 24,
+          "evaluationFailures" : [
+
+          ],
+          "falseCloud" : [
+
+          ],
+          "falseLocal" : [
+            {
+              "fixtureID" : "news-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-08",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-06",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "geminiFallbackCounts" : {
+            "local\/cloudFailed\/network" : 24
+          },
+          "inspectionExclusionRate" : 0,
+          "localReasons" : {
+            "deterministic private" : 10,
+            "uncertain\/below threshold" : 110
+          },
+          "measuredSecondsPer100" : 529.1705867482556,
+          "name" : "original 144 scored items",
+          "needsSystemOneRate" : 0.9027777777777778,
+          "overBudget" : [
+
+          ],
+          "pathCounts" : {
+            "ambiguousSystemOne" : 129,
+            "deterministicPrivate" : 10,
+            "trustedDirect" : 4,
+            "trustedSelective" : 1
+          },
+          "perCallMedianSeconds" : 5.22332501411438,
+          "perCallP95Seconds" : 7.426431059837341,
+          "perMessageMedianSeconds" : 5.203058540821075,
+          "perMessageP95Seconds" : 11.114544987678528,
+          "privateLocalRate" : 1,
+          "publicEligibility" : 0.6,
+          "total" : 144,
+          "trustedNeedingSystemOne" : 1,
+          "trustedTotal" : 5
+        },
+        {
+          "callsPer100" : 45.67901234567901,
+          "callsPerMessage" : 0.4567901234567901,
+          "chunkDistribution" : {
+            "0" : 45,
+            "1" : 35,
+            "2" : 1
+          },
+          "cloudOffCounts" : {
+            "notAssessed\/cloudOff" : 42,
+            "private\/rule" : 10,
+            "public\/trustedSender" : 29
+          },
+          "eligible" : 38,
+          "evaluationFailures" : [
+
+          ],
+          "falseCloud" : [
+
+          ],
+          "falseLocal" : [
+            {
+              "fixtureID" : "rt-case-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-case-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-pf-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "public_figure_contact",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-pf-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "trustedSelective",
+              "scenario" : "public_figure_contact",
+              "signal" : "risk.identifiable.sensitive"
+            },
+            {
+              "fixtureID" : "rt-amb-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "ambiguous_sender",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "geminiFallbackCounts" : {
+            "local\/cloudFailed\/network" : 38
+          },
+          "inspectionExclusionRate" : 0.06172839506172839,
+          "localReasons" : {
+            "deterministic private" : 10,
+            "inspection" : 5,
+            "too long" : 1,
+            "uncertain\/below threshold" : 27
+          },
+          "measuredSecondsPer100" : 225.44742852081487,
+          "name" : "new scenarios",
+          "needsSystemOneRate" : 0.4567901234567901,
+          "overBudget" : [
+            {
+              "fixtureID" : "rt-over-01",
+              "label" : "public",
+              "localReason" : "too long",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "long_over_budget",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "pathCounts" : {
+            "ambiguousSystemOne" : 23,
+            "deterministicPrivate" : 10,
+            "inspectionLocal" : 5,
+            "sensitiveSenderSystemOne" : 3,
+            "trustedDirect" : 29,
+            "trustedSelective" : 11
+          },
+          "perCallMedianSeconds" : 4.893780946731567,
+          "perCallP95Seconds" : 6.030614018440247,
+          "perMessageMedianSeconds" : 4.876550495624542,
+          "perMessageP95Seconds" : 6.2540119886398315,
+          "privateLocalRate" : 1,
+          "publicEligibility" : 0.8837209302325582,
+          "total" : 81,
+          "trustedNeedingSystemOne" : 11,
+          "trustedTotal" : 42
+        },
+        {
+          "callsPer100" : 74.89177489177489,
+          "callsPerMessage" : 0.7489177489177489,
+          "chunkDistribution" : {
+            "0" : 65,
+            "1" : 159,
+            "2" : 7
+          },
+          "cloudOffCounts" : {
+            "notAssessed\/cloudOff" : 178,
+            "private\/rule" : 20,
+            "public\/trustedSender" : 33
+          },
+          "eligible" : 62,
+          "evaluationFailures" : [
+
+          ],
+          "falseCloud" : [
+
+          ],
+          "falseLocal" : [
+            {
+              "fixtureID" : "news-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "news-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-08",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "mkt-10",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-01",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-06",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-07",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-09",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "notif-11",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "inj-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-case-03",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-case-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "anonymised_case_study",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-pf-04",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "public_figure_contact",
+              "signal" : "ambiguousSender"
+            },
+            {
+              "fixtureID" : "rt-pf-05",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "trustedSelective",
+              "scenario" : "public_figure_contact",
+              "signal" : "risk.identifiable.sensitive"
+            },
+            {
+              "fixtureID" : "rt-amb-02",
+              "label" : "public",
+              "localReason" : "uncertain\/below threshold",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "ambiguous_sender",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "geminiFallbackCounts" : {
+            "local\/cloudFailed\/network" : 62
+          },
+          "inspectionExclusionRate" : 0.047619047619047616,
+          "localReasons" : {
+            "deterministic private" : 20,
+            "inspection" : 11,
+            "too long" : 1,
+            "uncertain\/below threshold" : 137
+          },
+          "measuredSecondsPer100" : 408.9255679737438,
+          "name" : "combined",
+          "needsSystemOneRate" : 0.7229437229437229,
+          "overBudget" : [
+            {
+              "fixtureID" : "rt-over-01",
+              "label" : "public",
+              "localReason" : "too long",
+              "path" : "ambiguousSystemOne",
+              "scenario" : "long_over_budget",
+              "signal" : "ambiguousSender"
+            }
+          ],
+          "pathCounts" : {
+            "ambiguousSystemOne" : 152,
+            "deterministicPrivate" : 20,
+            "inspectionLocal" : 11,
+            "sensitiveSenderSystemOne" : 3,
+            "trustedDirect" : 33,
+            "trustedSelective" : 12
+          },
+          "perCallMedianSeconds" : 5.088619947433472,
+          "perCallP95Seconds" : 7.242858052253723,
+          "perMessageMedianSeconds" : 5.065784513950348,
+          "perMessageP95Seconds" : 11.065649032592773,
+          "privateLocalRate" : 1,
+          "publicEligibility" : 0.7469879518072289,
+          "total" : 231,
+          "trustedNeedingSystemOne" : 12,
+          "trustedTotal" : 47
+        }
+      ],
+      "model" : "tev1:0.8b-q8_0",
+      "scenarios" : [
+        {
+          "eligible" : 1,
+          "falseCloud" : 0,
+          "falseLocal" : 1,
+          "routes" : {
+            "ambiguousSystemOne" : 5
+          },
+          "scenario" : "ambiguous_sender",
+          "total" : 5
+        },
+        {
+          "eligible" : 3,
+          "falseCloud" : 0,
+          "falseLocal" : 2,
+          "routes" : {
+            "ambiguousSystemOne" : 2,
+            "trustedDirect" : 3
+          },
+          "scenario" : "anonymised_case_study",
+          "total" : 5
+        },
+        {
+          "eligible" : 3,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "deterministicPrivate" : 2,
+            "sensitiveSenderSystemOne" : 3
+          },
+          "scenario" : "bulk_sensitive_domain",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedSelective" : 5
+          },
+          "scenario" : "identifiable_sensitive_newsletter",
+          "total" : 5
+        },
+        {
+          "eligible" : 2,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 3,
+            "trustedDirect" : 1,
+            "trustedSelective" : 1
+          },
+          "scenario" : "long_message",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 1
+          },
+          "scenario" : "long_over_budget",
+          "total" : 1
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:ambiguous",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:confidential_work",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 7,
+            "deterministicPrivate" : 5
+          },
+          "scenario" : "orig:financial_transactional",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "inspectionLocal" : 6
+          },
+          "scenario" : "orig:inspection",
+          "total" : 6
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 9,
+            "deterministicPrivate" : 3
+          },
+          "scenario" : "orig:medical",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 10,
+            "deterministicPrivate" : 2
+          },
+          "scenario" : "orig:personal_identifiers",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:personal_scheduling",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:private_personal",
+          "total" : 12
+        },
+        {
+          "eligible" : 2,
+          "falseCloud" : 0,
+          "falseLocal" : 2,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:prompt_injection",
+          "total" : 12
+        },
+        {
+          "eligible" : 8,
+          "falseCloud" : 0,
+          "falseLocal" : 4,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:public_marketing",
+          "total" : 12
+        },
+        {
+          "eligible" : 9,
+          "falseCloud" : 0,
+          "falseLocal" : 3,
+          "routes" : {
+            "ambiguousSystemOne" : 8,
+            "trustedDirect" : 4
+          },
+          "scenario" : "orig:public_newsletter",
+          "total" : 12
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 7,
+          "routes" : {
+            "ambiguousSystemOne" : 12
+          },
+          "scenario" : "orig:public_notification",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 11,
+            "trustedSelective" : 1
+          },
+          "scenario" : "orig:public_with_sensitive",
+          "total" : 12
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 3,
+            "deterministicPrivate" : 1,
+            "trustedSelective" : 1
+          },
+          "scenario" : "pii_in_quoted_reply",
+          "total" : 5
+        },
+        {
+          "eligible" : 1,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 4,
+            "deterministicPrivate" : 1
+          },
+          "scenario" : "pii_in_signature",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 1,
+            "deterministicPrivate" : 4
+          },
+          "scenario" : "private_medical_financial",
+          "total" : 5
+        },
+        {
+          "eligible" : 3,
+          "falseCloud" : 0,
+          "falseLocal" : 2,
+          "routes" : {
+            "ambiguousSystemOne" : 2,
+            "trustedDirect" : 2,
+            "trustedSelective" : 1
+          },
+          "scenario" : "public_figure_contact",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "deterministicPrivate" : 2,
+            "trustedSelective" : 3
+          },
+          "scenario" : "trusted_embedded_private",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_invoice_software",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_medical_research",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_ordinary",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "trustedDirect" : 5
+          },
+          "scenario" : "trusted_tax_policy",
+          "total" : 5
+        },
+        {
+          "eligible" : 0,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "inspectionLocal" : 5
+          },
+          "scenario" : "uninspected_parts",
+          "total" : 5
+        },
+        {
+          "eligible" : 5,
+          "falseCloud" : 0,
+          "falseLocal" : 0,
+          "routes" : {
+            "ambiguousSystemOne" : 2,
+            "trustedDirect" : 3
+          },
+          "scenario" : "voluntary_reader_story",
+          "total" : 5
+        }
+      ]
+    }
+  ]
+}

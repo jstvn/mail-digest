@@ -1,0 +1,1325 @@
+[
+  {
+    "id": "rt-ord-01",
+    "split": "selective",
+    "category": "trusted_ordinary",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Notes from the allotment: sowing in the cold",
+    "from": "Notes From the Allotment <allotmentnotes@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://allotmentnotes.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Good morning,\n\nFebruary is the month where patience pays. The soil is still cold enough to rot seed, so I keep the packets in the shed and use the windowsill for onions and early leeks instead. If you have a spare tray, sow onion seed thinly, cover lightly with vermiculite and keep it somewhere cool and bright.\n\nThis week's small wins: the rhubarb crowns are showing pink, the broad beans under cloches are holding up, and the neighbour's compost heap finally turned into something usable.\n\nReader question of the week: can you reuse old potting mix? Yes, if it did not carry disease. Refresh it with a handful of fresh compost and a little grit.\n\nSee you next Sunday,\nThe Allotment Notes team\n\nYou are receiving this because you subscribed to Notes From the Allotment. Unsubscribe any time.",
+    "inspection": "complete",
+    "note": "Plain gardening newsletter from an allowlisted sender: should go straight to the cloud.",
+    "scenario": "trusted_ordinary"
+  },
+  {
+    "id": "rt-ord-02",
+    "split": "selective",
+    "category": "trusted_ordinary",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Weekly ledger: what shipped in the open-source world",
+    "from": "The Weekly Ledger <weeklyledger@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://weeklyledger.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Hello,\n\nFour things worth your attention this week.\n\n1. A popular static-site generator released its next major version, with faster incremental builds and a cleaner plugin interface. The migration guide is short and the maintainers have tagged the breaking changes clearly.\n\n2. A small team published a post-mortem on a three hour outage caused by an expired certificate. The takeaway is boring and useful: put expiry dates in a calendar and automate renewal.\n\n3. The terminal emulator everyone argues about added GPU rendering for Linux. Early benchmarks look good but the screen reader story is still unresolved.\n\n4. A reading recommendation: a long essay on why small libraries outlive large frameworks.\n\nThat is the issue. Hit reply if you want something covered next week.",
+    "inspection": "complete",
+    "note": "Tech roundup from an allowlisted sender.",
+    "scenario": "trusted_ordinary"
+  },
+  {
+    "id": "rt-ord-03",
+    "split": "selective",
+    "category": "trusted_ordinary",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "A beginner's guide to sourdough starters",
+    "from": "Medium Daily Digest <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Stories picked for you\n\nHow I finally got a sourdough starter to behave\nA baker with ten years of failed attempts explains the single change that worked: feed it at the same time every day and keep it at a steady 24 degrees.\n\nWhy your bread is dense, and what to do about it\nHydration, proofing time and oven steam, ranked by how much they matter.\n\nThe case for a plain wooden spoon\nA short essay on the tools that disappear into the work.\n\nRead more stories on Medium. You can change how often we email you from your settings page.",
+    "inspection": "complete",
+    "note": "Medium digest of public stories.",
+    "scenario": "trusted_ordinary"
+  },
+  {
+    "id": "rt-ord-04",
+    "split": "selective",
+    "category": "trusted_ordinary",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Coastal walks, issue 63: the headland path reopens",
+    "from": "Coastal Walks Weekly <coastalwalks@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://coastalwalks.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "The headland path has reopened after the winter landslip repairs, and it is better than it was. New steps near the second stile, a handrail on the steep bit, and a proper sign at the junction that used to confuse everyone.\n\nDistance: about 9 km round trip. Time: three hours at an easy pace. Best at low tide, when you can return along the beach. Take water, there is no kiosk until the village.\n\nAlso this issue: a profile of the volunteer who has maintained the path for twenty years, and a short note on seabird nesting season, when the cliff-edge detour is closed.\n\nWalk well, and send us your photos.",
+    "inspection": "complete",
+    "note": "Walking newsletter.",
+    "scenario": "trusted_ordinary"
+  },
+  {
+    "id": "rt-ord-05",
+    "split": "selective",
+    "category": "trusted_ordinary",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "The Pocket Economist: why rents track wages more slowly than you think",
+    "from": "The Pocket Economist <pocketeconomist@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://pocketeconomist.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "This week's chart is a simple one: asking rents against average wages over twenty years. Rents move in steps, wages move in a slope, and the gap opens whenever supply is tight.\n\nThree things the data says. First, rents respond to new building with a lag of two to three years. Second, regions with flexible planning rules catch up faster. Third, wage growth has been steadier than rent growth, which is why short bursts feel so painful.\n\nNone of this is a forecast. It is a reminder that housing is a slow system and that headline numbers hide a lot of variation between cities.\n\nNext week: the economics of the four day week.",
+    "inspection": "complete",
+    "note": "General economics commentary.",
+    "scenario": "trusted_ordinary"
+  },
+  {
+    "id": "rt-med-01",
+    "split": "selective",
+    "category": "trusted_medical_research",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Sleep and memory: what the new review actually found",
+    "from": "Evidence Brief <evidencebrief@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://evidencebrief.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "A new systematic review pooled forty-one trials on sleep and memory consolidation. The headline: people who slept after learning recalled about a fifth more than those who stayed awake, and the effect held across age groups.\n\nDr Imelda Fairweather, who led the review at the Marlow Institute, cautioned that most trials were small and that lab sleep is not home sleep. She said the strongest evidence was for declarative memory, such as word lists, and the weakest for motor skills.\n\nWhat this means in practice: protecting a normal night's sleep after a study session is sensible and costs nothing. Nothing in the review supports expensive sleep gadgets.\n\nThe full paper is open access. We have linked it below along with the authors' plain-language summary.",
+    "inspection": "complete",
+    "note": "Public medical research summary naming a researcher; no private person.",
+    "scenario": "trusted_medical_research"
+  },
+  {
+    "id": "rt-med-02",
+    "split": "selective",
+    "category": "trusted_medical_research",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Statins and muscle pain: the trial that tested the nocebo effect",
+    "from": "The Clinical Corner <clinicalcorner@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://clinicalcorner.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Many people stop statins because of muscle aches. A crossover trial gave participants months of real statin, months of placebo and months of nothing, and asked them to rate symptoms each month.\n\nThe surprise was how similar the symptom scores were on statin and on placebo. Most of the aches seemed to come from expecting aches. A small group did seem to have a genuine reaction, and the researchers say that group deserves proper follow up rather than being told it is all in their heads.\n\nDr Rohan Pillay, a cardiologist who was not involved, called the result reassuring but not final. If you are on a statin and worried, the sensible step is to talk to your own doctor before stopping anything.\n\nReference list and the trial registration number are in the footnotes.",
+    "inspection": "complete",
+    "note": "Trial summary; mentions a drug, no identifiable patient.",
+    "scenario": "trusted_medical_research"
+  },
+  {
+    "id": "rt-med-03",
+    "split": "selective",
+    "category": "trusted_medical_research",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Screening for bowel cancer: what changes at fifty",
+    "from": "Health Reads <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Public health programmes in several countries are lowering the starting age for bowel cancer screening. The reasoning is that cases in younger adults have been rising slowly for two decades.\n\nResearchers at the fictional Harlow Cancer Registry analysed forty years of records and found that early-onset cases are still rare, but that detection at an earlier stage roughly halves the chance of needing major surgery. They stressed that screening is a statistical benefit across a population, not a guarantee for any individual.\n\nIf you are unsure when you are invited, your national screening programme website lists the eligibility rules. Symptoms such as persistent bleeding or a change in bowel habit deserve a visit to a doctor at any age.",
+    "inspection": "complete",
+    "note": "Public health explainer mentioning cancer in general terms.",
+    "scenario": "trusted_medical_research"
+  },
+  {
+    "id": "rt-med-04",
+    "split": "selective",
+    "category": "trusted_medical_research",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Type 2 diabetes remission: a two year follow-up",
+    "from": "Evidence Brief <evidencebrief@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://evidencebrief.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Two years after a structured weight management programme, just over a third of participants were still in remission from type 2 diabetes. Remission here means blood sugar below the diagnostic threshold without medication.\n\nThe authors, led by Dr Mei-Lin Okafor, found that the amount of weight lost mattered more than the method used. People who regained most of it were the ones whose diabetes returned.\n\nIt is a good reminder that remission is not the same as cure, and that ongoing monitoring still matters. The study did not include people with long-standing disease, so the results may not apply to everyone.\n\nNext week we look at what the evidence says about continuous glucose monitors for people without diabetes.",
+    "inspection": "complete",
+    "note": "Research summary naming a researcher and a diagnosis in general terms.",
+    "scenario": "trusted_medical_research"
+  },
+  {
+    "id": "rt-med-05",
+    "split": "selective",
+    "category": "trusted_medical_research",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Depression and exercise: how much is enough?",
+    "from": "Mind and Body <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "A large meta-analysis looked at exercise as a treatment for depression. Most programmes lasted about twelve weeks and involved three sessions a week. Walking, jogging and strength work all showed benefit, and the effect was comparable with some medication in mild to moderate cases.\n\nDr Sana Haddad, a psychiatrist writing the accompanying commentary, noted that the studies were not blind, so some of the improvement may reflect attention and routine. She added that exercise should be an addition to, not a replacement for, treatment someone has already agreed with their clinician.\n\nIf you want to start, the researchers suggest something you enjoy, because adherence is the biggest predictor of benefit.",
+    "inspection": "complete",
+    "note": "Public discussion of a medical topic; named researchers only.",
+    "scenario": "trusted_medical_research"
+  },
+  {
+    "id": "rt-tax-01",
+    "split": "selective",
+    "category": "trusted_tax_policy",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Budget week: what the new income tax thresholds mean",
+    "from": "Policy in Plain English <policyplain@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://policyplain.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "The budget raises the threshold at which the middle tax rate starts and trims the offset for lower incomes. Here is the short version of who gains.\n\nHouseholds around the median earn a small cut, worth roughly a couple of dollars a week. The largest gains go to people just above the old threshold. Those at the very top see almost no change, because the top rate is untouched.\n\nThe treasury costs the package at several billion dollars over four years, funded by a levy on large banks and by bracket creep in later years. Economists we spoke to disagree about whether the funding assumptions are realistic.\n\nWe will publish a calculator next week so you can see the effect for different income levels.",
+    "inspection": "complete",
+    "note": "Tax policy commentary, nothing personal.",
+    "scenario": "trusted_tax_policy"
+  },
+  {
+    "id": "rt-tax-02",
+    "split": "selective",
+    "category": "trusted_tax_policy",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Capital gains tax: three proposals compared",
+    "from": "The Pocket Economist <pocketeconomist@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://pocketeconomist.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Three reform proposals are circulating. The first would reduce the discount on assets held more than a year. The second would tax gains at death. The third would index gains for inflation instead of discounting them.\n\nEach has trade-offs. A smaller discount raises more revenue but encourages people to hold assets longer than they otherwise would. Taxing gains at death is administratively tricky for farms and family businesses. Indexing is fairer in theory but more complicated to administer.\n\nThe common thread is that all three change behaviour as well as revenue, so the official numbers are estimates with wide error bars. As always, read the assumptions before the headline.",
+    "inspection": "complete",
+    "note": "General tax policy analysis.",
+    "scenario": "trusted_tax_policy"
+  },
+  {
+    "id": "rt-tax-03",
+    "split": "selective",
+    "category": "trusted_tax_policy",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Small business tax deadlines: a calendar for the year",
+    "from": "Small Business Weekly <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Keeping up with tax dates is easier when they live in one place. Here is a general calendar for sole traders and small companies.\n\nQuarterly instalments fall in late October, February, April and July. The annual return is due at the end of October for people filing on their own, and in May for those using an agent. Payroll reporting follows a separate monthly cycle.\n\nDates differ by country and by entity type, so treat this as a template and check the official revenue agency pages for your own situation. If you cannot meet a deadline, contact the agency before it passes rather than after.",
+    "inspection": "complete",
+    "note": "Generic compliance calendar.",
+    "scenario": "trusted_tax_policy"
+  },
+  {
+    "id": "rt-tax-04",
+    "split": "selective",
+    "category": "trusted_tax_policy",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Working from home deductions: the rule change explained",
+    "from": "Policy in Plain English <policyplain@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://policyplain.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "From next financial year the agency is changing how working from home expenses can be claimed. The fixed hourly rate is going up slightly, and the shortcut method now requires a simple record of hours worked rather than a four week diary.\n\nPractically, that means a basic timesheet or calendar entries are enough. Receipts are still needed if you claim actual costs such as a share of electricity or an office chair above a certain value.\n\nThe agency says the change reflects higher energy prices. Accountants we asked welcomed the simpler record keeping but warned that the shortcut rate often gives a lower result than actual costs for people with large home offices.",
+    "inspection": "complete",
+    "note": "Explainer on a public rule change.",
+    "scenario": "trusted_tax_policy"
+  },
+  {
+    "id": "rt-tax-05",
+    "split": "selective",
+    "category": "trusted_tax_policy",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Why tax brackets are not cliffs",
+    "from": "Money Matters <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "A common worry is that earning a little more will push someone into a higher bracket and reduce take-home pay. That is a myth. Marginal rates apply only to the slice of income inside each bracket, so a pay rise always leaves you with more money overall.\n\nThe real cliffs are in benefits and offsets that phase out as income rises. Those create effective marginal rates that can be higher than the headline tax rate for some families, which is a fair target for criticism.\n\nThe practical advice: do not turn down a raise or overtime because of a bracket. If you are near a benefit threshold, check the phase-out rules for that specific payment.",
+    "inspection": "complete",
+    "note": "Public tax explainer.",
+    "scenario": "trusted_tax_policy"
+  },
+  {
+    "id": "rt-inv-01",
+    "split": "selective",
+    "category": "trusted_invoice_software",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Ledgerly product update: recurring billing and smarter reminders",
+    "from": "Ledgerly Updates <ledgerlyupdates@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://ledgerlyupdates.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "What's new in Ledgerly this month.\n\nRecurring billing. You can now set a schedule once and let Ledgerly issue your invoices on the first of every month, quarter or year. Pause, skip or edit a single cycle without changing the template.\n\nSmarter reminders. Instead of one fixed nudge, reminders now follow a sequence you choose: a friendly note before the due date, a firmer one afterwards, and a final notice with a clear next step.\n\nFaster reports. The aged receivables view loads in about half the time, and you can export it to a spreadsheet in one click.\n\nComing next: multi-currency support and a redesigned mobile app. As always, reply to this email with ideas.",
+    "inspection": "complete",
+    "note": "Invoicing software product newsletter; mentions invoices generically.",
+    "scenario": "trusted_invoice_software"
+  },
+  {
+    "id": "rt-inv-02",
+    "split": "selective",
+    "category": "trusted_invoice_software",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "How freelancers can get paid faster",
+    "from": "The Freelance Desk <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Late payment is the most common complaint among freelancers, and most of it is preventable. A few habits help.\n\nSend invoices the same day the work is delivered. Put the payment terms in the first line, not the footer. Offer a bank transfer option and make the details easy to copy. Follow up politely on the day after the due date rather than waiting a week.\n\nSoftware helps, but the habit matters more than the tool. Whether you use a spreadsheet or a billing app, the aim is the same: make it effortless for the client to pay.\n\nNext time: how to say no to a client who always pays late.",
+    "inspection": "complete",
+    "note": "Freelance advice article.",
+    "scenario": "trusted_invoice_software"
+  },
+  {
+    "id": "rt-inv-03",
+    "split": "selective",
+    "category": "trusted_invoice_software",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Release notes: Tallyline 4.2",
+    "from": "Tallyline Release Notes <tallyline@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://tallyline.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Tallyline 4.2 is out. Highlights:\n\n- Bank feeds now sync every hour instead of daily.\n- A new rule builder lets you categorise transactions with simple conditions.\n- Invoice templates support custom fields and a second language.\n- The audit trail records who changed what, with an export for your accountant.\n- Fixes: rounding in multi-line discounts, a crash when importing very large files, and a misaligned logo on printed pages.\n\nUpgrade notes: the update runs a one-time database migration, so allow a few minutes on large accounts. Back up first as usual. Questions go to the support forum.",
+    "inspection": "complete",
+    "note": "Software release notes.",
+    "scenario": "trusted_invoice_software"
+  },
+  {
+    "id": "rt-inv-04",
+    "split": "selective",
+    "category": "trusted_invoice_software",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Five invoice template mistakes small businesses make",
+    "from": "The Bookkeeper's Notebook <bookkeepersnotebook@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://bookkeepersnotebook.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "After reviewing hundreds of templates, the same five problems keep appearing.\n\nOne: no clear due date. Two: a legal business name that does not match the bank account. Three: missing tax registration details where they are required. Four: line items too vague to dispute or approve. Five: payment instructions buried at the bottom.\n\nA good template reads like a short, polite letter. It says what was done, what it costs, when it is due and how to pay. If your template does all that on one page, you are ahead of most.\n\nNext issue: a plain explanation of accrual versus cash accounting.",
+    "inspection": "complete",
+    "note": "Accounting tips.",
+    "scenario": "trusted_invoice_software"
+  },
+  {
+    "id": "rt-inv-05",
+    "split": "selective",
+    "category": "trusted_invoice_software",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Webinar: automating your month-end close",
+    "from": "Ledgerly Blog <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Join our product team for a free thirty minute webinar on closing the books faster.\n\nWe will cover bank reconciliation shortcuts, how to handle prepaid expenses, and a checklist you can reuse every month. There will be a live demo using sample data, followed by questions.\n\nDate: Thursday at 11:00 AM Eastern. A recording will be sent to everyone who registers, so you can watch later if the time does not suit you.\n\nRegister using the button below. We hope to see you there.",
+    "inspection": "complete",
+    "note": "Marketing for a software webinar.",
+    "scenario": "trusted_invoice_software"
+  },
+  {
+    "id": "rt-case-01",
+    "split": "selective",
+    "category": "anonymised_case_study",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Case study: how one household cleared its credit card debt",
+    "from": "Money Without Panic <moneywithoutpanic@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://moneywithoutpanic.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "This is a composite case study. Names, ages and details have been changed so that no real household can be identified.\n\nMeet \"Alex\", a teacher in their late thirties with two children and a credit card balance that had crept up over three years. Alex and their partner listed every debt, ordered them by interest rate, and set up a fixed weekly payment that was slightly more than the minimum.\n\nThey cut two subscriptions, sold a spare bike, and moved the remaining balance to a lower rate card with a clear end date. Eighteen months later the card was cleared.\n\nThe lesson is not heroics. It is a boring system that runs without daily decisions. If you want a template, the spreadsheet is linked below.",
+    "inspection": "complete",
+    "note": "Explicitly anonymised composite case study about debt.",
+    "scenario": "anonymised_case_study"
+  },
+  {
+    "id": "rt-case-02",
+    "split": "selective",
+    "category": "anonymised_case_study",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "A patient story, anonymised: living with long-term back pain",
+    "from": "Health Reads <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "The following account is a composite drawn from several interviews. Details have been altered and no real patient is described.\n\n\"Sam\" is a fifty-year-old warehouse worker who developed chronic lower back pain after a decade of lifting. Early on, Sam rested a lot and the pain got worse. A physiotherapist introduced graded activity: short walks, gentle stretching and, after six weeks, light strength work.\n\nProgress was uneven. There were setbacks after a cold snap and a house move. What helped most was a plan for flare-ups agreed in advance, so that a bad day did not turn into a bad month.\n\nThe point of the case is that recovery is rarely linear, and that sensible exercise beats prolonged rest for most people with this condition.",
+    "inspection": "complete",
+    "note": "Composite medical case study, no real person.",
+    "scenario": "anonymised_case_study"
+  },
+  {
+    "id": "rt-case-03",
+    "split": "selective",
+    "category": "anonymised_case_study",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Founder lessons: a composite startup post-mortem",
+    "from": "Founders Notebook <hello@foundersnotebook.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://foundersnotebook.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Every story in this series is anonymised. Company names, products and numbers are changed, and several real cases are blended into one.\n\nThe company in this issue built scheduling software for dental clinics. It grew quickly on word of mouth, then stalled when a larger competitor bundled a similar feature for free. The founders spent six months adding features nobody asked for, instead of talking to the customers who were leaving.\n\nWhat they would do differently: interview churned customers in the first month, price for the segment they could defend, and set a kill date for experiments. They wound the company down with all debts paid and good references from clients.\n\nNext issue: a composite story about a hardware recall.",
+    "inspection": "complete",
+    "note": "Anonymised business case from an ordinary bulk sender; unknown sender goes to System One.",
+    "scenario": "anonymised_case_study"
+  },
+  {
+    "id": "rt-case-04",
+    "split": "selective",
+    "category": "anonymised_case_study",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Teaching case: a team that fixed its meeting culture",
+    "from": "Workplace Practice Review <editor@workplacepractice.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://workplacepractice.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Teaching note. The case below is fictional and is used in management courses. Any resemblance to a real organisation is coincidental.\n\nA product team of nine people held eleven recurring meetings a week and still missed deadlines. After a two week audit, they cancelled four meetings, shortened two, and replaced a status call with a shared written update.\n\nWithin a quarter the team reported more focus time and fewer surprises. The manager's own role changed from chairing meetings to unblocking decisions.\n\nDiscussion questions: What did the audit measure? Which meetings were the hardest to cancel, and why? How would you adapt this for a remote team?",
+    "inspection": "complete",
+    "note": "Fictional teaching case from an unknown sender.",
+    "scenario": "anonymised_case_study"
+  },
+  {
+    "id": "rt-case-05",
+    "split": "selective",
+    "category": "anonymised_case_study",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "How a clinic reduced missed appointments: a de-identified review",
+    "from": "Practice Management Notes <practicemgmtnotes@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://practicemgmtnotes.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "This review uses de-identified data. No patient names, dates of birth or contact details were collected or are shown.\n\nA community clinic with a twenty percent no-show rate tried three changes: text reminders the day before, an easy reply-to-reschedule link, and a small buffer of same-day slots. Over six months the no-show rate fell to eleven percent.\n\nThe reminder alone accounted for about half the improvement. Staff said the reschedule link saved the most phone time. Patients who had previously missed appointments were the most likely to use it.\n\nLimitations: one clinic, no control group, and a seasonal dip in winter. We would still encourage others to try the same sequence.",
+    "inspection": "complete",
+    "note": "De-identified operational case study.",
+    "scenario": "anonymised_case_study"
+  },
+  {
+    "id": "rt-reader-01",
+    "split": "selective",
+    "category": "voluntary_reader_story",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Reader stories: what the garden taught us this year",
+    "from": "The Slow Garden <slowgarden@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://slowgarden.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Thank you to everyone who wrote in. These are published with permission.\n\nMaria S. wrote: \"After my knee operation I thought my gardening days were over. A neighbour suggested raised beds and now I can tend them sitting down. It has been the best part of my recovery.\"\n\nTom R. sent this: \"I grow tomatoes on a balcony the size of a doormat. This year I got forty fruit from three plants. The secret was a weekly feed and ruthless pinching out.\"\n\nAnd from Priya K.: \"Our school garden started with two crates. This autumn the children harvested enough pumpkins for the whole street.\"\n\nKeep the stories coming. Next month's theme is gardening in tiny spaces.",
+    "inspection": "complete",
+    "note": "Reader stories submitted for publication with permission; first name and initial; mentions an operation.",
+    "scenario": "voluntary_reader_story"
+  },
+  {
+    "id": "rt-reader-02",
+    "split": "selective",
+    "category": "voluntary_reader_story",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Your stories: the best advice you ever got about running",
+    "from": "Run Easy <runeasy@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://runeasy.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "We asked, you answered. A selection, published with each reader's agreement.\n\nJonas B.: \"A coach told me to slow down until I could chat comfortably. I resisted for months. Then I ran my first half marathon without stopping.\"\n\nAisha M.: \"After a stress fracture I learned that rest days are part of training. I now take two a week and I am faster than before.\"\n\nDev P.: \"Run with a friend. Even if you hate the first ten minutes, you will not skip the session.\"\n\nThanks to all who sent a note. If you want to be included next time, reply with your story and tell us how you would like to be named.",
+    "inspection": "complete",
+    "note": "Reader tips published with consent.",
+    "scenario": "voluntary_reader_story"
+  },
+  {
+    "id": "rt-reader-03",
+    "split": "selective",
+    "category": "voluntary_reader_story",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "A reader's story: ten years since my diagnosis",
+    "from": "Healthy Living Letter <stories@healthyliving.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://healthyliving.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "The following piece was written by Helen W. at our invitation and is published with her full consent and her own wording.\n\n\"Ten years ago I was diagnosed with type 1 diabetes. I was frightened and angry. Today I run a small bakery and I wear an insulin pump on my belt. I want to tell other people who have just had the same news that it gets easier.\n\nThe first year is the hardest. Find a clinic you trust. Learn to count carbohydrates, and forgive yourself for the numbers that go wrong. I have never been happier or healthier.\"\n\nIf you would like to share your own story with our readers, our editor's address is at the foot of the page.",
+    "inspection": "complete",
+    "note": "Reader story clearly written for publication, with consent; named by first name and initial; mentions a diagnosis.",
+    "scenario": "voluntary_reader_story"
+  },
+  {
+    "id": "rt-reader-04",
+    "split": "selective",
+    "category": "voluntary_reader_story",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Customer stories: three small shops, three years on",
+    "from": "Main Street Collective <hello@mainstreetcollective.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://mainstreetcollective.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "We are proud to share these stories from members of our community. Each owner agreed to be featured.\n\nLeila A. opened a stationery shop three years ago. \"We started with a single shelf of notebooks. Now we run workshops every Saturday.\"\n\nBen C. runs a bicycle repair stand. \"People think repairs are boring until they see their old bike ride like new.\"\n\nRosa T. sells ceramics from her studio. \"The pandemic taught me to sell online. Now half my orders come from people I will never meet.\"\n\nIf you run a local business and would like to be featured, send us a short note.",
+    "inspection": "complete",
+    "note": "Testimonials from business owners who agreed to be featured.",
+    "scenario": "voluntary_reader_story"
+  },
+  {
+    "id": "rt-reader-05",
+    "split": "selective",
+    "category": "voluntary_reader_story",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Our members' recovery stories: the choir that keeps us going",
+    "from": "Community Choir News <communitychoirnews@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://communitychoirnews.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "For this month's newsletter we invited singers to tell us what the choir means to them. The following are published in full, with permission.\n\nColin J., 71: \"After my wife died I stopped leaving the house. A friend dragged me to a rehearsal. I have not missed one since.\"\n\nGrace L.: \"I had a stroke last spring and lost most of my speech. Singing came back before talking did, which still amazes my therapist.\"\n\nImran S.: \"I came for the music and stayed for the tea afterwards.\"\n\nWe are grateful to everyone who wrote. The winter concert is on the first Saturday of December.",
+    "inspection": "complete",
+    "note": "Written for publication; first names and initial; mentions bereavement and a stroke, but clearly intended publicly.",
+    "scenario": "voluntary_reader_story"
+  },
+  {
+    "id": "rt-ident-01",
+    "split": "selective",
+    "category": "identifiable_sensitive_newsletter",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "The Slow Cooking Letter: your questions answered (and one reader mailbag)",
+    "from": "The Slow Cooking Letter <slowcookingletter@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://slowcookingletter.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "This week: braising tough cuts, and why your stew goes grey.\n\nReader mailbag. A note arrived this week that we should not have pasted in unedited, so please treat it as private. It came from Karen Delaney, who lives at 14 Wattle Street, Marlow. \"I was diagnosed with breast cancer in March and I am halfway through chemotherapy. I can only eat soft food at the moment. My number is 0455 550 142 if you want to talk.\"\n\nKaren, if you are reading this, we are sorry we included your details. We will remove them from the web archive today.\n\nNow, the braising: brown the meat in small batches, keep the liquid at a bare simmer, and give it more time than you think.",
+    "inspection": "complete",
+    "note": "Allowlisted newsletter accidentally includes an identifiable reader's diagnosis, address and phone. Private.",
+    "scenario": "identifiable_sensitive_newsletter"
+  },
+  {
+    "id": "rt-ident-02",
+    "split": "selective",
+    "category": "identifiable_sensitive_newsletter",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Neighbourhood letter: tips for the season and a message we forwarded",
+    "from": "The Street Letter <thestreetletter@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://thestreetletter.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Hello neighbours. A few seasonal tips: clear the gutters before the first storm, label your bins, and check on older neighbours when the weather turns.\n\nWe also received a message from a resident that was meant for the council, not for publication, and it ended up pasted into this draft. It reads: \"My name is Neil Foster, 9 Orchard Road. My divorce was finalised in June and the custody arrangement for my daughter is still disputed. Please call me on 0412 550 377 about the parking permit.\"\n\nWe have removed it from the website. Apologies to Neil for the slip.\n\nNext week: a guide to the winter swap meet.",
+    "inspection": "complete",
+    "note": "Newsletter inadvertently includes a resident's private custody dispute with address and phone.",
+    "scenario": "identifiable_sensitive_newsletter"
+  },
+  {
+    "id": "rt-ident-03",
+    "split": "selective",
+    "category": "identifiable_sensitive_newsletter",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Money Without Panic: reader letters (some should not have been printed)",
+    "from": "Money Without Panic <moneywithoutpanic@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://moneywithoutpanic.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "This week we look at emergency funds and what size is enough.\n\nOne of the letters in our inbox was not meant to be public, and we included it by mistake. Please do not share it. It came from Priya Raman of 22 Linden Court: \"I filed for bankruptcy last year and my salary is still garnished. I am ashamed. You can reach me on (02) 5550 0189.\"\n\nWe are sorry, Priya. We have removed it from every copy we control.\n\nOn with the issue. A good emergency fund covers three months of essential spending. Start with one month and build.",
+    "inspection": "complete",
+    "note": "Allowlisted finance newsletter prints a reader's bankruptcy and contact details by mistake.",
+    "scenario": "identifiable_sensitive_newsletter"
+  },
+  {
+    "id": "rt-ident-04",
+    "split": "selective",
+    "category": "identifiable_sensitive_newsletter",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Medium Weekly Picks and a note from a subscriber",
+    "from": "Medium Weekly Picks <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Stories this week: a long read on tide mills, a short essay on learning the cello at fifty, and a guide to home espresso that is kinder than most.\n\nNote: this forwarded message from a subscriber was added to the digest by mistake. \"I'm Omar Haddad, 31 Birch Avenue. I was diagnosed with epilepsy last month and I'm worried about telling my employer. Please call 0433 550 618 if there is a support group nearby.\"\n\nWe have asked the team to remove it. If you are Omar, please accept our apologies.\n\nThat's the digest. See you next week.",
+    "inspection": "complete",
+    "note": "Digest includes an identifiable subscriber's health condition, address and phone.",
+    "scenario": "identifiable_sensitive_newsletter"
+  },
+  {
+    "id": "rt-ident-05",
+    "split": "selective",
+    "category": "identifiable_sensitive_newsletter",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Club bulletin: fixtures, and a note that slipped into the draft",
+    "from": "Eastbrook Cricket Club Bulletin <eastbrookcricket@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://eastbrookcricket.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Fixtures this weekend: seniors at home on Saturday, juniors away. Teas are being run by the Hendersons.\n\nAn email from a member found its way into this draft and we are sorry. For the record, it read: \"I'm Lucy Armstrong at 3 Willow Close. My husband and I are going through a visa application and an eviction notice at the same time. Could someone ring me on 0488 550 902 about the hardship fund?\"\n\nWe have removed it from the archive and will reach out to Lucy privately.\n\nPlease remember that the bar closes at nine on match days.",
+    "inspection": "complete",
+    "note": "Club bulletin accidentally includes a member's immigration and eviction details with address and phone.",
+    "scenario": "identifiable_sensitive_newsletter"
+  },
+  {
+    "id": "rt-pf-01",
+    "split": "selective",
+    "category": "public_figure_contact",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Your local member: electorate update",
+    "from": "Marlow Matters <marlowmatters@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://marlowmatters.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Your local member of parliament has published her electorate office details for constituents.\n\nElectorate office: Suite 2, 120 Parliament Street, Marlow. Phone: (02) 5550 0100. Open weekdays from nine to five. Appointments are not required for general enquiries, and a caseworker is available to help with federal agency problems.\n\nThis month the member is campaigning for better regional rail services and has tabled a petition. A public forum is on Thursday at the town hall, and all residents are welcome.\n\nContact details for the member's office are public and can also be found on the parliament's website.",
+    "inspection": "complete",
+    "note": "Public official's published office address and phone.",
+    "scenario": "public_figure_contact"
+  },
+  {
+    "id": "rt-pf-02",
+    "split": "selective",
+    "category": "public_figure_contact",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "The mayor's office: how to reach us",
+    "from": "City of Harlow Newsletter <news@harlowcouncil.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://harlowcouncil.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "The mayor's office is open to residents. Our front counter is at 1 Civic Plaza Drive, Harlow, and the main number is 02 5550 0155. You can also write to the mayor at the address on our website.\n\nThis month's council debt report shows borrowings falling for the third year running, thanks to the sale of two surplus buildings. The council debt is now below the figure forecast in last year's budget.\n\nPublic meetings are held on the first Monday of each month at 7 pm, and agendas are posted five days earlier. Residents may speak for three minutes on any item.",
+    "inspection": "complete",
+    "note": "Council newsletter with official contact details near the word debt (a trap for the debt plus address rule).",
+    "scenario": "public_figure_contact"
+  },
+  {
+    "id": "rt-pf-03",
+    "split": "selective",
+    "category": "public_figure_contact",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Senator's newsletter: summer break and office hours",
+    "from": "From the Senator's Desk <senatordesk@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://senatordesk.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Summer update. My Sydney office will be closed between Christmas and the second week of January. In an emergency, constituents can ring the office hotline on 1300 550 177.\n\nMy Melbourne office remains open: 45 Collins Terrace, Melbourne. Staff there can help with immigration queries, pension problems and questions about federal grants.\n\nI will be visiting several regional towns in January and will announce the schedule on my website. If you want to meet, please book through the office.\n\nThank you for another year of correspondence.",
+    "inspection": "complete",
+    "note": "Public official's office contacts. Mentions immigration only as a service topic.",
+    "scenario": "public_figure_contact"
+  },
+  {
+    "id": "rt-pf-04",
+    "split": "selective",
+    "category": "public_figure_contact",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Minister's regional tour: dates and contacts",
+    "from": "Regional Development Update <updates@regionaldev.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://regionaldev.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "The minister will visit five regional centres next month to hear from small business owners and local councils.\n\nMedia enquiries should go to the minister's press office on 02 5550 0120. Business owners who would like to attend can register through the department's events page. The ministerial office is at Level 9, 300 Government Road, Canberra.\n\nTopics will include regional broadband, freight links, and the new apprenticeship incentive. The department will publish a summary after the tour, and the minister's office will respond to questions from attendees within two weeks.",
+    "inspection": "complete",
+    "note": "Public officials' office phone and address in an official update.",
+    "scenario": "public_figure_contact"
+  },
+  {
+    "id": "rt-pf-05",
+    "split": "selective",
+    "category": "public_figure_contact",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "City councillor's report: potholes, parks and how to reach me",
+    "from": "Ward Report <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "This month in Ward 4: eleven potholes repaired on River Road, the new playground opens next weekend, and we have secured funding to resurface the cycle path.\n\nIf you have an issue to raise, call my office on (02) 5550 0188 or drop in at 18 Station Street, Harlow, any weekday morning. I also voted this month to freeze councillors' salary for another year. I hold a street stall outside the library on the last Saturday of every month.\n\nThank you to the volunteers who helped plant trees along the creek. We planted two hundred saplings and another hundred are planned for autumn. Your feedback shapes my priorities.",
+    "inspection": "complete",
+    "note": "Elected councillor's published office contact details, near the word salary (public-figure trap for the identifiable-sensitive risk signal).",
+    "scenario": "public_figure_contact"
+  },
+  {
+    "id": "rt-emb-01",
+    "split": "selective",
+    "category": "trusted_embedded_private",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Re: Fwd: your question about the lease (from The Renters' Letter)",
+    "from": "The Renters' Letter <rentersletter@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://rentersletter.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Thanks for reading. This week's tip: photograph the property on move-in day.\n\nBelow is the reply thread that was accidentally included at the foot of this edition.\n\nOn Tuesday, Sarah Whitfield wrote:\n> Hi, my landlord says I owe two months of rent because of the damage claim.\n> I earn about $1,900 a week and I am worried because my daughter has asthma and we cannot move.\n> My address is 5 Elm Street and my number is 0411 550 223.\n\nOn Wednesday, the editor wrote:\n> Please do not worry. Send us the lease and we will look at it.",
+    "inspection": "complete",
+    "note": "Allowlisted newsletter with an embedded private reply thread including personal circumstances and contact details.",
+    "scenario": "trusted_embedded_private"
+  },
+  {
+    "id": "rt-emb-02",
+    "split": "selective",
+    "category": "trusted_embedded_private",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Medium Partner Program: your payment confirmation",
+    "from": "Medium Partner Program <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Hi,\n\nYour payment confirmation is below.\n\nPayment confirmation\nPayee: Jordan Ellis\nBank account ending: 4821\nAmount paid: $412.50\nTransaction ID: MP-20458813\nPeriod: October earnings\n\nFunds usually arrive within three business days. If you did not expect this payment, please contact support.\n\nThis is an automated message.",
+    "inspection": "complete",
+    "note": "A transaction record from an allowlisted sender (Medium). Private record, even with unsubscribe header.",
+    "scenario": "trusted_embedded_private"
+  },
+  {
+    "id": "rt-emb-03",
+    "split": "selective",
+    "category": "trusted_embedded_private",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "The Pocket Economist: a subscriber wrote in (thread attached)",
+    "from": "The Pocket Economist <pocketeconomist@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://pocketeconomist.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Interesting week. A reader wrote about real wages, and I replied. I have left the thread below because it may help others.\n\nOn Monday, Mark Delgado wrote:\nI lost my job in August and our mortgage payments are now behind by four months. My partner is on a visa and cannot work yet. I live at 60 Harbour Lane and you can ring me on 0422 550 364.\n\nOn Monday, I wrote:\nI am sorry to hear that. Please ask your lender about a hardship arrangement.\n\nAnyway, back to real wages: they have been flat for a decade in most sectors.",
+    "inspection": "complete",
+    "note": "Allowlisted newsletter with a private reply thread including financial hardship and contact details.",
+    "scenario": "trusted_embedded_private"
+  },
+  {
+    "id": "rt-emb-04",
+    "split": "selective",
+    "category": "trusted_embedded_private",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Substack: your receipt for Evidence Brief",
+    "from": "Substack Receipts <receipts@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://receipts.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Thank you for subscribing to Evidence Brief.\n\nPayment received: $5.00 USD\nReceipt number: 2058-7731-0042\nCard ending 4242\nBilling name: Amara Osei\n\nYour subscription renews each month on the same date. To manage your subscription or update your payment method, visit your account settings.\n\nQuestions? Reply to this message.",
+    "inspection": "complete",
+    "note": "A subscription receipt from an allowlisted sender: a private transaction record.",
+    "scenario": "trusted_embedded_private"
+  },
+  {
+    "id": "rt-emb-05",
+    "split": "selective",
+    "category": "trusted_embedded_private",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Neighbourhood Notes: a thread from our inbox",
+    "from": "Neighbourhood Notes <neighbourhoodnotes@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://neighbourhoodnotes.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "This edition: the library extends its hours, and the community garden needs volunteers on Saturday.\n\n----- Original Message -----\nFrom: Adrian Walsh\nSubject: Please keep this confidential\n\nHello, I am writing to you privately because I do not know who else to ask. My son is receiving treatment for leukaemia and we are struggling with the cost of travelling to hospital. We live at 12 Poplar Way.\n\nIs there any local fund that could help? My mobile is 0433 550 940.\n\nThank you for your discretion.\n\n----- End of forwarded message -----",
+    "inspection": "complete",
+    "note": "Newsletter with a forwarded private plea containing a child's diagnosis, address and phone.",
+    "scenario": "trusted_embedded_private"
+  },
+  {
+    "id": "rt-pmf-01",
+    "split": "selective",
+    "category": "private_medical_financial",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Your lab results are ready",
+    "from": "Marlow Pathology <results@marlowpath.example>",
+    "headers": {},
+    "body": "Hello Ms Chen,\n\nYour lab results are ready to view. Your blood test from 4 March shows your HbA1c at 7.4 percent and your cholesterol slightly above the target range.\n\nDr Patel has asked you to book a follow-up appointment within two weeks. Please bring your medication list and your Medicare card.\n\nTo view the full report, log in to the patient portal with the reference on your request form.\n\nMarlow Pathology\nPatient services: 1300 550 144",
+    "inspection": "complete",
+    "note": "Unknown sender, a named patient's lab results (strong medical record phrase).",
+    "scenario": "private_medical_financial"
+  },
+  {
+    "id": "rt-pmf-02",
+    "split": "selective",
+    "category": "private_medical_financial",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Your bank statement is ready",
+    "from": "Redwood Credit Union <statements@redwoodcu.example>",
+    "headers": {},
+    "body": "Dear Mr Alvarez,\n\nYour bank statement is ready. The closing balance on your everyday account was $3,482.17 on 31 October.\n\nHighlights this month: 3 direct debit payments, 1 transfer to your savings account, and a card purchase of $212.40 at a hardware store.\n\nPlease review the transactions and contact us within 30 days if anything looks wrong.\n\nRedwood Credit Union",
+    "inspection": "complete",
+    "note": "Unknown sender, statement with closing balance (financial record).",
+    "scenario": "private_medical_financial"
+  },
+  {
+    "id": "rt-pmf-03",
+    "split": "selective",
+    "category": "private_medical_financial",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Notice of assessment for Hannah Brooks",
+    "from": "Revenue Services <noreply@revenueservices.example>",
+    "headers": {},
+    "body": "Notice of assessment\n\nTaxpayer: Hannah Brooks\nTax file number: 123 456 782\nAssessment year: 2025\n\nYour assessment is complete. You have a refund of $1,284.00 which will be paid to the bank account you nominated.\n\nIf you disagree with this assessment you may lodge an objection within two years.",
+    "inspection": "complete",
+    "note": "Unknown sender, a personal tax assessment with identifiers.",
+    "scenario": "private_medical_financial"
+  },
+  {
+    "id": "rt-pmf-04",
+    "split": "selective",
+    "category": "private_medical_financial",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Following your visit on Tuesday",
+    "from": "Eastbrook Family Practice <reception@eastbrookpractice.example>",
+    "headers": {},
+    "body": "Hi Daniel,\n\nThanks for coming in on Tuesday. As we discussed, the scan showed a small nodule on your left lung that we would like to follow up. I have referred you to the respiratory clinic and they will contact you within ten days.\n\nIn the meantime, please avoid smoking and let us know if you cough up blood or have chest pain. Your next review with me is booked for the 24th.\n\nKind regards,\nDr Michelle Tan\nEastbrook Family Practice",
+    "inspection": "complete",
+    "note": "Plain clinician letter to a named patient with no record phrase: needs the model.",
+    "scenario": "private_medical_financial"
+  },
+  {
+    "id": "rt-pmf-05",
+    "split": "selective",
+    "category": "private_medical_financial",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Payment declined on your account",
+    "from": "Maple Card Services <alerts@maplecards.example>",
+    "headers": {},
+    "body": "Hello Fatima,\n\nA payment of $89.99 on your card ending 5521 was declined on 2 November. This can happen if the card has reached its limit or if the details on file are out of date.\n\nTo avoid late fees, please update your payment method in the app or call us on 1800 550 190. Your account number is on the back of your card.\n\nMaple Card Services",
+    "inspection": "complete",
+    "note": "Unknown sender, a payment failure with card tail (financial record).",
+    "scenario": "private_medical_financial"
+  },
+  {
+    "id": "rt-amb-01",
+    "split": "selective",
+    "category": "ambiguous",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Spring sale: 20 percent off garden tools",
+    "from": "Greenfingers Garden Centre <offers@greenfingers.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://greenfingers.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Spring is here and so are our best prices of the year.\n\nThis weekend only, enjoy 20 percent off spades, forks, secateurs and watering cans. Our plant nursery has fresh stock of lavender, herbs and fruit trees, and the cafe is serving hot soup.\n\nVisit us at the garden centre or order online for pickup. Offer ends Sunday.\n\nHappy gardening,\nThe Greenfingers team",
+    "inspection": "complete",
+    "note": "Ordinary retail promotion from an unknown sender. Public.",
+    "scenario": "ambiguous_sender"
+  },
+  {
+    "id": "rt-amb-02",
+    "split": "selective",
+    "category": "ambiguous",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Minutes of the March committee meeting",
+    "from": "Hillcrest Residents Association <secretary@hillcrestresidents.example>",
+    "headers": {},
+    "body": "Dear members,\n\nPlease find the minutes of last week's committee meeting. Items discussed: the street tree planting, the annual picnic, and the proposal to repaint the notice board. The treasurer reported that the account is healthy.\n\nActions: arrange quotes for the notice board, confirm the picnic permit, and update the website. The next meeting is on 14 April at the library.\n\nRegards,\nHillcrest Residents Association",
+    "inspection": "complete",
+    "note": "Community minutes sent to members; public content from an unknown sender.",
+    "scenario": "ambiguous_sender"
+  },
+  {
+    "id": "rt-amb-03",
+    "split": "selective",
+    "category": "ambiguous",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "About Thursday",
+    "from": "Greg Nowak <greg@nowakfamily.example>",
+    "headers": {},
+    "body": "Hi,\n\nCan we talk before Thursday? I got the results back and the doctor wants me to start treatment next week. I haven't told the boys yet. Could you come round on Wednesday evening? I'd rather not do this on the phone.\n\nAlso, I changed the alarm code at the house to 4471 in case you need to let yourself in.\n\nGreg",
+    "inspection": "complete",
+    "note": "Personal message with health news and an alarm code, from an individual.",
+    "scenario": "ambiguous_sender"
+  },
+  {
+    "id": "rt-amb-04",
+    "split": "selective",
+    "category": "ambiguous",
+    "label": "ambiguous",
+    "difficulty": "hard",
+    "subject": "Following up on your enquiry",
+    "from": "Sam from Brightpath <sam@brightpath.example>",
+    "headers": {},
+    "body": "Hi there,\n\nJust following up on the enquiry you sent last week about our services. I would be happy to book a short call to talk through what would suit you. I have time on Wednesday afternoon or Friday morning.\n\nIf it is easier, reply with a couple of times that suit you and I will send an invite.\n\nThanks,\nSam\nBrightpath",
+    "inspection": "complete",
+    "note": "Short one-to-one follow-up; neither clearly public nor private.",
+    "scenario": "ambiguous_sender"
+  },
+  {
+    "id": "rt-amb-05",
+    "split": "selective",
+    "category": "ambiguous",
+    "label": "ambiguous",
+    "difficulty": "hard",
+    "subject": "Documents for review",
+    "from": "Anika Rao <anika@raoconsulting.example>",
+    "headers": {},
+    "body": "Hi,\n\nAttached are the documents we discussed. Please look them over and let me know whether the figures work for you. I would like to finalise by Friday if possible, so a quick answer would help.\n\nI have not copied anyone else yet because I wanted your view first.\n\nThanks,\nAnika",
+    "inspection": "complete",
+    "note": "Attachment-less note about documents; content could be public or confidential.",
+    "scenario": "ambiguous_sender"
+  },
+  {
+    "id": "rt-quote-01",
+    "split": "selective",
+    "category": "pii_in_quoted_reply",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Re: dinner on Saturday",
+    "from": "Claire Mitchell <claire@mitchellfamily.example>",
+    "headers": {},
+    "body": "Sounds good, see you then. I'll bring dessert.\n\nOn Thursday, Rob Mitchell wrote:\n> Thanks for the invite. Just so you know, I start chemotherapy on Monday so I may be tired.\n> The oncology clinic is at 80 Hospital Road and they said to expect about four hours.\n> Please don't mention it to the kids yet.",
+    "inspection": "complete",
+    "note": "Bland reply; diagnosis and address are only in the quoted text.",
+    "scenario": "pii_in_quoted_reply"
+  },
+  {
+    "id": "rt-quote-02",
+    "split": "selective",
+    "category": "pii_in_quoted_reply",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Re: next week",
+    "from": "Priya Nair <priya@nairhome.example>",
+    "headers": {},
+    "body": "Thanks, that works for me.\n\n> On Mon, Ajay Singh <ajay@singhfamily.example> wrote:\n> > My lawyer says the divorce settlement will be finalised on the 12th.\n> > My bank details for the transfer are BSB 062-000, account 12345678.\n> > Please keep this between us.",
+    "inspection": "complete",
+    "note": "Bland top; BSB and account number plus divorce details are in quoted lines (tests pattern.bsb rule too).",
+    "scenario": "pii_in_quoted_reply"
+  },
+  {
+    "id": "rt-quote-03",
+    "split": "selective",
+    "category": "pii_in_quoted_reply",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Re: catch up",
+    "from": "Emma Walsh <emma@walshhome.example>",
+    "headers": {},
+    "body": "Great, let's do coffee. Text me when you are close.\n\nOn 3 June, Tom Walsh wrote:\nThanks Emma. Just to update you, I was made redundant last month and our salary is now half what it was. We are selling the house at 7 Cedar Crescent and moving to my parents'. I'd rather this stays within the family.",
+    "inspection": "complete",
+    "note": "Bland top; redundancy, salary and address only in the quoted part.",
+    "scenario": "pii_in_quoted_reply"
+  },
+  {
+    "id": "rt-quote-04",
+    "split": "selective",
+    "category": "pii_in_quoted_reply",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Re: Reminder: team offsite agenda",
+    "from": "Nina Park <nina@parkteam.example>",
+    "headers": {},
+    "body": "Agenda looks fine to me. Let's keep Friday afternoon free.\n\n> -----Original Message-----\n> From: Marcus Lee\n> Subject: Re: Reminder: team offsite agenda\n>\n> I need to step back from the project. My therapist has advised me to take leave and I have a diagnosis of depression. Please don't share this with the wider team.\n> You can reach me at 0455 550 361.",
+    "inspection": "complete",
+    "note": "Bland top; mental health detail and phone only in the quoted original message.",
+    "scenario": "pii_in_quoted_reply"
+  },
+  {
+    "id": "rt-quote-05",
+    "split": "selective",
+    "category": "pii_in_quoted_reply",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Re: Chorus rehearsal times",
+    "from": "Community Choir News <communitychoirnews@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://communitychoirnews.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "Thanks for writing. Rehearsals are on Wednesdays at 7 pm in the church hall.\n\nOn Friday, Colin Jarvis wrote:\n> Hello, can I swap to the Monday group? My oncologist has booked me for treatment on Wednesday evenings from next month.\n> I live at 19 Chapel Lane if someone could drop off the music book.",
+    "inspection": "complete",
+    "note": "Allowlisted sender, bland answer, with the health and address details only in the quoted reply.",
+    "scenario": "pii_in_quoted_reply"
+  },
+  {
+    "id": "rt-sig-01",
+    "split": "selective",
+    "category": "pii_in_signature",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Tutoring availability next term",
+    "from": "Sam Okafor <sam@okaforhome.example>",
+    "headers": {},
+    "body": "Hi,\n\nYes, I can take on another student next term. Tuesdays and Thursdays after four work best for me. Let me know which suits your family.\n\nThanks,\nSam\n\n--\nSam Okafor\nHome: 14 Rosewood Crescent, Marlow\nMobile: 0455 550 123\nDate of birth: 3 June 1992",
+    "inspection": "complete",
+    "note": "Bland text; a personal address, mobile and date of birth sit in the signature.",
+    "scenario": "pii_in_signature"
+  },
+  {
+    "id": "rt-sig-02",
+    "split": "selective",
+    "category": "pii_in_signature",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Quote for fencing",
+    "from": "Joe Brennan <joe@brennanfencing.example>",
+    "headers": {},
+    "body": "Hello,\n\nThanks for the enquiry. I can do the job for the price we discussed and start in the first week of June.\n\nRegards,\nJoe\n\n-- \nJoe Brennan\nBrennan Fencing (sole trader)\nHome address: 6 Hawthorn Road, Harlow\nPersonal mobile 0412 550 887\nBank: BSB 062-100, account 98765432",
+    "inspection": "complete",
+    "note": "Bland quote; the signature includes a home address, mobile and bank details.",
+    "scenario": "pii_in_signature"
+  },
+  {
+    "id": "rt-sig-03",
+    "split": "selective",
+    "category": "pii_in_signature",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Re: book club venue",
+    "from": "Alice Moreno <alice@morenohome.example>",
+    "headers": {},
+    "body": "Happy to host in March. I'll make soup.\n\nAlice\n\n--\nAlice Moreno\nFlat 3, 41 Quarry Street, Harlow\nPhone: 02 5550 0176\nI am out for chemotherapy sessions on Mondays, so please avoid that day.",
+    "inspection": "complete",
+    "note": "Bland text with a diagnosis-related note, address and phone after the signature separator.",
+    "scenario": "pii_in_signature"
+  },
+  {
+    "id": "rt-sig-04",
+    "split": "selective",
+    "category": "pii_in_signature",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Parent evening notes",
+    "from": "Dina Ahmed <dina@ahmedfamily.example>",
+    "headers": {},
+    "body": "Thank you for the notes. I think Tuesday works best for us.\n\nBest wishes,\nDina\n\n--\nDina Ahmed\nMother of Zayn (Year 4)\nHome: 25 Larkspur Way, Marlow\nMobile: 0422 550 618\nZayn has been diagnosed with ADHD, please see attached plan.",
+    "inspection": "complete",
+    "note": "Bland text; a child's diagnosis, address and phone in the signature block.",
+    "scenario": "pii_in_signature"
+  },
+  {
+    "id": "rt-sig-05",
+    "split": "selective",
+    "category": "pii_in_signature",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Product catalogue and pricing for Q3",
+    "from": "Northfield Industrial Supplies <sales@northfieldsupplies.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://northfieldsupplies.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Hello,\n\nPlease find our latest product catalogue and pricing for the third quarter. Trade customers receive volume discounts on orders over fifty units, and delivery is free within the metro area.\n\nContact me if you would like a sample or a quote.\n\nRegards,\nJane Cooper\n\n--\nJane Cooper\nSales Manager, Northfield Industrial Supplies\nHead office: 250 Industrial Drive, Harlow\nTel: 02 5550 0140\nwww.northfieldsupplies.example",
+    "inspection": "complete",
+    "note": "An ordinary corporate signature (business address and switchboard); honestly public marketing.",
+    "scenario": "pii_in_signature"
+  },
+  {
+    "id": "rt-bulk-01",
+    "split": "selective",
+    "category": "bulk_sensitive_domain",
+    "label": "public",
+    "difficulty": "hard",
+    "subject": "New in the app: pay your bills faster",
+    "from": "Example Bank News <updates@news.commbank.com.au>",
+    "headers": {
+      "List-Unsubscribe": "<https://news.commbank.com.au/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "What's new in the banking app.\n\nYou can now schedule bill payments up to twelve months in advance, and the new spending insights screen groups your purchases by category. We have also redesigned the home screen to make your most-used actions easier to find.\n\nUpdates are rolling out over the next fortnight. Make sure you have the latest version from your app store.\n\nTo change how often we send news, visit your preferences.",
+    "inspection": "complete",
+    "note": "Bulk product-announcement from a bank domain, no account evidence.",
+    "scenario": "bulk_sensitive_domain"
+  },
+  {
+    "id": "rt-bulk-02",
+    "split": "selective",
+    "category": "bulk_sensitive_domain",
+    "label": "public",
+    "difficulty": "hard",
+    "subject": "Public consultation open: draft rules for community gardens",
+    "from": "Department Updates <consultation@news.example.gov.au>",
+    "headers": {
+      "List-Unsubscribe": "<https://news.example.gov.au/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "The department is seeking public comment on proposed rules for community gardens on public land.\n\nThe draft rules cover leasing, insurance, water use and how decisions are made. Submissions are open until the end of next month and can be made online or by post. All submissions will be published unless you ask for yours to be treated as confidential.\n\nAn information session will be held at the town hall on the second Tuesday of next month. Everyone is welcome and no booking is required.",
+    "inspection": "complete",
+    "note": "Government bulk announcement of a public consultation.",
+    "scenario": "bulk_sensitive_domain"
+  },
+  {
+    "id": "rt-bulk-03",
+    "split": "selective",
+    "category": "bulk_sensitive_domain",
+    "label": "public",
+    "difficulty": "hard",
+    "subject": "Free flu vaccination clinic this weekend",
+    "from": "Clinic Updates <clinic@news.healthengine.com.au>",
+    "headers": {
+      "List-Unsubscribe": "<https://news.healthengine.com.au/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Our clinic is running a free flu vaccination day this Saturday from 9 am to 1 pm. No appointment is needed, and walk-ins are welcome.\n\nEveryone over six months is eligible, and people over 65 are encouraged to attend. Please wear a short-sleeved top and bring your concession card if you have one.\n\nLight refreshments will be provided, and our nurses will be available to answer questions about the vaccine. We look forward to seeing you.",
+    "inspection": "complete",
+    "note": "Health provider bulk announcement, general public information.",
+    "scenario": "bulk_sensitive_domain"
+  },
+  {
+    "id": "rt-bulk-04",
+    "split": "selective",
+    "category": "bulk_sensitive_domain",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Your account statement is ready",
+    "from": "Example Bank Statements <statements@mail.westpac.com.au>",
+    "headers": {
+      "List-Unsubscribe": "<https://mail.westpac.com.au/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Dear Customer,\n\nYour account statement is ready to view. The closing balance of your everyday account is $2,914.60, and your available balance is $2,814.60.\n\nTransactions this period include a direct debit of $126.50 and two card purchases. Sign in to view your account statement in full.\n\nIf you did not make a transaction, please call us immediately.",
+    "inspection": "complete",
+    "note": "Bank mail with account evidence even though it has an unsubscribe header. Private.",
+    "scenario": "bulk_sensitive_domain"
+  },
+  {
+    "id": "rt-bulk-05",
+    "split": "selective",
+    "category": "bulk_sensitive_domain",
+    "label": "private",
+    "difficulty": "easy",
+    "subject": "Your appointment with Dr Lee is confirmed",
+    "from": "Example Health Bookings <bookings@mail.hotdoc.com.au>",
+    "headers": {
+      "List-Unsubscribe": "<https://mail.hotdoc.com.au/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Hello Jessica,\n\nYour appointment with Dr Lee is confirmed for Tuesday at 10:30 AM at the Marlow Medical Centre. Your reason for visit is listed as follow-up for an ultrasound.\n\nPlease arrive ten minutes early and bring your Medicare card. If you need to cancel, please do so at least 24 hours in advance.\n\nThank you.",
+    "inspection": "complete",
+    "note": "Health booking confirmation naming a doctor and a reason for the visit; private despite bulk headers.",
+    "scenario": "bulk_sensitive_domain"
+  },
+  {
+    "id": "rt-insp-01",
+    "split": "selective",
+    "category": "inspection",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Hiking Notes: the ridge route in autumn",
+    "from": "Hiking Notes <news@hikingnotes.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://hikingnotes.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "The ridge route is at its best in autumn, when the bracken turns copper and the visibility improves. Start early, as the car park fills by nine.\n\nThe full route is about fourteen kilometres with 700 metres of climb. Carry layers, because the wind picks up on the summit. We have attached a printable map and a photo gallery as separate files.\n\nSee you on the trail.",
+    "inspection": "uninspectedParts",
+    "note": "Public newsletter with an image gallery that is not read; inspection is incomplete.",
+    "scenario": "uninspected_parts"
+  },
+  {
+    "id": "rt-insp-02",
+    "split": "selective",
+    "category": "inspection",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Winter reading list from the library",
+    "from": "Harlow Library <newsletter@harlowlibrary.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://harlowlibrary.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Our winter reading list is here. Staff picks include a gentle mystery set in a lighthouse, a history of the postal service, and a new picture book about owls.\n\nOpening hours are extended in the school holidays, and the children's story hour moves to Wednesday mornings. A poster and reading list PDF are attached.\n\nHappy reading from all of us at the library.",
+    "inspection": "uninspectedParts",
+    "note": "Public library newsletter with a PDF attachment, never read.",
+    "scenario": "uninspected_parts"
+  },
+  {
+    "id": "rt-insp-03",
+    "split": "selective",
+    "category": "inspection",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Weekly specials at the farm shop",
+    "from": "Oakfield Farm Shop <specials@oakfieldfarm.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://oakfieldfarm.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "This week at the farm shop: new season apples, fresh sourdough on Thursdays, and eggs from our own hens.\n\nWe will be open late on Friday for the autumn market. Our printable recipe cards are in the attached images.\n\nThank you for supporting a family farm.",
+    "inspection": "unknown",
+    "note": "Retail newsletter with inline images only; inspection unknown.",
+    "scenario": "uninspected_parts"
+  },
+  {
+    "id": "rt-insp-04",
+    "split": "selective",
+    "category": "inspection",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Chess club bulletin",
+    "from": "Marlow Chess Club <bulletin@marlowchess.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://marlowchess.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "The club championship begins next week. Pairings will be posted on the notice board and sent as an attached PDF.\n\nBeginner coaching continues on Tuesday evenings. Tea and biscuits are provided, and new members are always welcome.\n\nSee you at the board.",
+    "inspection": "unknown",
+    "note": "Club bulletin with PDF attachment; inspection unknown.",
+    "scenario": "uninspected_parts"
+  },
+  {
+    "id": "rt-insp-05",
+    "split": "selective",
+    "category": "inspection",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Product news: new colours for spring",
+    "from": "Pebble & Co <hello@pebbleandco.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://pebbleandco.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Spring has arrived and so have our new colours: sage, clay and a soft oat. All three are available in tote bags, aprons and tea towels.\n\nShop the full range on our site, or browse the attached lookbook. Free delivery on orders over fifty dollars until the end of the month.\n\nThanks for being part of the Pebble & Co family.",
+    "inspection": "uninspectedParts",
+    "note": "Marketing newsletter with a calendar invite and lookbook that cannot be read.",
+    "scenario": "uninspected_parts"
+  },
+  {
+    "id": "rt-long-01",
+    "split": "selective",
+    "category": "long_message",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Weir Rowing Club: autumn newsletter",
+    "from": "Weir Rowing Club <secretary@weirrowing.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://weirrowing.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Dear members,\n\nHere is our autumn newsletter.\n\nThe council has confirmed that the footbridge over Mill Creek will close for eight weeks from the start of next month while the timber deck is replaced. A signed diversion will take walkers along the towpath to the lower crossing, which adds about ten minutes. Cyclists are asked to dismount on the diversion. The contractor expects to finish ahead of schedule if the weather holds, and a reopening ceremony is planned for the first Saturday after the work is complete.\n\nThe community library is trialling a tool library in the back room. Residents can borrow drills, ladders, garden tools and a pressure washer for up to a week at no charge. Volunteers are needed to run the desk on Tuesday and Saturday mornings, and training is provided. Donations of working tools in good condition are welcome, but please do not leave them outside the door overnight.\n\nBin collection days are changing on three streets from the start of the month. Properties on the north side of Station Road move to Wednesday, while Long Lane and Mill Close move to Friday. Residents will receive a reminder card in the post, and an updated collection calendar is on the council website. Recycling and garden waste will alternate as before. Report any missed collections within two working days.\n\nThe town band is recruiting. Rehearsals are on Thursday evenings at the scout hut, and all abilities are welcome, from beginners with a borrowed trumpet to players returning after thirty years away. The band performs at the carol evening, the remembrance parade and the summer bandstand series. Instruments can be lent for the first term, and a retired music teacher offers free lessons before each rehearsal for anyone who would like them.\n\nMember welfare. We would like to let members know that Gareth Thornton of 8 Beacon Road has been diagnosed with motor neurone disease and has asked that crews do not call at the house. His wife has asked that we keep this within the club, so please do not share it outside. If you need to contact the family, the number is 0433 550 276.\n\nThe primary school summer fair raised more than four thousand dollars for the new reading garden. Highlights included the cake stall, the second-hand book sale, and the surprisingly competitive welly-throwing contest. The headteacher thanked every parent who volunteered and said the money will pay for raised beds, benches and a small shelter. Planting day is the second Saturday of next month and helpers of all ages are welcome.\n\nFollowing a review of the library's opening hours, the branch will open an hour earlier on Saturdays from next month. The change responds to a survey in which more than half of the respondents asked for more weekend access. Midweek hours are unchanged. Staff will use the extra time for a children's story session, and the quiet study room will be bookable for the first time at weekends.\n\nThanks for reading, and see you on the water.",
+    "inspection": "complete",
+    "note": "Long club newsletter, sensitive welfare note placed after the first 1,500 characters.",
+    "scenario": "long_message"
+  },
+  {
+    "id": "rt-long-02",
+    "split": "selective",
+    "category": "long_message",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "Family reunion planning (long update)",
+    "from": "Margaret Doyle <margaret@doylefamily.example>",
+    "headers": {},
+    "body": "Hi all,\n\nHere is the long update on the family reunion, because I know some of you are tired of scattered messages. Please read it through.\n\nThe date is the third weekend of January. We have booked the hall at the lakeside park for the Saturday, and the picnic area for Sunday morning. The hall holds sixty comfortably and has a kitchen. I would like each branch of the family to bring a main dish or a dessert, and I will make a list of who is bringing what so we do not end up with seven potato salads again.\n\nAccommodation is trickier this year. The caravan park near the lake has cabins for eight, but they go quickly. There are two motels in town, one of them with a pool, which will please the children. Aunty Jean has offered her spare room to anyone who does not mind the cats. If you need help with a booking, ring me and we will work something out.\n\nTransport: I know several of you are driving up from the city. Please try to share cars. The road between the two towns is being resurfaced, and there are temporary lights at the bridge, so allow an extra half hour. If anyone needs collecting from the station, tell me your train time and I will find a driver.\n\nEntertainment: the cousins are organising a quiz, a few of the boys are bringing cricket gear, and Uncle Pete has promised a slideshow of old photos. If you have any prints you would like to be scanned, bring them along and Dave will scan them on Saturday.\n\nFood: the hall kitchen has two ovens and a large urn, so hot dishes are fine. Please label anything that contains nuts, and let me know about any allergies in advance. Drinks are on me, though if you would like to bring something special for the toast, please do.\n\nNow, a more private matter, and I would ask that you do not forward this message. Mum's biopsy results came back last week and it is lymphoma. She is starting treatment at the hospital in the new year and she is frightened, but she has said she wants to tell everyone at the reunion in person. Please do not bring it up with her before then. Her address is 33 Banksia Street, in case you want to send a card, and her number is 02 5550 0197.\n\nOn a lighter note, the weather forecast is good, and the lake is warm. Children: there will be a bouncy castle on Saturday afternoon, a treasure hunt around the park, and a table of games for the quieter ones. Teenagers are welcome to help with the music, and the older cousins have promised to run the water balloon contest. Please bring sunscreen and hats, because the park has very little shade.\n\nPlease let me know by the end of the month how many are coming, including children, so I can confirm the catering. If cost is a worry, tell me quietly and we will sort something out between us.\n\nLove to you all,\nMargaret",
+    "inspection": "complete",
+    "note": "Long family update with a relative's diagnosis, address and phone far past the first 1,500 characters.",
+    "scenario": "long_message"
+  },
+  {
+    "id": "rt-long-03",
+    "split": "selective",
+    "category": "long_message",
+    "label": "private",
+    "difficulty": "hard",
+    "subject": "The Letter: our big autumn essay, and your replies",
+    "from": "The Letter <theletterweekly@substack.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://theletterweekly.substack.com/action/disable_email>",
+      "Precedence": "bulk"
+    },
+    "body": "I have been thinking lately about why some tools last and others vanish. The tools that last are rarely the cleverest. They are the ones that do one job plainly, that a stranger can learn in an afternoon, and that fail in ways you can see. A good spade is a good spade partly because you can tell at a glance when it is broken.\n\nSoftware is the opposite case. We build things that are impressive at first, and then we spend years learning how they fail. Each layer hides the one beneath, and the person using the product has no way to see the cracks until they widen. I do not think this is an argument against complexity. It is an argument for honest edges.\n\nConsider the humble checklist. Pilots use them, surgeons use them, and anyone who has ever packed for a trip has made a bad one. The value is not in the list. It is in the decision, made calmly in advance, about what matters. When the pressure is on, you do not have to decide again. You only have to follow your own earlier good sense.\n\nThe same applies to writing. A plan for an article is not a cage. It is a way of telling your future self where you were going when you stopped. The first draft is allowed to be bad, provided it exists. Most of the real work happens in the second and third, where the structure becomes visible and the clumsy sentences announce themselves.\n\nPeople often ask me how to read more. My answer is unglamorous: carry a book, and be willing to quit one that is not working. Finishing every book out of loyalty is a tax on the books you would have enjoyed more. The goal is to be a person who reads, not a person who completes reading lists.\n\nA friend who restores clocks told me the hardest part of the job is not the mechanism. It is the patience to leave a piece alone once it is running. The urge to improve a thing that works is, he says, the origin of most repairs. I have thought about that remark in many contexts since, and rarely found it wrong.\n\nReader replies. I promised to share some of your responses, and here is one, left with the full thread so that you can see the context.\n\nOn Tuesday, Elena Kovacs wrote:\n> I read your piece on tiredness and it hit home. I am on leave because of burnout and my doctor has put me on antidepressants. I am not telling my employer the reason.\n> I live at 27 Fennel Street if you ever want to send me a book. My mobile is 0444 550 612.\n\nOn Tuesday, I wrote:\n> Thank you for trusting me with that. Rest well.\n\nThere is a particular kind of tiredness that comes from being constantly reachable. The cure is not a digital detox so much as a few rules you keep. Messages answered at set times. A walk without a phone. A table where devices are not welcome. None of this is virtuous. It is simply maintenance, like oiling a hinge.\n\nI will end with a small recommendation. Find someone whose work you admire and read how they made their first, unremarkable attempts. It is wonderfully reassuring. The distance between a beginner and an expert is mostly the number of unremarkable attempts, and nobody can skip those. Thank you for reading, and for writing back.",
+    "inspection": "complete",
+    "note": "Trusted long newsletter with a private reply thread (mental health, address, phone) placed far past 1,500 characters.",
+    "scenario": "long_message"
+  },
+  {
+    "id": "rt-long-04",
+    "split": "selective",
+    "category": "long_message",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Harlow Community News: the big autumn round-up",
+    "from": "Harlow Community News <news@harlowcommunity.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://harlowcommunity.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Welcome to the autumn round-up of what is happening around town.\n\nLocal bus route 14 will run every twenty minutes on weekdays after a successful trial. The operator reported a rise in passengers of almost a fifth in the first three months, and the extra service will be funded by a state grant for the next two years. Timetables are posted at stops and online. Feedback on the new schedule can be given through the operator's website until the end of the month.\n\nThe annual heritage open weekend returns with more than thirty buildings taking part. Visitors can tour the old mill, climb the church tower, and see inside the telegraph office, which has not opened to the public in decades. Most events are free, and a printed guide is available from the visitor centre. Guided walks leave from the market square at ten and two each day, and booking is advised for the tower climb.\n\nThe community garden on Alder Street has harvested its first crop of winter squash. Volunteers shared the produce with the food bank, and the surplus went to a neighbourhood soup night. The group meets on Sunday mornings and always welcomes new members, whatever their experience. This month's jobs include mulching, building a second compost bay, and repairing the gate that has refused to latch since spring.\n\nThe town's youth football league announced its autumn fixtures. Teams from under-seven to under-fifteen will play at the recreation ground on Saturday mornings. The league is looking for more volunteer referees and offers a short course for anyone aged fourteen or over. Kit swaps are held on the first weekend of each month, and families can borrow boots and shin pads if cost is a barrier.\n\nCouncil crews will resurface sections of River Road over the next three weeks, working overnight to reduce disruption. Temporary traffic lights will be in place, and some parking restrictions apply. Access for residents and emergency vehicles will be maintained throughout. The works are part of a wider programme to repair roads damaged by last winter's floods and will be followed by new road markings.\n\nA reminder that the farmers' market has moved to the car park behind the town hall while the square is relaid. There are more than forty stalls, including bread, cheese, honey, plants and a stall that sells only mushrooms. The market runs from eight until one every Saturday, and a free shuttle runs from the station for those who prefer not to drive. Bring your own bags, as plastic ones are no longer provided.\n\nThat is all for this issue. Thanks for reading, and please forward the newsletter to a neighbour who might like it.",
+    "inspection": "complete",
+    "note": "Long, fully public local digest from an unknown sender; every chunk should score public.",
+    "scenario": "long_message"
+  },
+  {
+    "id": "rt-long-05",
+    "split": "selective",
+    "category": "long_message",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "A long essay: on tools that last",
+    "from": "Medium Daily Digest <noreply@medium.com>",
+    "headers": {
+      "List-Unsubscribe": "<https://medium.com/p/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Today's featured long read.\n\nI have been thinking lately about why some tools last and others vanish. The tools that last are rarely the cleverest. They are the ones that do one job plainly, that a stranger can learn in an afternoon, and that fail in ways you can see. A good spade is a good spade partly because you can tell at a glance when it is broken.\n\nSoftware is the opposite case. We build things that are impressive at first, and then we spend years learning how they fail. Each layer hides the one beneath, and the person using the product has no way to see the cracks until they widen. I do not think this is an argument against complexity. It is an argument for honest edges.\n\nConsider the humble checklist. Pilots use them, surgeons use them, and anyone who has ever packed for a trip has made a bad one. The value is not in the list. It is in the decision, made calmly in advance, about what matters. When the pressure is on, you do not have to decide again. You only have to follow your own earlier good sense.\n\nThe same applies to writing. A plan for an article is not a cage. It is a way of telling your future self where you were going when you stopped. The first draft is allowed to be bad, provided it exists. Most of the real work happens in the second and third, where the structure becomes visible and the clumsy sentences announce themselves.\n\nPeople often ask me how to read more. My answer is unglamorous: carry a book, and be willing to quit one that is not working. Finishing every book out of loyalty is a tax on the books you would have enjoyed more. The goal is to be a person who reads, not a person who completes reading lists.\n\nA friend who restores clocks told me the hardest part of the job is not the mechanism. It is the patience to leave a piece alone once it is running. The urge to improve a thing that works is, he says, the origin of most repairs. I have thought about that remark in many contexts since, and rarely found it wrong.\n\nThere is a particular kind of tiredness that comes from being constantly reachable. The cure is not a digital detox so much as a few rules you keep. Messages answered at set times. A walk without a phone. A table where devices are not welcome. None of this is virtuous. It is simply maintenance, like oiling a hinge.\n\nI will end with a small recommendation. Find someone whose work you admire and read how they made their first, unremarkable attempts. It is wonderfully reassuring. The distance between a beginner and an expert is mostly the number of unremarkable attempts, and nobody can skip those. Thank you for reading, and for writing back.\n\nIf you enjoyed this essay, you may also like our reading list on craft and work.",
+    "inspection": "complete",
+    "note": "Long public essay from an allowlisted sender: no triage needed.",
+    "scenario": "long_message"
+  },
+  {
+    "id": "rt-over-01",
+    "split": "selective",
+    "category": "long_over_budget",
+    "label": "public",
+    "difficulty": "easy",
+    "subject": "Harlow Community News: the complete year in review",
+    "from": "Harlow Community News <news@harlowcommunity.example>",
+    "headers": {
+      "List-Unsubscribe": "<https://harlowcommunity.example/unsubscribe/synthetic-token>",
+      "Precedence": "bulk"
+    },
+    "body": "Our complete year in review. Grab a cup of tea; it is a long one.\n\nThe council has confirmed that the footbridge over Mill Creek will close for eight weeks from the start of next month while the timber deck is replaced. A signed diversion will take walkers along the towpath to the lower crossing, which adds about ten minutes. Cyclists are asked to dismount on the diversion. The contractor expects to finish ahead of schedule if the weather holds, and a reopening ceremony is planned for the first Saturday after the work is complete.\n\nThe community library is trialling a tool library in the back room. Residents can borrow drills, ladders, garden tools and a pressure washer for up to a week at no charge. Volunteers are needed to run the desk on Tuesday and Saturday mornings, and training is provided. Donations of working tools in good condition are welcome, but please do not leave them outside the door overnight.\n\nBin collection days are changing on three streets from the start of the month. Properties on the north side of Station Road move to Wednesday, while Long Lane and Mill Close move to Friday. Residents will receive a reminder card in the post, and an updated collection calendar is on the council website. Recycling and garden waste will alternate as before. Report any missed collections within two working days.\n\nThe primary school summer fair raised more than four thousand dollars for the new reading garden. Highlights included the cake stall, the second-hand book sale, and the surprisingly competitive welly-throwing contest. The headteacher thanked every parent who volunteered and said the money will pay for raised beds, benches and a small shelter. Planting day is the second Saturday of next month and helpers of all ages are welcome.\n\nLocal bus route 14 will run every twenty minutes on weekdays after a successful trial. The operator reported a rise in passengers of almost a fifth in the first three months, and the extra service will be funded by a state grant for the next two years. Timetables are posted at stops and online. Feedback on the new schedule can be given through the operator's website until the end of the month.\n\nThe annual heritage open weekend returns with more than thirty buildings taking part. Visitors can tour the old mill, climb the church tower, and see inside the telegraph office, which has not opened to the public in decades. Most events are free, and a printed guide is available from the visitor centre. Guided walks leave from the market square at ten and two each day, and booking is advised for the tower climb.\n\nThe community garden on Alder Street has harvested its first crop of winter squash. Volunteers shared the produce with the food bank, and the surplus went to a neighbourhood soup night. The group meets on Sunday mornings and always welcomes new members, whatever their experience. This month's jobs include mulching, building a second compost bay, and repairing the gate that has refused to latch since spring.\n\nThe town's youth football league announced its autumn fixtures. Teams from under-seven to under-fifteen will play at the recreation ground on Saturday mornings. The league is looking for more volunteer referees and offers a short course for anyone aged fourteen or over. Kit swaps are held on the first weekend of each month, and families can borrow boots and shin pads if cost is a barrier.\n\nCouncil crews will resurface sections of River Road over the next three weeks, working overnight to reduce disruption. Temporary traffic lights will be in place, and some parking restrictions apply. Access for residents and emergency vehicles will be maintained throughout. The works are part of a wider programme to repair roads damaged by last winter's floods and will be followed by new road markings.\n\nA reminder that the farmers' market has moved to the car park behind the town hall while the square is relaid. There are more than forty stalls, including bread, cheese, honey, plants and a stall that sells only mushrooms. The market runs from eight until one every Saturday, and a free shuttle runs from the station for those who prefer not to drive. Bring your own bags, as plastic ones are no longer provided.\n\nThe local history society is digitising its collection of old photographs and is asking residents to bring theirs along. Volunteers will scan prints at the library on the third Thursday of each month, and the originals go straight back to their owners. The aim is a free online archive of how the town looked over the last hundred years. So far the collection includes more than six hundred images and a surprising number of dogs.\n\nSwimming lessons for children resume at the leisure centre next week, with new beginner and improver sessions. Parents can book online or at the desk. The centre has also extended its early morning adult sessions after strong demand, and the pool temperature has been raised by a degree for the colder months. The cafe now serves hot porridge for those who need warming up afterwards.\n\nThe nature reserve reopens its boardwalk after repairs, giving visitors access to the reedbed hide again. Spring counts recorded more than ninety bird species, including a pair of bitterns that have returned for the third year. Binoculars can be borrowed from the visitor centre. Guided dawn walks run on the first Sunday of the month and need no booking, though numbers are limited to twenty.\n\nThe library's reading group is looking for new members. The group meets on the first Wednesday of each month at the community centre to discuss a novel chosen by vote. Recent books have included a historical thriller, a collection of short stories and a surprisingly funny book about bees. No preparation is required beyond reading the book, though biscuits are encouraged.\n\nThe town band is recruiting. Rehearsals are on Thursday evenings at the scout hut, and all abilities are welcome, from beginners with a borrowed trumpet to players returning after thirty years away. The band performs at the carol evening, the remembrance parade and the summer bandstand series. Instruments can be lent for the first term, and a retired music teacher offers free lessons before each rehearsal for anyone who would like them.\n\nFollowing a review of the library's opening hours, the branch will open an hour earlier on Saturdays from next month. The change responds to a survey in which more than half of the respondents asked for more weekend access. Midweek hours are unchanged. Staff will use the extra time for a children's story session, and the quiet study room will be bookable for the first time at weekends.\n\nVolunteers are cleaning up the riverbank on the last Sunday of the month. Gloves, bags and litter pickers are provided, and the council will collect the sacks afterwards. Last year's clean-up gathered more than two hundred kilos of rubbish, including a shopping trolley, three traffic cones and a very old bicycle. Refreshments are provided by the cafe at the boathouse, and children are welcome with an adult.\n\nA new community fridge has opened outside the church hall. Anyone can take food, and anyone can leave it, provided it is in date and labelled. A volunteer rota keeps the fridge clean and the shelves tidy, and the project is supported by a local supermarket that donates surplus produce every evening. Offers of help are welcome, and no experience is needed to join the team.\n\nAnd a few closing thoughts.\n\nI have been thinking lately about why some tools last and others vanish. The tools that last are rarely the cleverest. They are the ones that do one job plainly, that a stranger can learn in an afternoon, and that fail in ways you can see. A good spade is a good spade partly because you can tell at a glance when it is broken.\n\nSoftware is the opposite case. We build things that are impressive at first, and then we spend years learning how they fail. Each layer hides the one beneath, and the person using the product has no way to see the cracks until they widen. I do not think this is an argument against complexity. It is an argument for honest edges.\n\nConsider the humble checklist. Pilots use them, surgeons use them, and anyone who has ever packed for a trip has made a bad one. The value is not in the list. It is in the decision, made calmly in advance, about what matters. When the pressure is on, you do not have to decide again. You only have to follow your own earlier good sense.\n\nThe same applies to writing. A plan for an article is not a cage. It is a way of telling your future self where you were going when you stopped. The first draft is allowed to be bad, provided it exists. Most of the real work happens in the second and third, where the structure becomes visible and the clumsy sentences announce themselves.\n\nPeople often ask me how to read more. My answer is unglamorous: carry a book, and be willing to quit one that is not working. Finishing every book out of loyalty is a tax on the books you would have enjoyed more. The goal is to be a person who reads, not a person who completes reading lists.\n\nA friend who restores clocks told me the hardest part of the job is not the mechanism. It is the patience to leave a piece alone once it is running. The urge to improve a thing that works is, he says, the origin of most repairs. I have thought about that remark in many contexts since, and rarely found it wrong.\n\nThanks for reading all the way to the end.",
+    "inspection": "complete",
+    "note": "Very long public newsletter from an unknown sender: needs more chunks than the budget, so it must fail closed (local, too long).",
+    "scenario": "long_over_budget"
+  }
+]
