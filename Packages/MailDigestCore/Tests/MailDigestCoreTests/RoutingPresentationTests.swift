@@ -163,7 +163,7 @@ import Testing
         #expect(RoutingPresentation.localReasonText(.contentNotInspected)
                 == "Content not fully inspected, so it stayed on this Mac.")
         for f in [TriageFailure.unreachable, .versionTooOld, .versionUnknown, .modelMissing, .httpError, .timedOut,
-                  .malformedResponse, .unsupportedModel] {
+                  .malformedResponse, .unsupportedModel, .contentTooLong] {
             #expect(!RoutingPresentation.triageFailureText(f).isEmpty)
         }
         for code in ["invalidCredential", "rateLimited", "modelUnavailable", "server503", "timedOut", "network",
@@ -276,5 +276,21 @@ import Testing
                 [local(.privateContent, Self.assessment(.private, .rule)), local(.notEligible, Self.assessment(.uncertain, .systemOne))])
                 == "Local: 2 not fully inspected · 1 private rule · 1 low confidence")
         #expect(RoutingPresentation.localReasonSummaryText([]) == nil)
+    }
+
+    @Test func detailsShowTextAssessedAndTooLong() {
+        var a = PrivacyAssessment(verdict: .public, method: .systemOne, assessedAt: Date(timeIntervalSince1970: 0),
+                                  triageCoverage: TriageCoverage(assessedChunks: 3, totalChunks: 3))
+        var lines = RoutingPresentation.details(RoutingProvenance(assessment: a))
+        #expect(lines.contains(RoutingDetailLine(label: "Text assessed", value: "3 of 3 sections")))
+        a.triageCoverage = TriageCoverage(assessedChunks: 1, totalChunks: 1)
+        lines = RoutingPresentation.details(RoutingProvenance(assessment: a))
+        #expect(!lines.contains { $0.label == "Text assessed" })
+        a = PrivacyAssessment(verdict: .uncertain, method: .systemOne, triageFailure: .contentTooLong,
+                              assessedAt: Date(timeIntervalSince1970: 0),
+                              triageCoverage: TriageCoverage(assessedChunks: 0, totalChunks: 9))
+        lines = RoutingPresentation.details(RoutingProvenance(assessment: a))
+        #expect(lines.contains(RoutingDetailLine(label: "Triage", value: "Too long to assess completely")))
+        #expect(lines.contains(RoutingDetailLine(label: "Text assessed", value: "0 of 9 sections")))
     }
 }

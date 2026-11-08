@@ -146,6 +146,45 @@ private func reason(_ data: Data) -> EmlxUnusableReason? {
         #expect(try usable(emlx(msg)).body == "Only HTML")
     }
 
+    @Test func htmlOutsideAlternativeIsReadAlongsidePlain() throws {
+        let msg = """
+        \(baseHeaders)
+        Content-Type: multipart/mixed; boundary="m"
+
+        --m
+        Content-Type: text/plain; charset=utf-8
+
+        Plain note
+        --m
+        Content-Type: text/html; charset=utf-8
+
+        <p>Separate HTML content</p>
+        --m--
+        """
+        let p = try usable(emlx(msg))
+        #expect(p.body.contains("Plain note") && p.body.contains("Separate HTML content"))
+        // An alternative group still prefers plain and does not duplicate it.
+        let alt = """
+        \(baseHeaders)
+        Content-Type: multipart/mixed; boundary="m"
+
+        --m
+        Content-Type: multipart/alternative; boundary="a"
+
+        --a
+        Content-Type: text/plain; charset=utf-8
+
+        Same text
+        --a
+        Content-Type: text/html; charset=utf-8
+
+        <p>Same text</p>
+        --a--
+        --m--
+        """
+        #expect(try usable(emlx(alt)).body == "Same text")
+    }
+
     @Test func partialStyleWithBodyIsUsableAndEmptyIsNot() throws {
         let withBody = try usable(emlx("\(baseHeaders)\nContent-Type: text/plain\n\nStart of the message"))
         #expect(withBody.body == "Start of the message")

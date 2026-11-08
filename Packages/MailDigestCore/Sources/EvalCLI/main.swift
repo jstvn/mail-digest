@@ -118,7 +118,8 @@ func runCommand(_ opts: [String: [String]]) async {
     for (i, f) in fixtures.enumerated() {
         // The raw email goes to the router; TriageInputBuilder cleans the body itself (as in DigestPipeline).
         let email = f.email()
-        let input = TriageInputBuilder().build(email)
+        // Stage 3 replaces this with chunked assessment; until then only the first planned input is sent.
+        let input = TriageInputBuilder().plan(email).inputs.first ?? TriageInput(state: "")
         var scores: SystemOneScores?
         var failure: TriageFailure?
         var errorText: String?

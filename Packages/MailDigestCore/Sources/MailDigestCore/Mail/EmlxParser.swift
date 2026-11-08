@@ -192,24 +192,35 @@ public struct EmlxParser: Sendable {
     private static func extractBody(_ root: Entity, charsetDecoder: CharsetDecoder?) throws -> (String, ContentInspection, InspectionGap?) {
         var plain: [Entity] = []
         var html: [Entity] = []
+        var looseHTML: [Entity] = []
         var gap: InspectionGap?
-        try collect(root, depth: 0, plain: &plain, html: &html, gap: &gap)
+        try collect(root, depth: 0, underAlternative: false, plain: &plain, html: &html, looseHTML: &looseHTML,
+                    gap: &gap)
 
         var decodeFailed = false
         var result: String?
-        for (candidates, isHTML) in [(plain, false), (html, true)] where !candidates.isEmpty {
+        // An HTML part outside a multipart/alternative group is separate content, not another rendering of the
+        // plain text, so it is read alongside the plain parts instead of being ignored.
+        // `optional` parts only add text; failing to decode one flags the message but keeps the plain parts.
+        let groups: [[(entity: Entity, isHTML: Bool, optional: Bool)]] = [
+            plain.map { ($0, false, false) } + (plain.isEmpty ? [] : looseHTML.map { ($0, true, true) }),
+            (html + (plain.isEmpty ? looseHTML : [])).map { ($0, true, false) },
+        ]
+        for candidates in groups where !candidates.isEmpty {
             var pieces: [String] = []
-            do {
-                for e in candidates {
+            var groupFailed = false
+            for (e, isHTML, optional) in candidates {
+                do {
                     let text = try decodeText(e, charsetDecoder: charsetDecoder)
                     let cleaned = isHTML ? htmlToText(text) : normalise(text)
                     if !cleaned.isEmpty { pieces.append(cleaned) }
+                } catch {
+                    // An untrustworthy part: try the other representation, else report undecodable.
+                    decodeFailed = true
+                    if !optional { groupFailed = true; break }
                 }
-            } catch {
-                // An untrustworthy part: try the other representation, else report undecodable.
-                decodeFailed = true
-                continue
             }
+            if groupFailed { continue }
             // Keep looping so every part is decode-checked for the inspection verdict.
             if result == nil, !pieces.isEmpty { result = pieces.joined(separator: "\n\n") }
         }
@@ -221,7 +232,8 @@ public struct EmlxParser: Sendable {
         throw decodeFailed ? EmlxUnusableReason.undecodableBody : EmlxUnusableReason.noUsableTextPart
     }
 
-    private static func collect(_ e: Entity, depth: Int, plain: inout [Entity], html: inout [Entity],
+    private static func collect(_ e: Entity, depth: Int, underAlternative: Bool, plain: inout [Entity],
+                                html: inout [Entity], looseHTML: inout [Entity],
                                 gap: inout InspectionGap?) throws {
         guard depth <= maxDepth else { throw EmlxUnusableReason.mimeStructure }
         let ct = parseParameterised(e.header("content-type") ?? "text/plain")
@@ -230,18 +242,20 @@ public struct EmlxParser: Sendable {
 
         if ct.main.hasPrefix("multipart/") {
             guard let boundary = ct.params["boundary"], !boundary.isEmpty else { throw EmlxUnusableReason.mimeStructure }
+            let alternative = underAlternative || ct.main == "multipart/alternative"
             for part in try splitMultipart(e.body, boundary: boundary) {
                 let (h, b) = splitHeaderBody(part)
                 // A part may have no headers at all (defaults to text/plain); only a bad block is an error.
                 let fields = h.isEmpty ? [] : (parseHeaders(h)?.fields ?? [])
                 if !h.isEmpty && fields.isEmpty { throw EmlxUnusableReason.mimeStructure }
-                try collect(Entity(headers: fields, body: b), depth: depth + 1, plain: &plain, html: &html,
-                                gap: &gap)
+                try collect(Entity(headers: fields, body: b), depth: depth + 1, underAlternative: alternative,
+                            plain: &plain, html: &html, looseHTML: &looseHTML, gap: &gap)
             }
         } else if ct.main == "text/plain" {
             plain.append(e)
         } else if ct.main == "text/html" {
-            html.append(e)
+            // Inside a multipart, outside any alternative group: separate content. A lone HTML message stays `html`.
+            if depth > 0, !underAlternative { looseHTML.append(e) } else { html.append(e) }
         } else {
             // Images, calendar, PDF, S/MIME, message/*, unknown: never read, so never "complete".
             if gap != .attachment { gap = .nonTextPart }

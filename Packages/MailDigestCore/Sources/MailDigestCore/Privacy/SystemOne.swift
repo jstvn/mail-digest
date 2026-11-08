@@ -35,13 +35,13 @@ public enum SystemOneSpec {
     public static let sensitiveQuestion = "contains_pii_or_sensitive"
     public static let categoryQuestion = "mail_category"
     public static let publicCategory = "public_newsletter_or_promo"
-    public static let sensitiveInstructions = "Does this email contain personally identifiable information, financial records, medical information, credentials, private personal matters, or confidential work discussions?"
-    public static let categoryInstructions = "Classify the primary nature of this email."
+    public static let sensitiveInstructions = "Should this email stay on the user's own device because it reveals sensitive personal information in a private, confidential, transactional or apparently unintended way? Answer yes for identifiable medical, financial, legal or identity records; credentials or security codes; account, billing or transaction details; private correspondence; confidential work matters; or a private individual's sensitive details disclosed without clear intent to publish. Answer no for public discussion of medical, financial or tax topics; anonymised case studies; testimonials and reader stories clearly written for publication; and ordinary names, public figures or publicly available contact details. Mentioning a sensitive topic is not the same as containing a private record."
+    public static let categoryInstructions = "Classify the primary nature of this email. Text after a reply marker or signature is part of the email."
     /// Ordered for a stable request body.
     public static let categoryCriteria: [(key: String, text: String)] = [
-        ("public_newsletter_or_promo", "Public newsletters, marketing promotions, product updates, or public notifications."),
-        ("personal_or_work_private", "Private correspondence, internal work communication, or personal scheduling."),
-        ("sensitive_transactional", "Bills, receipts, security alerts, account statements, or legal or medical documents."),
+        ("public_newsletter_or_promo", "Public newsletters, articles, marketing promotions, product updates, public announcements or public notifications, including published stories, testimonials and discussion of medical, financial or tax topics."),
+        ("personal_or_work_private", "Private correspondence, replies between individuals, internal work communication, or personal scheduling, even when quoted inside another message."),
+        ("sensitive_transactional", "Bills, receipts, security alerts, account statements, order or delivery details for a person, or legal or medical documents about a person."),
     ]
     /// Minimum Ollama version for the Kev triage models (Kev model page; System One itself needs 0.35.0).
     public static let minimumOllamaVersion = [0, 40, 4]
@@ -49,34 +49,78 @@ public enum SystemOneSpec {
     public static let thresholdRange = 0.80...0.99
 }
 
-/// Builds the `state` string: cleaned body, tracking parameters removed, whole state <= 1,500 characters.
+/// The triage states for one email: one per chunk of the prepared text.
+public struct TriagePlan: Sendable, Equatable {
+    public var inputs: [TriageInput]
+    /// The real number of chunks the text needs, even when it is over budget.
+    public var totalChunks: Int
+    /// False when the text needs more than `TriageInputBuilder.maxChunks` chunks; `inputs` is then empty.
+    public var isWithinBudget: Bool
+
+    public init(inputs: [TriageInput], totalChunks: Int, isWithinBudget: Bool) {
+        self.inputs = inputs
+        self.totalChunks = totalChunks
+        self.isWithinBudget = isWithinBudget
+    }
+}
+
+/// Builds the `state` strings: prepared text (see `PrivacyAssessmentText`) split into overlapping chunks,
+/// each state <= 1,500 characters. Nothing is truncated; text that needs too many chunks is reported instead.
 public struct TriageInputBuilder: Sendable {
     public static let maxStateCharacters = 1_500
+    public static let maxChunks = 6
+    static let maxSubject = 200
+    static let maxSender = 120
+    /// Characters repeated between consecutive chunks so a detail on a boundary is seen whole.
+    static let overlap = 80
     static let trackingParams: Set<String> = [
         "fbclid", "gclid", "dclid", "gbraid", "wbraid", "msclkid", "yclid", "twclid", "mc_cid", "mc_eid",
         "_hsenc", "_hsmi", "mkt_tok", "igshid", "vero_id", "oly_enc_id", "oly_anon_id", "ref_src",
     ]
-    private let cleaner = EmailCleaner()
     public init() {}
 
-    public func build(_ email: EmailMessage) -> TriageInput {
-        let prefix = "Subject: \(Self.collapse(email.subject))\nFrom: \(Self.collapse(email.sender))\nBody: "
-        var body = Self.collapse(Self.stripTracking(cleaner.clean(email.body)))
-        let room = max(0, Self.maxStateCharacters - prefix.count)
-        if prefix.count >= Self.maxStateCharacters {
-            return TriageInput(state: String((prefix).prefix(Self.maxStateCharacters - 1)) + "…")
+    public func plan(_ email: EmailMessage) -> TriagePlan {
+        let prefix = "Subject: \(String(Self.collapse(email.subject).prefix(Self.maxSubject)))\n"
+            + "From: \(String(Self.collapse(email.sender).prefix(Self.maxSender)))\nBody: "
+        let room = Self.maxStateCharacters - prefix.count
+        let chunks = Self.chunks(Array(PrivacyAssessmentText.prepare(body: email.body)), room: room)
+        guard chunks.count <= Self.maxChunks else {
+            return TriagePlan(inputs: [], totalChunks: chunks.count, isWithinBudget: false)
         }
-        if body.count > room {
-            body = String(body.prefix(max(0, room - 1))) + "…"
+        return TriagePlan(inputs: chunks.map { TriageInput(state: prefix + $0) },
+                          totalChunks: chunks.count, isWithinBudget: true)
+    }
+
+    /// Splits on spaces where possible; a run without spaces is hard-split. Always returns at least one chunk.
+    private static func chunks(_ text: [Character], room: Int) -> [String] {
+        guard text.count > room else { return [String(text)] }
+        var out: [String] = []
+        var start = 0
+        while true {
+            let hardEnd = min(start + room, text.count)
+            var end = hardEnd
+            if hardEnd < text.count {
+                // Prefer the last space in the second half of the window, so progress is guaranteed.
+                var k = hardEnd - 1
+                while k > start + room / 2, text[k] != " " { k -= 1 }
+                if text[k] == " ", k > start + room / 2 { end = k }
+            }
+            out.append(String(text[start..<end]).trimmingCharacters(in: .whitespaces))
+            if end >= text.count { return out }
+            // Step back by the overlap, then to a word start so words are not cut in the overlap.
+            var next = end - overlap
+            var back = next
+            while back > next - 40, back > start, text[back - 1] != " " { back -= 1 }
+            if back > start, text[back - 1] == " " { next = back }
+            start = next
         }
-        return TriageInput(state: prefix + body)
     }
 
     static func collapse(_ s: String) -> String {
         s.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
     }
 
-    private static let urlRegex = try? NSRegularExpression(pattern: #"https?://[^\s<>"')\]]+"#)
+    static let urlRegex = try? NSRegularExpression(pattern: #"https?://[^\s<>"')\]]+"#)
 
     static func isTracking(_ name: String) -> Bool {
         let n = name.lowercased()

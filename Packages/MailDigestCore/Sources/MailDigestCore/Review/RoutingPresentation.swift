@@ -110,6 +110,10 @@ public enum RoutingPresentation {
             lines.append(RoutingDetailLine(label: "Threshold", value: percent(t.threshold)))
             lines.append(RoutingDetailLine(label: "Public floor", value: percent(t.publicFloor)))
         }
+        if let c = a.triageCoverage, c.totalChunks > 1 {
+            lines.append(RoutingDetailLine(label: "Text assessed",
+                                           value: "\(c.assessedChunks) of \(c.totalChunks) sections"))
+        }
         if let f = a.triageFailure { lines.append(RoutingDetailLine(label: "Triage", value: triageFailureText(f))) }
         if let e = routing.execution {
             lines.append(RoutingDetailLine(label: "Processed by", value: executionBadge(e).text))
@@ -282,6 +286,7 @@ public enum RoutingPresentation {
         case .timedOut: return "The triage request timed out."
         case .malformedResponse: return "The triage response could not be read."
         case .unsupportedModel: return "The triage model is not supported."
+        case .contentTooLong: return "Too long to assess completely"
         }
     }
 

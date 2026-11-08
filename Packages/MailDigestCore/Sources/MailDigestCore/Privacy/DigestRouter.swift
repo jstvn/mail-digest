@@ -69,7 +69,11 @@ public struct DigestRouter: Sendable {
         if let stored, stored.method != .cloudOff {
             var isPublic = false
             if case .public = verdict { isPublic = true }
-            if !(stored.method == .trustedSender && !isPublic) { return stored }
+            // A stored System One "public" made under the old truncated-input policy (no or partial
+            // coverage) is not trusted; it is assessed again over the whole text.
+            let truncatedPublic = stored.method == .systemOne && stored.verdict == .public
+                && stored.triageCoverage?.isComplete != true
+            if !(stored.method == .trustedSender && !isPublic) && !truncatedPublic { return stored }
         }
         if config.cloudExtractor == nil {
             if case .public(let id) = verdict {
@@ -87,25 +91,51 @@ public struct DigestRouter: Sendable {
         var trigger: TriageTrigger?
         var signal: String?
         if case .needsTriage(let t, let s) = verdict { trigger = t; signal = s }
-        func uncertain(_ failure: TriageFailure) -> PrivacyAssessment {
+        func uncertain(_ failure: TriageFailure?, coverage: TriageCoverage? = nil) -> PrivacyAssessment {
             PrivacyAssessment(verdict: .uncertain, method: .systemOne, triageFailure: failure, assessedAt: now,
-                              triageTrigger: trigger, riskSignal: signal)
+                              triageTrigger: trigger, riskSignal: signal, triageCoverage: coverage)
         }
         guard let triage = config.triage else { return uncertain(.unreachable) }
+        // Plan once: every chunk of the text is assessed, or none is (nothing is silently truncated).
+        let plan = TriageInputBuilder().plan(email)
+        guard plan.isWithinBudget else {
+            return uncertain(.contentTooLong, coverage: TriageCoverage(assessedChunks: 0, totalChunks: plan.totalChunks))
+        }
+        let total = plan.totalChunks
+        var finished = 0
         do {
-            if let failure = try await triage.preflight(model: config.triageModel) { return uncertain(failure) }
-            let scores = try await triage.assess(TriageInputBuilder().build(email), model: config.triageModel)
-            var result = TriageEvaluator().evaluate(scores, model: config.triageModel,
-                                                    threshold: config.privacyThreshold, assessedAt: clock.now())
-            result.triageTrigger = trigger
-            result.riskSignal = signal
-            return result
+            if let failure = try await triage.preflight(model: config.triageModel) {
+                return uncertain(failure, coverage: TriageCoverage(assessedChunks: 0, totalChunks: total))
+            }
+            let evaluator = TriageEvaluator()
+            var worst: PrivacyAssessment?
+            for input in plan.inputs {
+                try Task.checkCancellation()
+                let scores = try await triage.assess(input, model: config.triageModel)
+                var result = evaluator.evaluate(scores, model: config.triageModel,
+                                                threshold: config.privacyThreshold, assessedAt: clock.now())
+                finished += 1
+                result.triageTrigger = trigger
+                result.riskSignal = signal
+                result.triageCoverage = TriageCoverage(assessedChunks: finished, totalChunks: total)
+                // The first chunk that is not confidently public decides; later chunks need not be read.
+                if result.verdict != .public { return result }
+                if worst == nil || (result.triage?.pNonSensitive ?? 0) < (worst?.triage?.pNonSensitive ?? 0) {
+                    worst = result
+                }
+            }
+            // Fail closed: "public" is only ever returned for a fully assessed message.
+            guard var final = worst, finished == total else {
+                return uncertain(nil, coverage: TriageCoverage(assessedChunks: finished, totalChunks: total))
+            }
+            final.triageCoverage = TriageCoverage(assessedChunks: finished, totalChunks: total)
+            return final
         } catch is CancellationError {
             throw CancellationError()
         } catch let failure as TriageFailure {
-            return uncertain(failure)
+            return uncertain(failure, coverage: TriageCoverage(assessedChunks: finished, totalChunks: total))
         } catch {
-            return uncertain(.unreachable)
+            return uncertain(.unreachable, coverage: TriageCoverage(assessedChunks: finished, totalChunks: total))
         }
     }
 

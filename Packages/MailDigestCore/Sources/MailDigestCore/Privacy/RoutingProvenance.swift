@@ -15,6 +15,8 @@ public enum AssessmentMethod: String, Codable, Sendable, Equatable {
 public enum TriageFailure: String, Codable, Sendable, Equatable, Error {
     case unreachable, versionTooOld, versionUnknown, modelMissing, httpError, timedOut
     case malformedResponse, unsupportedModel
+    /// The text needs more chunks than the triage budget allows, so it could not be assessed completely.
+    case contentTooLong
 }
 
 /// Raw System One scores plus the thresholds in force at decision time.
@@ -37,6 +39,18 @@ public struct TriageScores: Codable, Sendable, Equatable {
     }
 }
 
+/// How much of the message text System One assessed. Counts only, never text.
+public struct TriageCoverage: Codable, Sendable, Equatable {
+    public var assessedChunks: Int
+    public var totalChunks: Int
+    public var isComplete: Bool { totalChunks > 0 && assessedChunks == totalChunks }
+
+    public init(assessedChunks: Int, totalChunks: Int) {
+        self.assessedChunks = assessedChunks
+        self.totalChunks = totalChunks
+    }
+}
+
 /// The privacy decision, persisted as soon as it is made (before generation).
 public struct PrivacyAssessment: Codable, Sendable, Equatable {
     public var verdict: PrivacyVerdict
@@ -52,11 +66,14 @@ public struct PrivacyAssessment: Codable, Sendable, Equatable {
     public var triageTrigger: TriageTrigger?
     /// Contextual risk signal id (for example `risk.medical.identifiable`); never matched text.
     public var riskSignal: String?
+    /// How much of the text System One read. Old records decode as nil (assessed from truncated input).
+    public var triageCoverage: TriageCoverage?
 
     public init(verdict: PrivacyVerdict, method: AssessmentMethod, ruleID: String? = nil,
                 triage: TriageScores? = nil, triageFailure: TriageFailure? = nil, assessedAt: Date,
                 inspectionGap: InspectionGap? = nil, triageTrigger: TriageTrigger? = nil,
-                riskSignal: String? = nil) {
+                riskSignal: String? = nil, triageCoverage: TriageCoverage? = nil) {
+        self.triageCoverage = triageCoverage
         self.triageTrigger = triageTrigger
         self.riskSignal = riskSignal
         self.inspectionGap = inspectionGap

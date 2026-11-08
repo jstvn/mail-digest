@@ -259,6 +259,11 @@ private func run(_ p: DigestPipeline, _ e: EmailMessage, _ c: CloudRoutingConfig
         let reused = try await router.assess(email(), stored: stored, config: c)
         #expect(reused == stored)
         #expect((await triage.preflightCalls).isEmpty)
+        // A stored System One "public" with complete coverage is reused too.
+        let complete = PrivacyAssessment(verdict: .public, method: .systemOne, assessedAt: today,
+                                         triageCoverage: TriageCoverage(assessedChunks: 2, totalChunks: 2))
+        #expect(try await router.assess(email(), stored: complete, config: c) == complete)
+        #expect((await triage.preflightCalls).isEmpty)
         let placeholder = PrivacyAssessment(verdict: .notAssessed, method: .cloudOff, assessedAt: today)
         let fresh = try await router.assess(email(), stored: placeholder, config: c)
         #expect(fresh.method == .systemOne && fresh.verdict == .public)
@@ -537,5 +542,122 @@ private func plan() -> JobPlan {
         #expect(partial.routing?.assessment.method == .inspection)
         #expect(await cloud.calls.isEmpty)
         #expect(await triage.assessCalls.isEmpty)
+    }
+}
+
+// MARK: Complete long-message coverage
+
+/// Scripted client that cancels the calling task during its first assessment.
+private actor CancellingSystemOne: SystemOneClient {
+    private(set) var assessCount = 0
+    func preflight(model: String) async throws -> TriageFailure? { nil }
+    func assess(_ input: TriageInput, model: String) async throws -> SystemOneScores {
+        assessCount += 1
+        withUnsafeCurrentTask { $0?.cancel() }
+        return eligibleScores
+    }
+}
+
+private let okScores = SystemOneScores(noul: 0.05, categoryProbabilities: ["public_newsletter_or_promo": 0.97])
+private let sensitiveScores = SystemOneScores(noul: 0.95, categoryProbabilities: ["public_newsletter_or_promo": 0.1])
+/// About three chunks of harmless text.
+private let threeChunkBody = String(repeating: "lorem ipsum dolor ", count: 170)
+
+@Suite struct DigestRouterCoverageTests {
+    private func assess(_ body: String, results: [Result<SystemOneScores, TriageFailure>], preflight: TriageFailure? = nil,
+                        stored: PrivacyAssessment? = nil) async throws -> (PrivacyAssessment, StubSystemOneClient) {
+        let triage = StubSystemOneClient(preflightResult: preflight, results: results)
+        let a = try await DigestRouter(clock: FixedClock(today))
+            .assess(email(body: body), stored: stored, config: config(cloud: RecordingExtractor(), triage: triage))
+        return (a, triage)
+    }
+
+    @Test func fixtureNeedsThreeChunks() {
+        let plan = TriageInputBuilder().plan(email(body: threeChunkBody))
+        #expect(plan.totalChunks == 3)
+    }
+
+    @Test func allPublicIsPublicWithWorstScoresAndCompleteCoverage() async throws {
+        let (a, triage) = try await assess(threeChunkBody, results: [.success(eligibleScores), .success(okScores),
+                                                                     .success(eligibleScores)])
+        #expect(a.verdict == .public && a.method == .systemOne)
+        #expect(a.triageCoverage == TriageCoverage(assessedChunks: 3, totalChunks: 3) && a.triageCoverage?.isComplete == true)
+        #expect(a.triage?.pSensitive == 0.05)
+        let calls = await triage.assessCalls.count, preflights = await triage.preflightCalls.count
+        #expect(calls == 3 && preflights == 1)
+    }
+
+    @Test func laterSensitiveChunkStopsEarly() async throws {
+        let (a, triage) = try await assess(threeChunkBody, results: [.success(eligibleScores), .success(sensitiveScores)])
+        #expect(a.verdict == .private && a.method == .systemOne)
+        #expect(a.triageCoverage == TriageCoverage(assessedChunks: 2, totalChunks: 3))
+        #expect(await triage.assessCalls.count == 2)
+    }
+
+    @Test func middleChunkBelowThresholdStaysLocal() async throws {
+        let (a, triage) = try await assess(threeChunkBody, results: [.success(eligibleScores), .success(lowScores)])
+        #expect(a.verdict == .uncertain && a.triageFailure == nil)
+        #expect(a.triageCoverage?.assessedChunks == 2 && a.triageCoverage?.isComplete == false)
+        #expect(await triage.assessCalls.count == 2)
+    }
+
+    @Test func errorInLaterChunkIsUncertain() async throws {
+        let (a, _) = try await assess(threeChunkBody, results: [.success(eligibleScores), .success(eligibleScores),
+                                                                .failure(.timedOut)])
+        #expect(a.verdict == .uncertain && a.triageFailure == .timedOut)
+        #expect(a.triageCoverage == TriageCoverage(assessedChunks: 2, totalChunks: 3))
+    }
+
+    @Test func overBudgetMakesNoModelCall() async throws {
+        let (a, triage) = try await assess(String(repeating: "word ", count: 6_000), results: [.success(eligibleScores)])
+        #expect(a.verdict == .uncertain && a.method == .systemOne && a.triageFailure == .contentTooLong)
+        #expect((a.triageCoverage?.totalChunks ?? 0) > TriageInputBuilder.maxChunks && a.triageCoverage?.assessedChunks == 0)
+        let calls = await triage.assessCalls.count, preflights = await triage.preflightCalls.count
+        #expect(calls == 0 && preflights == 0)
+        // And the pipeline runs it locally.
+        let llm = StubLLMClient(), cloud = RecordingExtractor()
+        let out = try await run(pipeline(llm), email(body: String(repeating: "word ", count: 6_000)),
+                                config(cloud: cloud, triage: triage))
+        let cloudCalls = await cloud.calls.count, localCalls = await llm.extractCalls.count
+        #expect(cloudCalls == 0 && localCalls == 1)
+        #expect(out.routing?.execution?.localReason == .triageUnavailable)
+    }
+
+    @Test func cancellationBetweenChunksThrows() async throws {
+        let triage = CancellingSystemOne()
+        let cfg = config(cloud: RecordingExtractor(), triage: triage)
+        let task = Task { try await DigestRouter(clock: FixedClock(today)).assess(email(body: threeChunkBody), stored: nil, config: cfg) }
+        await #expect(throws: CancellationError.self) { _ = try await task.value }
+        #expect(await triage.assessCount == 1)
+    }
+
+    @Test func trustedDirectRouteMakesNoCallsForLongMessage() async throws {
+        let triage = StubSystemOneClient(results: [.success(eligibleScores)])
+        let cloud = RecordingExtractor()
+        let e = email(sender: allowlisted.0, body: threeChunkBody, headers: allowlisted.1)
+        let out = try await run(pipeline(StubLLMClient()), e, config(cloud: cloud, triage: triage))
+        #expect(out.routing?.assessment.method == .trustedSender)
+        let calls = await triage.assessCalls.count, preflights = await triage.preflightCalls.count
+        #expect(calls == 0 && preflights == 0)
+    }
+
+    @Test func storedPublicWithoutCompleteCoverageIsReassessed() async throws {
+        for coverage in [nil, TriageCoverage(assessedChunks: 1, totalChunks: 2)] {
+            let stored = PrivacyAssessment(verdict: .public, method: .systemOne, assessedAt: today,
+                                           triageCoverage: coverage)
+            let (a, triage) = try await assess(threeChunkBody, results: [.success(sensitiveScores)], stored: stored)
+            #expect(a.verdict == .private)
+            #expect(await triage.assessCalls.count == 1)
+        }
+    }
+
+    @Test func oldAssessmentJSONDecodesWithoutCoverage() throws {
+        let json = #"{"verdict":"public","method":"systemOne","assessedAt":0}"#
+        let a = try JSONDecoder().decode(PrivacyAssessment.self, from: Data(json.utf8))
+        #expect(a.triageCoverage == nil && a.verdict == .public)
+        let round = try JSONDecoder().decode(PrivacyAssessment.self, from: JSONEncoder().encode(
+            PrivacyAssessment(verdict: .uncertain, method: .systemOne, triageFailure: .contentTooLong, assessedAt: today,
+                              triageCoverage: TriageCoverage(assessedChunks: 0, totalChunks: 9))))
+        #expect(round.triageCoverage?.totalChunks == 9 && round.triageFailure == .contentTooLong)
     }
 }
