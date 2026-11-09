@@ -7,6 +7,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WindowPresenceController.shared.start()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        IdleSleepAssertion.shared.release()
+    }
+
     /// A Dock click with no real window opens the review window. The flag is ignored because
     /// non-window items (status bar) can make it true.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

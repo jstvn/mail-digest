@@ -82,12 +82,18 @@ struct MailDigestApp: App {
         guard scheduler == nil else { return }
         let morning = MorningScheduler(run: run)
         scheduler = morning
+        // Waiting overnight jobs start only after onboarding and a Mail access check.
+        run.autoStartGate = { [access] in
+            UserDefaults.standard.bool(forKey: OnboardingView.completedKey) && access.status?.mode != nil
+                && access.status?.mode != .unavailable
+        }
         await run.loadLastRun()
         await access.refresh()
         if !UserDefaults.standard.bool(forKey: OnboardingView.completedKey) {
             openWindow(id: "onboarding")
             NSApp.activate()
         }
+        run.evaluateResources(force: true)
         morning.start()
     }
 }

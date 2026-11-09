@@ -63,6 +63,15 @@ final class DigestRunModel {
     @ObservationIgnored let monitor = ResourceMonitor()
     @ObservationIgnored private var lastBlocked: [JobKind: PauseReason] = [:]
     @ObservationIgnored private var lastOvernightBlock: PauseReason?
+    /// The overnight and quiet-hours windows last evaluated, so editing them re-evaluates at once.
+    @ObservationIgnored private var lastWindows: [QuietHours?] = []
+    /// Whether a job may be started automatically now: onboarding is done and Mail access is available.
+    /// The app sets it; until it passes, rules only pause (never start) and evaluation is retried.
+    @ObservationIgnored var autoStartGate: @MainActor () -> Bool = { true }
+    @ObservationIgnored private var autoStartPending = false
+    /// `overnightOnly` per job id, looked up once from the store, for the idle-sleep assertion.
+    @ObservationIgnored private var overnightJobFlags: [UUID: Bool] = [:]
+    @ObservationIgnored private var overnightLookups: Set<UUID> = []
 
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "run")
 
@@ -785,28 +794,81 @@ final class DigestRunModel {
 
     private func startResourceMonitor() {
         monitor.onChange = { [weak self] in self?.evaluateResources() }
+        // After a wake or a boundary the readings may look unchanged although the window just opened.
+        monitor.onTimeMayHaveChanged = { [weak self] in self?.evaluateResources(force: true) }
         monitor.start()
-        evaluateResources()
+        evaluateResources(force: true)
     }
 
     /// Applies the core resource policy when the set of blocking reasons changes (or once more with `force`).
     /// Start and Resume check the same rules themselves (Q43), so a manual Resume never overrides them.
+    /// Overnight-only jobs waiting for these rules are started here, also at launch and after a wake.
     func evaluateResources(force: Bool = false) {
         let policy = settings.settings.resourcePolicy()
         let now = clock.now()
         // The overnight window matters even with "Only run during this time window" off, because a job created
         // as "Overnight While Plugged In" waits for it; the boundary timer is what starts that job tonight.
         monitor.scheduleBoundary(at: policy.overnightWindow.nextBoundary(after: now, in: policy.timeZone))
+        updateSleepAssertion()
+        let windows: [QuietHours?] = [policy.overnightWindow, policy.quietHours]
+        let windowChanged = windows != lastWindows
+        lastWindows = windows
         let blocked = currentBlockers()
         let overnight = currentOvernightBlock()
-        guard force || blocked != lastBlocked || overnight != lastOvernightBlock else { return }
+        guard force || windowChanged || autoStartPending || blocked != lastBlocked
+                || overnight != lastOvernightBlock else { return }
         lastBlocked = blocked
         lastOvernightBlock = overnight
-        guard let runner else { return }
-        Task {
-            do { try await runner.applyResourceRules(blocked, overnight: overnight) } catch {
-                Self.log.error("resource rules failed: \(String(describing: error), privacy: .public)")
+        // Never start Mail work before onboarding and access checks pass; try again at the next evaluation.
+        if !Self.isActive(progress?.state, includePaused: false), !autoStartGate() {
+            autoStartPending = true
+            return
+        }
+        autoStartPending = false
+        Task { await applyResourceRulesNow() }
+    }
+
+    /// Hands the current rules to the runner. Without a runner it is only created when an overnight job is
+    /// waiting, so nobody else gets one (or a Mail prompt) from this path.
+    private func applyResourceRulesNow() async {
+        var target = runner
+        if target == nil {
+            guard let store = await openStore(), let jobs = try? await store.jobs() else {
+                autoStartPending = true
+                return
             }
+            guard jobs.contains(where: { $0.overnightOnly && OvernightPolicy.isAutoResumeCandidate($0, autoPausedThisSession: false) })
+            else { return }
+            target = await ensureRunner()
+        }
+        guard let target else { autoStartPending = true; return }
+        do {
+            try await target.applyResourceRules(currentBlockers(), overnight: currentOvernightBlock())
+        } catch {
+            Self.log.error("resource rules failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Holds the idle-sleep assertion only while an overnight-only job works on mains power. It reads the
+    /// latest state every time, so any order of updates ends in the right answer.
+    private func updateSleepAssertion() {
+        guard let progress else { IdleSleepAssertion.shared.set(false); return }
+        guard let overnightOnly = overnightJobFlags[progress.jobID] else {
+            IdleSleepAssertion.shared.set(false)
+            lookUpOvernightFlag(progress.jobID)
+            return
+        }
+        IdleSleepAssertion.shared.set(OvernightPolicy.shouldPreventIdleSleep(
+            state: progress.state, overnightOnly: overnightOnly, onBattery: monitor.conditions.onBattery))
+    }
+
+    private func lookUpOvernightFlag(_ id: UUID) {
+        guard overnightLookups.insert(id).inserted else { return }
+        Task {
+            let job = try? await openStore()?.jobs().first { $0.id == id }
+            overnightJobFlags[id] = job?.overnightOnly ?? false
+            overnightLookups.remove(id)
+            updateSleepAssertion()
         }
     }
 
@@ -952,6 +1014,7 @@ final class DigestRunModel {
     private func apply(_ update: JobProgress) {
         let changed = progress?.jobID != update.jobID || progress?.state != update.state
         progress = update
+        updateSleepAssertion()
         // Keeps the Daily lifecycle (built from the job list) in step, for example for a just-created job.
         if changed { Task { await refreshPastJobs() } }
         // Show finished results while the job runs. The runner already throttles updates to 2 a second.

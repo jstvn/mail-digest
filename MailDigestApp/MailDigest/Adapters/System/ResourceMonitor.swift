@@ -10,6 +10,9 @@ final class ResourceMonitor {
     private(set) var conditions = ResourceConditions()
     /// Called after any watched value changed, on the main actor.
     var onChange: (() -> Void)?
+    /// Called after the Mac woke or a boundary timer fired. Unlike `onChange` it fires even when the
+    /// readings look the same, because a timer due during sleep may never have fired.
+    var onTimeMayHaveChanged: (() -> Void)?
 
     private var powerSource: CFRunLoopSource?
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
@@ -36,7 +39,14 @@ final class ResourceMonitor {
         observe(NotificationCenter.default, .NSProcessInfoPowerStateDidChange)
         observe(NotificationCenter.default, ProcessInfo.thermalStateDidChangeNotification)
         // A wake can cross a quiet-hours boundary the timer slept through.
-        observe(NSWorkspace.shared.notificationCenter, NSWorkspace.didWakeNotification)
+        let wake = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.refresh()
+                self?.onTimeMayHaveChanged?()
+            }
+        }
+        observers.append((NSWorkspace.shared.notificationCenter, wake))
         refresh()
     }
 
@@ -54,7 +64,7 @@ final class ResourceMonitor {
         boundaryTimer = nil
         guard let date else { return }
         let timer = Timer(fire: date, interval: 0, repeats: false) { [weak self] _ in
-            Task { @MainActor in self?.onChange?() }
+            Task { @MainActor in self?.onTimeMayHaveChanged?() }
         }
         timer.tolerance = 5
         RunLoop.main.add(timer, forMode: .common)

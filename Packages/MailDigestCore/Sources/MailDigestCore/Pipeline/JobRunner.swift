@@ -370,14 +370,14 @@ public actor JobRunner {
 
     /// Resumes the newest job this runner auto-paused for a resource reason that has cleared (its kind is
     /// not in `blocked`). A job the user paused or stopped, one paused for a Daily job, or one auto-paused
-    /// in an earlier session is never resumed here. Returns the resumed job id.
+    /// in an earlier session is never resumed here, except an overnight-only job (see `OvernightPolicy`). Returns the resumed job id.
     @discardableResult
     public func autoResume(blocked: [JobKind: PauseReason], overnight: PauseReason? = nil) async throws -> UUID? {
         resourceBlockers = blocked
         overnightBlocker = overnight
         guard !busy else { return nil }
         let candidate = try await store.jobs().first {
-            autoPausedThisSession.contains($0.id) && $0.state == .paused && $0.pauseReason != nil
+            OvernightPolicy.isAutoResumeCandidate($0, autoPausedThisSession: autoPausedThisSession.contains($0.id))
                 && blocker(kind: $0.kind, overnightOnly: $0.overnightOnly) == nil
         }
         guard let candidate else { return nil }
@@ -529,8 +529,16 @@ public actor JobRunner {
         _ = try await store.requeueInterrupted()
         for var job in try await store.jobs() where [.running, .pausing, .listing, .stopping].contains(job.state) {
             // An interrupted Stop stays a Stop (Q15); everything else was never asked to stop, so it is paused.
+            let wasWorking = job.state == .running || job.state == .listing
             job.state = job.state == .stopping ? .stopped : .paused
             if job.state == .stopped { job.endedAt = clock.now() }
+            // An overnight-only job cut off by a quit or crash was not paused by the user: mark it as waiting
+            // so the resource rules start it again once the window and power allow (the first evaluation at
+            // launch corrects the reason).
+            if wasWorking && job.kind == .backlog && job.overnightOnly {
+                job.autoPaused = true
+                job.pauseReason = .quietHours
+            }
             try await store.updateJob(job, event: event(
                 .recoveredAfterInterruption, job.id,
                 JobEventPayload(trigger: .launch, count: interrupted[job.id] ?? 0)))
