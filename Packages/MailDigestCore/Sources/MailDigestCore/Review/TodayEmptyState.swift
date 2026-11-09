@@ -27,14 +27,19 @@ public struct TodayEmptyState: Equatable, Sendable {
     ///   - runHour, runMinute: the configured daily run time.
     ///   - timeZone: the zone the run time is read in.
     ///   - hasEverRun: whether any digest has ever been created.
-    ///   - problem: what the app knows about a missed or failed run.
+    ///   - problem: what the app knows about a missed or failed run; any known problem outranks the
+    ///     first-launch and before-schedule wording.
     public init(now: Date, runHour: Int, runMinute: Int, timeZone: TimeZone, hasEverRun: Bool, problem: Problem?) {
         let h = min(max(runHour, 0), 23), m = min(max(runMinute, 0), 59)
         let time = Self.clockText(hour: h, minute: m)
         let scheduled = MorningSchedule.runTime(on: now, hour: h, minute: m, timeZone: timeZone)
+        // Order: running, then any known problem (whatever the time or history), then the no-problem variants.
         if problem == .running {
             title = "Today's Digest Is Running"
             description = "It will appear here as soon as it finishes."
+        } else if let problem {
+            title = "Today's Digest Didn't Run"
+            description = Self.reason(problem, time: time)
         } else if !hasEverRun {
             // The very first launch: nothing has run, so there is nothing to explain yet.
             title = "No Digest Yet"
@@ -57,11 +62,11 @@ public struct TodayEmptyState: Equatable, Sendable {
         case .failed:
             return "The digest stopped before it finished."
         case .paused(let reason?):
-            return "The digest is paused (\(reason.displayText)). Resume it from the toolbar."
+            return "The digest is paused (\(reason.displayText))."
         case .paused(nil):
-            return "The digest is paused. Resume it from the toolbar."
+            return "The digest is paused."
         case .stopped:
-            return "The digest was stopped before it finished. Resume it from the toolbar."
+            return "The digest was stopped before it finished."
         case .unfinished:
             return "More than one unfinished digest is waiting for a decision in Activity."
         case .startFailed(let reason?) where !reason.trimmingCharacters(in: .whitespaces).isEmpty:

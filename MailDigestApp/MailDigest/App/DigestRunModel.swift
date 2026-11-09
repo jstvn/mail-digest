@@ -185,6 +185,29 @@ final class DigestRunModel {
         canStartDaily && !mailUnavailable
     }
 
+    /// Whether `action` can act now; shared by the toolbar button and Today's empty state so they agree.
+    func canPerform(_ action: ToolbarRunAction, mailUnavailable: Bool) -> Bool {
+        switch action.behavior {
+        case .runNow: return canRunNow(mailUnavailable: mailUnavailable)
+        case .pause: return true
+        case .resumeJob: return !isRunning && !mailUnavailable
+        case .resumeDaily, .retryDaily: return isDailyActionEnabled && !mailUnavailable
+        case .unavailable: return false
+        }
+    }
+
+    /// Carries out `action`; shared by the toolbar button and Today's empty state.
+    func perform(_ action: ToolbarRunAction) {
+        switch action.behavior {
+        case .runNow: Task { await runNow() }
+        case .pause: pause()
+        case .resumeJob(let id): Task { await resumeJob(id) }
+        case .resumeDaily(let id): Task { await resumeCurrentDaily(id) }
+        case .retryDaily(let id): Task { await resumeDailyJob(id, expecting: .failed) }
+        case .unavailable: break
+        }
+    }
+
     /// Nothing is running, or only a Backlog job a Daily job may pre-empt (Q23).
     private var canRunDailyWork: Bool {
         guard !dailyStarting else { return false }

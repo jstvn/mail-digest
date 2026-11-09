@@ -329,7 +329,20 @@ struct DigestCanvasView: View {
                                    timeZone: library.calendar.timeZone,
                                    hasEverRun: !(library.archive.months.isEmpty && library.archive.backlogs.isEmpty),
                                    problem: todayProblem)
-        let canRun = run.canRunNow(mailUnavailable: access.status?.mode == .unavailable)
+        let mailUnavailable = access.status?.mode == .unavailable
+        // Match the toolbar when a Daily job needs Retry or Resume; otherwise stay "Run Now" (never a Pause).
+        let toolbar = ToolbarRunAction(progress: run.activeProgress, daily: run.dailyAction)
+        let needsRecovery: Bool = {
+            switch toolbar.behavior {
+            case .resumeDaily, .resumeJob, .retryDaily: return true
+            case .runNow: return toolbar.title == "Retry"
+            case .pause, .unavailable: return false
+            }
+        }()
+        let action = needsRecovery ? toolbar
+            : ToolbarRunAction(title: "Run Now", systemImage: "play.fill", behavior: .runNow, help: "")
+        let canRun = needsRecovery ? run.canPerform(action, mailUnavailable: mailUnavailable)
+            : run.canRunNow(mailUnavailable: mailUnavailable)
         return ContentUnavailableView {
             Label(copy.title, systemImage: "sun.max")
         } description: {
@@ -337,7 +350,7 @@ struct DigestCanvasView: View {
         } actions: {
             // Natural widths, side by side.
             HStack {
-                Button("Run Now") { Task { await run.runNow() } }
+                Button(action.title) { run.perform(action) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!canRun)

@@ -738,3 +738,11 @@ Core tests and the xcodebuild build pass. Screenshots (light and dark) were chec
 - Empty-state copy at the scheduled time: with no digest today and the run set a couple of minutes ahead (Settings > General), leave Today open. It should read "Not Ready Yet" with the time, then flip to "Today's Digest Didn't Run" at the scheduled minute. On a brand-new install it should say "No Digest Yet / Your first digest runs at <time>" instead, before and after.
 - Reasons: after the time, a failed Daily job should show its stored error, a paused or stopped one says so, a failed start (Ollama quit) shows the banner text, and with none of those it says the Mac may have been asleep or Mail Digest wasn't open. Check that "Run Now" is dimmed exactly when the toolbar's Run Now is, and that Return triggers it.
 - Toolbar button: Run Now, Pause, Resume and Retry icons should look level with the title at normal and large text sizes, and Run Now should stay left of the search field.
+
+## Today empty state with a job problem (2026-11-10)
+
+Builds and Core tests pass; not checked in the running app.
+
+- With a failed Daily job and no digest today, the empty state reads "Today's Digest Didn't Run" with the reason and its prominent button says Retry, even before the scheduled time and on a first launch. Clicking it retries the same job.
+- With a paused or stopped Daily job, the button says Resume and resumes in place. It matches the toolbar's label and enabled state.
+- While a Daily job runs, the state reads "Today's Digest Is Running" and Run Now is disabled.

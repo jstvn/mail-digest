@@ -55,13 +55,23 @@ import Testing
                 == "The digest stopped before it finished. Ollama stopped responding.")
         #expect(Self.state(now, problem: .failed(reason: nil)).description == "The digest stopped before it finished.")
         #expect(Self.state(now, problem: .paused(.battery)).description
-                == "The digest is paused (battery power). Resume it from the toolbar.")
-        #expect(Self.state(now, problem: .paused(nil)).description == "The digest is paused. Resume it from the toolbar.")
+                == "The digest is paused (battery power).")
+        #expect(Self.state(now, problem: .paused(nil)).description == "The digest is paused.")
         #expect(Self.state(now, problem: .stopped).description
-                == "The digest was stopped before it finished. Resume it from the toolbar.")
+                == "The digest was stopped before it finished.")
         #expect(Self.state(now, problem: .startFailed(reason: "Ollama isn't running.")).description
                 == "Mail Digest couldn't start the digest. Ollama isn't running.")
         #expect(Self.state(now, problem: .unfinished).title == "Today's Digest Didn't Run")
+    }
+
+    @Test func aKnownProblemOutranksFirstLaunchAndBeforeSchedule() {
+        let first = Self.state(Self.at(9), ever: false, problem: .failed(reason: "Ollama isn't running"))
+        #expect(first.title == "Today's Digest Didn't Run")
+        #expect(first.description == "The digest stopped before it finished. Ollama isn't running.")
+        let early = Self.state(Self.at(5), problem: .paused(.battery))
+        #expect(early.title == "Today's Digest Didn't Run")
+        #expect(early.description == "The digest is paused (battery power).")
+        #expect(Self.state(Self.at(5), ever: false, problem: .stopped).title == "Today's Digest Didn't Run")
     }
 
     @Test func aRunningJobIsNotReportedAsMissed() {

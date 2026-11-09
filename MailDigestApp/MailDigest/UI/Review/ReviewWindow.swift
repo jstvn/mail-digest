@@ -49,36 +49,14 @@ struct ReviewWindow: View {
     /// Run Now, or whatever the job state calls for (Pause, Resume, Retry), the same way the menu bar does.
     private var runButton: some View {
         let action = runAction
-        return Button { perform(action) } label: {
+        return Button { run.perform(action) } label: {
             Label(action.title, systemImage: action.systemImage)
         }
         .labelStyle(ToolbarRunLabelStyle())
         .keyboardShortcut("r", modifiers: .command)
         .accessibilityLabel(action.title)
-        .disabled(!isEnabled(action))
+        .disabled(!run.canPerform(action, mailUnavailable: access.status?.mode == .unavailable))
         .help(action.help)
-    }
-
-    private func isEnabled(_ action: ToolbarRunAction) -> Bool {
-        let mailUnavailable = access.status?.mode == .unavailable
-        switch action.behavior {
-        case .runNow: return run.canRunNow(mailUnavailable: mailUnavailable)
-        case .pause: return true
-        case .resumeJob: return !run.isRunning && !mailUnavailable
-        case .resumeDaily, .retryDaily: return run.isDailyActionEnabled && !mailUnavailable
-        case .unavailable: return false
-        }
-    }
-
-    private func perform(_ action: ToolbarRunAction) {
-        switch action.behavior {
-        case .runNow: Task { await run.runNow() }
-        case .pause: run.pause()
-        case .resumeJob(let id): Task { await run.resumeJob(id) }
-        case .resumeDaily(let id): Task { await run.resumeCurrentDaily(id) }
-        case .retryDaily(let id): Task { await run.resumeDailyJob(id, expecting: .failed) }
-        case .unavailable: break
-        }
     }
 
     @ViewBuilder private var canvas: some View {
