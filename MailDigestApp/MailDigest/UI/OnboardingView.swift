@@ -32,10 +32,10 @@ struct OnboardingView: View {
                 mailSection
                 remindersSection
                 notificationsSection
-                Section("Daily digest") {
+                Section("Daily Digest") {
                     TextField("Reminders list", text: $store.settings.remindersListName,
                               prompt: Text(DigestSettings.defaultListName))
-                    DatePicker("Run at", selection: $store.runTime, displayedComponents: .hourAndMinute)
+                    DatePicker("Run At", selection: $store.runTime, displayedComponents: .hourAndMinute)
                     LaunchAtLoginToggle()
                 }
             }

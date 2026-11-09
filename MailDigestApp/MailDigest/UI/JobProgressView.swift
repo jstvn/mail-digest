@@ -39,7 +39,7 @@ struct JobProgressView: View {
         let rows = feed.recent(items, limit: 3)
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
-                Text("RECENT").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text("Recent").font(.caption.weight(.semibold)).foregroundStyle(.secondary).textCase(.uppercase)
                     .accessibilityAddTraits(.isHeader)
                 ForEach(rows) { row in
                     Button {

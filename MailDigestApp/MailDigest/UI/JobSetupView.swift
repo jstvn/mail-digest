@@ -399,7 +399,7 @@ private struct VolumeChart: View {
             .chartPlotStyle { $0.frame(height: 84) }
             .frame(height: 112)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Emails per day")
+            .accessibilityLabel("Emails per Day")
             .accessibilityValue(VolumeHistogram.accessibilitySummary(bins, calendar: calendar))
         case .unavailable:
             placeholder("Daily volume needs Full Disk Access. The numbers below still count the chosen range.")

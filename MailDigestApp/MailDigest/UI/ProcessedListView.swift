@@ -5,6 +5,7 @@ import SwiftUI
 /// The Processed tab: fully handled emails the user can clear from the inbox in one click.
 /// Nothing moves until a button is clicked; Keep only hides the rows.
 struct ProcessedListView: View {
+    @Environment(\.colorScheme) private var scheme
     let model: ProcessedMailModel
 
     var body: some View {
@@ -16,7 +17,7 @@ struct ProcessedListView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if model.allEntries.isEmpty {
-                ContentUnavailableView("Nothing to clear", systemImage: "tray.full",
+                ContentUnavailableView("Nothing to Clear", systemImage: "tray.full",
                                        description: Text("Emails appear here once every suggestion from them is added or dismissed."))
                     .frame(maxWidth: .infinity, minHeight: 200)
             } else {
@@ -24,8 +25,8 @@ struct ProcessedListView: View {
                     section(title: group.account, entries: group.entries)
                 }
                 if !model.processed.blocked.isEmpty {
-                    Text("BLOCKED SENDERS (\(model.processed.blocked.count))")
-                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("Blocked Senders (\(model.processed.blocked.count))")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary).textCase(.uppercase)
                         .accessibilityAddTraits(.isHeader)
                         .padding(.top, 4)
                     ForEach(model.groupedBlocked, id: \.account) { group in
@@ -79,7 +80,7 @@ struct ProcessedListView: View {
             }
         }
         .padding(10)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.orange.tintedFill(scheme), in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .contain)
     }
 }
@@ -115,7 +116,7 @@ private struct ProcessedRow: View {
             }
             Button(action: onOpen) { Image(systemName: "arrow.up.forward.square") }
                 .help("Open this email in Mail")
-                .accessibilityLabel("Open email in Mail")
+                .accessibilityLabel("Open Email in Mail")
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 12)

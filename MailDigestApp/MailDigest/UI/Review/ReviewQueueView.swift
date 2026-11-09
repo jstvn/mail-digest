@@ -285,7 +285,7 @@ struct ReviewQueueView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(!coordinator.canAddSelected(in: shown))
-                .help(coordinator.reminderWriter == nil ? "Reminders access isn't available"
+                .help(coordinator.reminderWriter == nil ? "Add to Reminders is off until you allow access in Privacy & Security"
                       : (isPartial ? "Add the ticked suggestions shown to Reminders. Hidden suggestions aren't affected."
                                    : "Add the ticked suggestions to Reminders"))
             }
@@ -331,7 +331,7 @@ struct ReviewQueueView: View {
                 lists: run.reminders.lists, defaultListName: coordinator.defaultListName,
                 defaultListID: coordinator.defaultListID,
                 canAdd: coordinator.reminderWriter != nil && !coordinator.isWorking,
-                addHelp: coordinator.reminderWriter == nil ? "Reminders access isn't available"
+                addHelp: coordinator.reminderWriter == nil ? "Add to Reminders is off until you allow access in Privacy & Security"
                     : "Add this suggestion to Reminders",
                 titleFocusRequest: titleFocusRequest,
                 onEdit: { try await coordinator.edit($0, record: record) },

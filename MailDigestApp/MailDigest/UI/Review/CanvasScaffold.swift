@@ -125,7 +125,7 @@ struct CanvasScaffold<Content: View>: View {
             canDismiss: coordinator.unselectedCount(in: records) > 0 && !coordinator.isWorking,
             dismissHelp: isPartial ? "Dismiss the suggestions shown that aren't ticked. Hidden suggestions aren't affected."
                                    : "Dismiss the suggestions shown that aren't ticked",
-            addHelp: coordinator.reminderWriter == nil ? "Reminders access isn't available"
+            addHelp: coordinator.reminderWriter == nil ? "Add to Reminders is off until you allow access in Privacy & Security"
                 : (isPartial ? "Add the ticked suggestions shown to Reminders. Hidden suggestions aren't affected."
                              : "Add the ticked suggestions to Reminders"),
             dismissUnselected: { Task { await coordinator.dismissUnselected(in: records) } },

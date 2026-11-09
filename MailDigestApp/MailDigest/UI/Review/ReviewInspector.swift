@@ -141,7 +141,7 @@ struct ReviewInspector: View {
                 .onSubmit { commitTitle(); focus = nil }
                 .onExitCommand { draft.title = suggestion.title; focus = nil }
                 .onChange(of: focus) { old, new in if old == .title, new != .title { commitTitle() } }
-                .accessibilityLabel("Reminder title")
+                .accessibilityLabel("Reminder Title")
             if let errorText {
                 Text(errorText).font(.caption).foregroundStyle(.red)
             }

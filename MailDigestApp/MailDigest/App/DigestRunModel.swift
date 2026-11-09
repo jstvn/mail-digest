@@ -41,6 +41,8 @@ final class DigestRunModel {
     private var bannerText: String?
     /// What `banner` reports, set only through `showBanner` and cleared whenever the banner changes.
     private var bannerContext: (kind: JobFailureKind?, dailyStartFailedAt: Date?)?
+    /// Whether the current banner is "Ollama isn't running", which the canvas answers with Start Ollama.
+    var bannerOffersStartOllama: Bool { banner != nil && bannerContext?.kind == .ollamaUnreachable }
     /// A job stopped by a provider outage (Q25); Retry resumes this same job and its queue.
     private(set) var failedJobID: UUID?
     /// A paused job loaded from the store, for example one left paused by a previous session, so its strip

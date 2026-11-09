@@ -97,6 +97,12 @@ import Testing
         #expect(nextText(9, 0) == "Next digest tomorrow at 6:30 am")
     }
 
+    @Test func whenTextDropsTheLeadIn() {
+        let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 9, hour: 9, minute: 0))!
+        #expect(NextDigestText.when(now: now, hour: 6, minute: 30, timeZone: zone) == "tomorrow at 6:30 am")
+        #expect(NextDigestText.when(now: now, hour: 17, minute: 5, timeZone: zone) == "today at 5:05 pm")
+    }
+
     @Test func footerFormatsTwelveHourTimes() {
         #expect(nextText(9, 0, runHour: 0, runMinute: 5) == "Next digest tomorrow at 12:05 am")
         #expect(nextText(9, 0, runHour: 12, runMinute: 0) == "Next digest today at 12:00 pm")

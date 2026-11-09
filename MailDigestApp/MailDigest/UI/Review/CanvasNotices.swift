@@ -13,7 +13,8 @@ struct CanvasNotices: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(PanelAlert.current(run: run, access: access, reminders: run.reminders.status)) { alert in
-                AlertBanner(alert: alert, canRetry: !run.isRunning, onRetry: retry,
+                AlertBanner(alert: alert, canRetry: !run.isRunning, offersStartOllama: run.bannerOffersStartOllama,
+                            onStartOllama: { OllamaLauncher.start() }, onRetry: retry,
                             onRequestReminders: { Task { await run.reminders.request() } })
             }
             if let message = coordinator.message {
@@ -39,6 +40,7 @@ struct CanvasNotices: View {
 
 /// An inline, non-modal offer to ignore a sender the user keeps dismissing. Nothing changes until "Ignore Sender".
 struct IgnoreSuggestionNotice: View {
+    @Environment(\.colorScheme) private var scheme
     let suggestion: IgnoreSuggestion
     let name: String
     let onIgnore: () -> Void
@@ -62,15 +64,19 @@ struct IgnoreSuggestionNotice: View {
         }
         .controlSize(.small)
         .padding(10)
-        .background(Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.blue.tintedFill(scheme), in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .contain)
     }
 }
 
 /// A banner with the fix and, where it applies, a button for it.
 struct AlertBanner: View {
+    @Environment(\.colorScheme) private var scheme
     let alert: PanelAlert
     let canRetry: Bool
+    /// The run problem is "Ollama isn't running": offer Start Ollama beside Retry.
+    var offersStartOllama = false
+    var onStartOllama: () -> Void = {}
     let onRetry: () -> Void
     let onRequestReminders: () -> Void
 
@@ -81,20 +87,21 @@ struct AlertBanner: View {
             Spacer(minLength: 8)
             switch alert {
             case .runProblem:
+                if offersStartOllama { Button("Start Ollama", action: onStartOllama) }
                 Button("Retry", action: onRetry).disabled(!canRetry)
             case .mailAutomationDenied:
-                Button("Open Automation Settings…") { open(MailAccessStatus.automationSettingsURL) }
+                Button("Open Privacy Settings") { open(MailAccessStatus.automationSettingsURL) }
             case .fullDiskAccessFallback:
-                Button("Open Full Disk Access Settings…") { open(MailAccessStatus.fullDiskAccessSettingsURL) }
+                Button("Grant Access…") { open(MailAccessStatus.fullDiskAccessSettingsURL) }
             case .remindersNeedAccess:
                 Button("Allow Reminders Access…", action: onRequestReminders)
             case .remindersUnavailable:
-                Button("Open Reminders Settings…") { open(PanelAlert.remindersSettingsURL) }
+                Button("Open Privacy Settings") { open(PanelAlert.remindersSettingsURL) }
             }
         }
         .controlSize(.small)
         .padding(10)
-        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .background(tint.tintedFill(scheme), in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .contain)
     }
 
@@ -107,7 +114,8 @@ struct AlertBanner: View {
 
     private var tint: Color {
         switch alert {
-        case .fullDiskAccessFallback: return .blue
+        // Full Disk Access is optional (the app still works, only slower), so its banner is grey.
+        case .fullDiskAccessFallback: return .secondary
         default: return .orange
         }
     }

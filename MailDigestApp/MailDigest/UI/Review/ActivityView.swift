@@ -15,14 +15,14 @@ struct ActivityView: View {
         content
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Picker("Job type", selection: $model.kindFilter) {
+                    Picker("Job Type", selection: $model.kindFilter) {
                         ForEach(ActivityModel.KindFilter.allCases) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .help("Show Daily jobs, Backlog jobs or both")
                 }
                 ToolbarItem(placement: .principal) {
-                    Picker("Processed by", selection: $model.pathFilter) {
+                    Picker("Processed By", selection: $model.pathFilter) {
                         ForEach(ActivityModel.PathFilter.allCases) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)

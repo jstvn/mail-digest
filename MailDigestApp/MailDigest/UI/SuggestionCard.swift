@@ -157,7 +157,7 @@ struct SuggestionCard: View {
                 .onSubmit { commitTitle(); titleFocused = false; onEndTitleEdit() }
                 .onExitCommand { draft.title = suggestion.title; titleFocused = false; onEndTitleEdit() }
                 .onChange(of: titleFocused) { _, focused in if !focused { commitTitle() } }
-                .accessibilityLabel("Reminder title")
+                .accessibilityLabel("Reminder Title")
         } else {
             Text(suggestion.title)
                 .font(.system(size: 15, weight: .semibold))
@@ -207,6 +207,8 @@ struct SuggestionCard: View {
             if new != suggestion.priority { commit(SuggestionEdit(priority: new)) }
         }
         .help("Change the priority")
+        .accessibilityLabel("Priority")
+        .accessibilityValue(draft.priority.label)
     }
 
     private var categoryMenu: some View {
@@ -227,6 +229,8 @@ struct SuggestionCard: View {
             if new != category { commit(SuggestionEdit(category: new)) }
         }
         .help("Category tag added to the reminder")
+        .accessibilityLabel("Category")
+        .accessibilityValue(draft.category.rawValue)
     }
 
     // MARK: Second line
@@ -296,7 +300,7 @@ struct SuggestionCard: View {
 
     private var datePopover: some View {
         VStack(alignment: .leading, spacing: 12) {
-            DatePicker("Due date", selection: $draft.due, displayedComponents: [.date])
+            DatePicker("Due Date", selection: $draft.due, displayedComponents: [.date])
                 .datePickerStyle(.graphical)
                 .labelsHidden()
                 .onChange(of: draft.due) { _, new in

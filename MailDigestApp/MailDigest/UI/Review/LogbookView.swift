@@ -14,7 +14,7 @@ struct LogbookView: View {
             if !logbook.isLoaded {
                 ProgressView("Loading…").frame(maxWidth: .infinity, minHeight: 160)
             } else if logbook.records.isEmpty {
-                ContentUnavailableView("Nothing decided yet", systemImage: "checkmark.circle",
+                ContentUnavailableView("Nothing Decided Yet", systemImage: "checkmark.circle",
                                        description: Text("Suggestions you add or dismiss appear here."))
                     .frame(maxWidth: .infinity, minHeight: 200)
             } else {

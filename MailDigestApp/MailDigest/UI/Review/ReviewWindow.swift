@@ -31,6 +31,7 @@ struct ReviewWindow: View {
                     Label("Run Now", systemImage: "play.fill")
                 }
                 .keyboardShortcut("r", modifiers: .command)
+                .accessibilityLabel("Run Now")
                 .disabled(!run.canStartDaily || access.status?.mode == .unavailable)
                 .help(run.dailyLifecycle == .none ? "Read your new mail now" : "Resume or review the unfinished Daily job first.")
             }

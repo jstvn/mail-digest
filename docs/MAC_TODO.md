@@ -574,6 +574,20 @@ Builds and Core and Persistence tests pass; nothing below has been checked in th
 - Clicking the Dock icon with only a minimised window restores it, without opening a second copy.
 - With the new icon: not inside a grey rounded square on macOS 26; Dock and Finder show Letter List; dark appearance shows the dark blue background; the Icon Composer preview shows the light background lighter at the top.
 
+## UI redesign Phase 0: Design layer (2026-11-09)
+
+The shared components (`SidebarTile`, `SenderAvatar`, `RelativeDueLabel`, pills, `StatusDot`, `TintedSymbolTile`, `TriageBar`, `StepIndicator`, `StatStrip`) have no screen of their own; each is checked where it is used. If you want to see them alone, open their `#Preview`s in Xcode in light and dark and check the gradients, the tinted fills (0.12 in light, 0.18 in dark) and the triage bar on macOS 26 (Liquid Glass) against macOS 15 (material).
+
+## UI redesign Phase 1: Sidebar (2026-11-09)
+
+Builds and Core tests pass (new `SidebarPresentationTests`). Nothing below has been checked in the running app or against `Today@2x.png`.
+
+- Compare the sidebar with `Today@2x.png` in light and dark: tile gradients, row spacing, selection colour (follows the System Settings accent), the mini month and the footer.
+- Mini calendar: clicking a day with a digest opens that day; days without a digest do nothing; today is the orange disc and the selected day uses the accent. The chevrons step the month, stop at the first and last months that have digests, and are disabled there. VoiceOver reads each day as a date ("Friday 6 November, 3 emails" or similar), not a bare number.
+- Backlog Jobs: each row shows the ring (percent) and the subtitles (accounts, state). Check a running, paused, stopped, scheduled and finished job.
+- Context menu on a Backlog row: Pause, Resume, Stop, Rename… and Delete… appear dimmed or enabled by state (Pause only while running, Resume for paused or stopped when nothing else runs, Delete never for a running job). Rename… edits in a sheet and saves; Delete… asks first.
+- Footer: idle it reads "Next digest today at 6:30 am" (or "tomorrow at" after the time passes, updating without reopening the window); while a job runs or is paused it becomes the task capsule, and goes back when the job ends.
+
 ## UI redesign Phase 2: Today (2026-11-09)
 
 Builds and Core tests pass; nothing below has been checked in the running app or against `Today@2x.png`.
@@ -647,3 +661,15 @@ Builds (xcodebuild) and Core tests pass (new `SettingsRestructureTests` and Acti
 - Context menus: right-click a suggestion card, a Review Queue row and a Worth Knowing card (single and group). Add Sender to VIP, Block Sender, Ignore Sender and Trust as Newsletter add the sender to that list (visible in Settings > Senders) and are dimmed when already there.
 - Jobs tab is gone. Activity: each job row shows Resume (paused, stopped, failed with emails left) and Retry Failed where they apply, and a stopped job stays stopped until you press Resume. Expanding a row shows Summary (scope, totals, processing time). The filter menu (top right) has Show Empty Runs, off by default; check that a running, paused, stopped or failed job is never hidden. Start the same backlog job twice with the same range so two finished runs sit side by side and check they collapse to "Run 2 times" and expand.
 - Menu bar: with a stopped Daily job, "Review Daily Job…" now opens the review window on Activity, where Resume is. The panel itself shows no Resume for a stopped job (Daily or Backlog); a paused job still has Resume on its card or the Daily row. Say if the panel should resume a stopped job directly.
+
+## UI redesign Phase 7: Polish (2026-11-09)
+
+Builds (xcodebuild) and Core tests pass. This was a code-level pass; nothing below has been checked in the running app.
+
+- Dark Mode: walk every screen (Today, Review Queue, Logbook, Mail Cleanup, Activity, New Backlog Job, Mail Access, Settings) in dark. Warning pills, banners, the Mail Access tile and the billing note should use the stronger 0.18 tint; the evidence highlight is yellow at about 30% with readable text; sidebar tiles and avatars keep their gradients. The menu bar panel's orange attention card still uses a fixed 0.12 fill (frozen panel); check it reads fine in dark.
+- VoiceOver on Today and Review Queue: each card reads as one element with Select or Deselect, Dismiss and Open in Mail actions; the priority and category menus read "Priority, High" and "Category, events"; the toolbar buttons read Run Now, Previous Suggestion, Next Suggestion, Filter (value On or Off) and Open Email in Mail. Check there are no unlabelled buttons.
+- Reduce Motion (System Settings > Accessibility > Display): ticking a card, revealing hover actions, the Undo toast and scroll-to-card should not slide or bounce. Reduce Transparency: the triage bar becomes a solid background with a hairline.
+- Empty and error states: Today before any digest ("No Digest Yet", "Your first digest runs tomorrow at 6:30 am." with your configured time, and Run Now); after earlier digests but none today it says "Your next digest runs ..."; a Today with no mail ("Inbox Zero for Today"); Today with every suggestion decided ("All Caught Up", Open Logbook jumps to Logbook; Reviewed list and Worth Knowing still show below it); Mail Cleanup empty ("Nothing to Clear"); a failed load ("Couldn't Load This Digest" with Try Again; hard to trigger, so a code review only unless you break the database).
+- Banners at the top of the canvas: quit Ollama and run: the banner offers Start Ollama and Retry. Turn Mail Automation off for Mail Digest: "Open Privacy Settings" opens Automation. Remove Full Disk Access: a grey (not orange) banner with "Grant Access…". Deny Reminders: "Open Privacy Settings"; Add to Reminders is disabled and its tooltip says why. No Download Model button exists because the app has no model download path; a missing model still shows the error text with `ollama pull`.
+- Dock icon (Q75): open the review window, Settings, Mail Access and New Backlog Job in turn; the Dock icon stays while any is open and disappears after the last closes. Minimise the only window: the icon stays. Hide with Cmd-H and unhide. The menu bar panel, popovers, sheets and alerts alone must not show the icon. Clicking the Dock icon with no window open opens the review window. New observers (occlusion change, deminiaturise, unhide) were added so a window that is hidden without closing still updates the Dock; confirm no flicker when covering windows with other apps.
+- Copy: skim every window for Title Case buttons and headings, ellipsis where a window opens, Australian spelling and no em dashes. Known unchanged copy in the frozen menu bar panel: none found.

@@ -61,10 +61,15 @@ public enum NextDigestText {
     /// "Next digest tomorrow at 6:30 am". It says "today at" while today's run time is still ahead and
     /// "tomorrow at" otherwise. The time is written 12-hour with lowercase am/pm whatever the locale.
     public static func text(now: Date, hour: Int, minute: Int, timeZone: TimeZone) -> String {
+        "Next digest " + when(now: now, hour: hour, minute: minute, timeZone: timeZone)
+    }
+
+    /// "tomorrow at 6:30 am": the part of `text` after "Next digest", for sentences such as the empty Today state.
+    public static func when(now: Date, hour: Int, minute: Int, timeZone: TimeZone) -> String {
         let runTime = MorningSchedule.runTime(on: now, hour: hour, minute: minute, timeZone: timeZone)
         let h = min(max(hour, 0), 23), m = min(max(minute, 0), 59)
         let clock = "\(h % 12 == 0 ? 12 : h % 12):" + (m < 10 ? "0\(m)" : "\(m)") + (h < 12 ? " am" : " pm")
-        return "Next digest \(now < runTime ? "today" : "tomorrow") at \(clock)"
+        return "\(now < runTime ? "today" : "tomorrow") at \(clock)"
     }
 }
 

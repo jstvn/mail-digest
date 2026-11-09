@@ -132,7 +132,7 @@ struct EvidenceQuote: View {
                 .buttonStyle(.borderless)
                 .opacity(emphasised ? 1 : 0.5)
                 .help("Open this email in Mail")
-                .accessibilityLabel("Open email in Mail")
+                .accessibilityLabel("Open Email in Mail")
         }
         .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 8)

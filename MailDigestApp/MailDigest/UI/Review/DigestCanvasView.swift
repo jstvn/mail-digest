@@ -215,16 +215,16 @@ struct DigestCanvasView: View {
             case .loading:
                 ProgressView("Loading…").frame(maxWidth: .infinity, minHeight: carryOverAll.isEmpty ? 160 : 40)
             case .failed:
-                emptyState("Couldn't load this digest", systemImage: "exclamationmark.triangle", "Try again in a moment.")
-            case .neverRun:
-                emptyState("No digest yet", systemImage: "envelope.open", "Choose Run Now to read your new mail.")
-            case .noDigestToday:
-                emptyState("No digest yet today", systemImage: "envelope.open", "Choose Run Now to read your new mail.")
+                emptyState("Couldn't Load This Digest", systemImage: "exclamationmark.triangle",
+                           "Mail Digest couldn't read this digest from its database.",
+                           action: EmptyAction(title: "Try Again") { Task { await coordinator.loadSelected() } })
+            case .neverRun, .noDigestToday:
+                emptyState("No Digest Yet", systemImage: "envelope.open", nextDigestLine,
+                           action: EmptyAction(title: "Run Now", isDisabled: run.isRunning) { Task { await run.runNow() } })
             case .backlogPending:
                 backlogPendingState
-            case .noNewMail(let lastRun):
-                emptyState("Inbox zero for today", systemImage: "tray",
-                           lastRun.map { "Last run \($0.formatted(date: .omitted, time: .shortened))" } ?? "")
+            case .noNewMail:
+                emptyState("Inbox Zero for Today", systemImage: "tray", "No new mail since yesterday's digest.")
             case .digest:
                 if isSearching, shownRecords.isEmpty, settled.filter(matches).isEmpty, shownInfo.isEmpty,
                    shownPinned.isEmpty, shownSkipped.isEmpty {
@@ -278,13 +278,35 @@ struct DigestCanvasView: View {
         }
     }
 
+    /// A button under an empty state's line.
+    private struct EmptyAction {
+        let title: String
+        var isDisabled = false
+        let perform: () -> Void
+    }
+
+    /// "Your first digest runs tomorrow at 6:30 am." with the configured time.
+    private var nextDigestLine: String {
+        let s = run.settings.settings
+        let when = NextDigestText.when(now: .now, hour: s.runHour, minute: s.runMinute, timeZone: library.calendar.timeZone)
+        return "Your \(library.archive.months.isEmpty && library.archive.backlogs.isEmpty ? "first" : "next") digest runs \(when)."
+    }
+
     /// A full-size empty state, or one quiet line beneath the carry-over when that is on screen. The empty
     /// state describes only this canvas's own digests, so it never replaces the carry-over.
     @ViewBuilder
-    private func emptyState(_ title: String, systemImage: String, _ detail: String) -> some View {
+    private func emptyState(_ title: String, systemImage: String, _ detail: String, action: EmptyAction? = nil) -> some View {
         if carryOverAll.isEmpty {
-            ContentUnavailableView(title, systemImage: systemImage, description: Text(detail))
-                .frame(maxWidth: .infinity, minHeight: 200)
+            ContentUnavailableView {
+                Label(title, systemImage: systemImage)
+            } description: {
+                Text(detail)
+            } actions: {
+                if let action {
+                    Button(action.title, action: action.perform).disabled(action.isDisabled)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 200)
         } else {
             Text(detail.isEmpty ? title : "\(title). \(detail)").foregroundStyle(.secondary)
         }
@@ -334,15 +356,29 @@ struct DigestCanvasView: View {
 
     private func suggestionsSection(_ focus: FocusState<UUID?>.Binding) -> some View {
         let settledShown = settled.filter(matches)
+        // Today with every suggestion decided: the empty state replaces the empty "To Review" list.
+        let allDecided = kind == .today && !isSearching && actionable.isEmpty && carryOverAll.isEmpty && !settled.isEmpty
         return VStack(alignment: .leading, spacing: 26) {
-            ActionableRecordsSection(coordinator: coordinator, title: "To Review",
-                                     count: actionable.count, records: visibleRecords, focus: focus,
-                                     emptyText: isSearching ? "No matching suggestions."
-                                         : (settled.isEmpty ? "No reminders suggested." : "Nothing left to review."),
-                                     countText: isSearching ? ReviewCanvasLogic.countText(shown: visibleRecords.count, total: page.totalCount)
-                                                            : page.countText,
-                                     scopeAction: scopeAction, headingStyle: .heading)
+            if allDecided {
+                ContentUnavailableView {
+                    Label("All Caught Up", systemImage: "checkmark.circle")
+                } description: {
+                    Text("Every suggestion today has been added or dismissed.")
+                } actions: {
+                    Button("Open Logbook") { coordinator.select(.logbook) }
+                }
+                .frame(maxWidth: .infinity, minHeight: 200)
                 .id(TodayStatStrip.reviewID)
+            } else {
+                ActionableRecordsSection(coordinator: coordinator, title: "To Review",
+                                         count: actionable.count, records: visibleRecords, focus: focus,
+                                         emptyText: isSearching ? "No matching suggestions."
+                                             : (settled.isEmpty ? "No reminders suggested." : "Nothing left to review."),
+                                         countText: isSearching ? ReviewCanvasLogic.countText(shown: visibleRecords.count, total: page.totalCount)
+                                                                : page.countText,
+                                         scopeAction: scopeAction, headingStyle: .heading)
+                    .id(TodayStatStrip.reviewID)
+            }
             if !settledShown.isEmpty {
                 SettledRecordsSection(title: "Reviewed", records: settledShown, calendar: library.calendar)
             }

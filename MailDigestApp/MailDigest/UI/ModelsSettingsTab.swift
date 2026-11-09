@@ -166,7 +166,7 @@ private struct APIKeySheet: View {
             SecureField("API Key", text: $keyInput, prompt: Text("Paste your Gemini API key"))
                 .labelsHidden()
                 .onSubmit(save)
-                .accessibilityLabel("Gemini API key")
+                .accessibilityLabel("Gemini API Key")
             Text("The key is saved in the Keychain on this Mac.")
                 .font(.callout).foregroundStyle(.secondary)
             if let keyError {
