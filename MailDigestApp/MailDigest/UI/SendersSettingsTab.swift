@@ -1,8 +1,8 @@
 import MailDigestCore
 import SwiftUI
 
-/// Senders: VIP, Blocked, Ignored and Newsletters, one list at a time. `MailFilter` matches a sender's full
-/// email address, so each row is an address; whole domains aren't supported and so aren't offered.
+/// Senders: VIP, Blocked, Ignored and Newsletters, one list at a time. A row is an exact address or a whole
+/// domain ("@example.com", which also covers subdomains).
 struct SendersSettingsTab: View {
     let run: DigestRunModel
 
@@ -70,7 +70,7 @@ struct SendersSettingsTab: View {
                 Button { showsAdd = true } label: {
                     Image(systemName: "plus").frame(width: 28, height: 24)
                 }
-                .help("Add an email address")
+                .help("Add an email address or whole domain")
                 .accessibilityLabel("Add Address")
                 .popover(isPresented: $showsAdd, arrowEdge: .bottom) {
                     AddAddressPopover(list: list, store: store) { showsAdd = false }
@@ -94,22 +94,23 @@ struct SendersSettingsTab: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
-    private func row(_ address: String) -> some View {
-        HStack(spacing: 10) {
-            SenderAvatar(sender: address, size: .small)
-            Text(address).lineLimit(1).truncationMode(.middle)
+    private func row(_ entry: String) -> some View {
+        let rule = SenderRule(entry)
+        let isDomain = rule?.kind == .domain
+        return HStack(spacing: 10) {
+            SenderAvatar(sender: isDomain ? String(entry.dropFirst()) : entry, size: .small)
+            Text(isDomain ? "Anyone \(entry)" : entry).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 8)
-            // An entry saved before addresses were checked, such as a bare domain, never matches mail.
-            if !DigestSettings.isMatchableAddress(address) {
-                Text("Won't Match").font(.callout).foregroundStyle(.secondary)
-            }
+            // An entry that is neither an address nor a domain (such as a bare word) never matches mail.
+            Text(rule == nil ? "Won't Match" : isDomain ? "Whole domain" : "Address")
+                .font(.callout).foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(DigestSettings.isMatchableAddress(address)
-                            ? address : "\(address), won't match any email")
+        .accessibilityLabel(rule == nil ? "\(entry), won't match any email"
+                            : isDomain ? "Anyone at \(entry.dropFirst()), whole domain" : "\(entry), address")
         .contextMenu {
-            Button("Remove", role: .destructive) { remove(address) }
+            Button("Remove", role: .destructive) { remove(entry) }
         }
     }
 
@@ -125,7 +126,7 @@ struct SendersSettingsTab: View {
     }
 }
 
-/// Types one address onto the current list. Whole domains are explained, not accepted.
+/// Types one address or whole domain onto the current list.
 private struct AddAddressPopover: View {
     let list: SenderList
     let store: SettingsStore
@@ -139,7 +140,7 @@ private struct AddAddressPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Add to \(list.title)").font(.headline)
-            TextField("Email address", text: $text, prompt: Text("name@example.com"))
+            TextField("Email address or domain", text: $text, prompt: Text("name@example.com or @example.com"))
                 .labelsHidden()
                 .focused($focused)
                 .onSubmit(add)
@@ -147,7 +148,7 @@ private struct AddAddressPopover: View {
             if isDuplicate {
                 Text("Already on this list.").font(.callout).foregroundStyle(.secondary)
             } else if !text.isEmpty && !isValid {
-                Text("Enter a full email address. Whole domains aren't supported.")
+                Text("Enter a full email address, or a domain starting with @, such as @example.com.")
                     .font(.callout).foregroundStyle(.secondary).frame(width: 240, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -141,19 +141,23 @@ import Testing
         s.add(sender: sender, to: list)
     }
 
-    @Test func addingNormalisesDeduplicatesAndRejectsDomains() {
+    @Test func addingNormalisesDeduplicatesAndRejectsInvalidEntries() {
         var s = DigestSettings()
         #expect(Self.add(&s, "Jacob Harland <Jacob@Example.com>", .vip))
         #expect(s.vipSenders == ["jacob@example.com"])
         #expect(!Self.add(&s, "jacob@example.com", .vip))
-        #expect(!Self.add(&s, "@example.com", .vip))
+        #expect(!Self.add(&s, "@", .vip))
+        #expect(!Self.add(&s, "@com", .vip))
         #expect(!Self.add(&s, "no-at-sign", .blocked))
         #expect(!Self.add(&s, "a@", .blocked))
         #expect(!Self.add(&s, "a b@x.com", .blocked))
         #expect(s.blockedSenders.isEmpty)
         #expect(Self.add(&s, "jacob@example.com", .ignored))
         #expect(s.contains(sender: "Jacob <jacob@example.com>", in: .ignored))
+        #expect(Self.add(&s, "@Example.com", .vip))   // a whole domain is a valid rule
+        #expect(s.vipSenders == ["jacob@example.com", "@example.com"])
         s.remove("JACOB@example.com", from: .vip)
+        s.remove("@example.com", from: .vip)
         #expect(s.vipSenders.isEmpty && s.senders(in: .ignored) == ["jacob@example.com"])
     }
 
@@ -183,13 +187,13 @@ import Testing
         #expect(SenderList.precedenceFootnote.contains("Blocked wins, then VIP, then Ignored, then Newsletters"))
     }
 
-    @Test func domainsAreNotMatchedSoNoDomainRuleIsOffered() {
+    @Test func domainRuleInOldSettingsNowMatches() {
         var s = DigestSettings()
-        s.ignoredSenders = ["@example.com"]   // possible in a pre-redesign blob
+        s.ignoredSenders = ["@example.com"]   // saved by an older build, where it never matched
         let h = MessageHeader(id: "1", account: "a", mailbox: "Inbox", sender: "a@example.com", subject: "s", receivedAt: Date())
-        #expect(s.mailFilter.estimatedTier(for: h) == .full)
-        #expect(!DigestSettings.isMatchableAddress("@example.com"))
-        #expect(!SenderList.vip.summary.contains("domain"))
+        #expect(s.mailFilter.estimatedTier(for: h) == .skip)
+        #expect(DigestSettings.isMatchableAddress("@example.com"))
+        #expect(SenderList.vip.summary.contains("Add a whole domain with @example.com."))
     }
 
     @Test func recentSendersRankByCountThenRecencyAndSkipListed() {

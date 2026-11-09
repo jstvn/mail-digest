@@ -3,7 +3,8 @@ import Foundation
 /// The four sender lists in Settings > Senders. Each maps onto one `DigestSettings` array, so the tab, the
 /// context menus on suggestion and info cards and the learned-ignore notice all edit settings through the same code.
 ///
-/// `MailFilter` matches a sender's full email address only, so every list holds addresses, never domains.
+/// A list holds exact addresses ("name@example.com") and whole-domain rules ("@example.com", which also covers
+/// subdomains). Within a list an exact address outranks a domain rule; across lists Blocked > VIP > Ignored > Newsletters.
 public enum SenderList: String, CaseIterable, Sendable, Identifiable, Hashable {
     case vip, blocked, ignored, newsletters
 
@@ -23,7 +24,7 @@ public enum SenderList: String, CaseIterable, Sendable, Identifiable, Hashable {
     public var summary: String {
         switch self {
         case .vip:
-            "VIP senders always get a full summary, even when an email looks like a newsletter."
+            "VIP senders always get a full summary, even when an email looks like a newsletter. Add a whole domain with @example.com."
         case .blocked:
             "Blocked senders are never read."
         case .ignored:
@@ -61,27 +62,25 @@ extension DigestSettings {
     /// The addresses on `list`, as stored.
     public func senders(in list: SenderList) -> [String] { self[keyPath: list.keyPath] }
 
-    /// Whether `sender` (a bare address or "Name <address>") is already on `list`.
+    /// Whether `sender` is already covered by `list`. A bare address or "Name <address>" is covered by an exact
+    /// entry or a matching domain rule; a domain entry ("@example.com") is covered only by the same entry.
     public func contains(sender: String, in list: SenderList) -> Bool {
-        let address = MailFilter.address(from: sender)
-        return self[keyPath: list.keyPath].contains { MailFilter.address(from: $0) == address }
+        let entries = self[keyPath: list.keyPath]
+        if let rule = SenderRule(sender), rule.kind == .domain {
+            return entries.contains { MailFilter.address(from: $0) == rule.text }
+        }
+        return SenderRuleSet(entries).matches(sender)
     }
 
-    /// Whether `text` is a full email address that `MailFilter` can match: something on both sides of one "@".
-    /// A domain such as "@example.com" is not an address, because the filter compares whole addresses.
-    public static func isMatchableAddress(_ text: String) -> Bool {
-        let address = MailFilter.address(from: text)
-        let parts = address.split(separator: "@", omittingEmptySubsequences: false)
-        return parts.count == 2 && !parts[0].isEmpty && !parts[1].isEmpty
-            && !address.contains(where: \.isWhitespace)
-    }
+    /// Whether `text` is a valid rule: a full email address or a whole domain such as "@example.com".
+    public static func isMatchableAddress(_ text: String) -> Bool { SenderRule.isValid(text) }
 
-    /// Adds `sender`'s normalised address to `list`. Returns false, changing nothing, when it is not a full address
-    /// or is already there. Other lists are left alone: `MailFilter` decides conflicts by precedence.
+    /// Adds the normalised entry to `list`. Returns false, changing nothing, when it is not a valid address or
+    /// domain or is already covered. Other lists are left alone: `MailFilter` decides conflicts by precedence.
     @discardableResult
     public mutating func add(sender: String, to list: SenderList) -> Bool {
-        guard Self.isMatchableAddress(sender), !contains(sender: sender, in: list) else { return false }
-        self[keyPath: list.keyPath].append(MailFilter.address(from: sender))
+        guard let rule = SenderRule(sender), !contains(sender: sender, in: list) else { return false }
+        self[keyPath: list.keyPath].append(rule.text)
         return true
     }
 
@@ -101,13 +100,15 @@ public struct RecentSender: Sendable, Equatable, Identifiable {
     public var lastReceived: Date
     public var id: String { address }
 
-    /// The most frequent senders first, then the most recent. Skips addresses `excluding` already holds and
+    /// The most frequent senders first, then the most recent. Skips addresses `excluding` or `excludingRules` (including domain rules) already cover and
     /// anything that is not a full address, and takes the newest display name seen for each address.
-    public static func rank(_ items: [JobItem], excluding: Set<String> = [], limit: Int = 50) -> [RecentSender] {
+    public static func rank(_ items: [JobItem], excluding: Set<String> = [], excludingRules: [String] = [],
+                              limit: Int = 50) -> [RecentSender] {
+        let rules = SenderRuleSet(excludingRules)
         var byAddress: [String: RecentSender] = [:]
         for item in items {
             let address = MailFilter.address(from: item.sender)
-            guard DigestSettings.isMatchableAddress(address), !excluding.contains(address) else { continue }
+            guard SenderRule(address)?.kind == .address, !excluding.contains(address), !rules.matches(address) else { continue }
             if var existing = byAddress[address] {
                 existing.count += 1
                 if item.receivedAt > existing.lastReceived {

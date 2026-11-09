@@ -13,13 +13,28 @@ public struct MailFilter: Sendable {
     /// Per-email suggestion limit for a Trusted Newsletter sender.
     public static let trustedNewsletterSuggestionLimit = 8
 
-    /// Entries are email addresses; they are normalised to lowercase.
+    private let rules: [SenderList: SenderRuleSet]
+
+    /// Entries are exact addresses or whole domains ("@example.com"); they are normalised to lowercase.
     public init(blockedSenders: Set<String> = [], ignoredSenders: Set<String> = [], vipSenders: Set<String> = [],
                 trustedNewsletterSenders: Set<String> = []) {
         self.blockedSenders = Set(blockedSenders.map { $0.lowercased() })
         self.ignoredSenders = Set(ignoredSenders.map { $0.lowercased() })
         self.vipSenders = Set(vipSenders.map { $0.lowercased() })
         self.trustedNewsletterSenders = Set(trustedNewsletterSenders.map { $0.lowercased() })
+        rules = [.blocked: SenderRuleSet(self.blockedSenders), .ignored: SenderRuleSet(self.ignoredSenders),
+                 .vip: SenderRuleSet(self.vipSenders), .newsletters: SenderRuleSet(self.trustedNewsletterSenders)]
+    }
+
+    /// The rule on `list` that covers `sender` (exact address before domain), or nil. The one place every
+    /// sender-list check goes through.
+    public func matchedRule(for sender: String, in list: SenderList) -> SenderRule? {
+        rules[list]?.matchedRule(for: sender)
+    }
+
+    /// Whether any rule on `list` covers `sender`.
+    public func matches(_ sender: String, in list: SenderList) -> Bool {
+        matchedRule(for: sender, in: list) != nil
     }
 
     /// Extracts the lowercased address from "Name <addr>" or a bare "addr".
@@ -49,8 +64,8 @@ public struct MailFilter: Sendable {
     /// higher-precedence rule (block, VIP, ignore) applies. VIP mail keeps the ordinary limit.
     public func isTrustedNewsletter(_ email: EmailMessage) -> Bool {
         let addr = Self.address(from: email.sender)
-        return trustedNewsletterSenders.contains(addr) && !blockedSenders.contains(addr)
-            && !vipSenders.contains(addr) && !ignoredSenders.contains(addr)
+        return matches(addr, in: .newsletters) && !matches(addr, in: .blocked)
+            && !matches(addr, in: .vip) && !matches(addr, in: .ignored)
     }
 
     /// The most task suggestions this email may produce: 8 for a Trusted Newsletter, otherwise 3.
@@ -60,10 +75,10 @@ public struct MailFilter: Sendable {
 
     /// The tier decided by sender rules alone, or nil when the bulk checks decide.
     private func senderTier(_ addr: String) -> MailTier? {
-        if blockedSenders.contains(addr) { return .skip }
-        if vipSenders.contains(addr) { return .full }
-        if ignoredSenders.contains(addr) { return .skip }
-        if trustedNewsletterSenders.contains(addr) { return .full }
+        if matches(addr, in: .blocked) { return .skip }
+        if matches(addr, in: .vip) { return .full }
+        if matches(addr, in: .ignored) { return .skip }
+        if matches(addr, in: .newsletters) { return .full }
         return nil
     }
 
@@ -71,7 +86,7 @@ public struct MailFilter: Sendable {
     public func skipReason(_ email: EmailMessage) -> String? {
         guard tier(email) == .skip else { return nil }
         let addr = Self.address(from: email.sender)
-        return blockedSenders.contains(addr) ? "blocked sender" : "ignored sender"
+        return matches(addr, in: .blocked) ? "blocked sender" : "ignored sender"
     }
 
     private func hasBulkHeaders(_ headers: [String: String]) -> Bool {

@@ -696,3 +696,9 @@ Core tests and the xcodebuild build pass; nothing below has been checked on the 
 - Notes: a suggestion with no saved notes shows "From <sender> · <subject>" as editable text. Leave it alone and nothing is saved; edit it and it is saved; clear it and select another row and back, and the default shows again. Add one (inspector and bulk) and check the Reminders note is notes line, quote line, #category, and the link opens the email in Mail.
 - New Backlog Job step 2: no "Skip Emails Already Processed" toggle; a plain line "<n> already processed will be skipped" ("Counting…" until the preview is ready). Skip Ignored Senders is still a toggle.
 - Menu bar: stop a Daily job and a Backlog job in turn. The panel shows "<job name> · Stopped at <done> of <total>" with a Resume button; Resume continues it without opening a window. A paused job shows "<job name> · Paused at <done> of <total>" in one block (no second row). The Daily row reads "Resume Daily Digest" for a paused or stopped Daily job and "Retry Daily Digest" for a failed one; a stopped Backlog job does not change it. The review window's toolbar button reads Resume for a stopped Daily job. Nothing resumes by itself after a relaunch (Q48).
+
+## Whole-domain sender rules (manual check)
+
+- In Settings > Senders, add `@example.com` to a list through the + popover: the row should read "Anyone @example.com" with "Whole domain" on the right, and `name@example.com` should show "Address". Typing `@` or `@com` should show the explanation and disable Add.
+- Confirm a domain rule affects a real preview: put a domain on Ignored, open New Backlog Job, and check the "skip ignored senders" count includes mail from that domain and its subdomains.
+- Right-click a card whose sender is covered by a listed domain: that list's menu item should be dimmed. Check VoiceOver reads the domain rows sensibly.

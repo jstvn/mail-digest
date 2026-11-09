@@ -213,7 +213,7 @@ final class JobSetupModel {
 
     /// How many previewed emails come from an address on the Ignored list.
     func ignoredSenderCount(filter: MailFilter) -> Int {
-        preview?.toProcess.filter { filter.ignoredSenders.contains(MailFilter.address(from: $0.sender)) }.count ?? 0
+        preview?.toProcess.filter { filter.matches($0.sender, in: .ignored) }.count ?? 0
     }
 
     func canStart(filter: MailFilter) -> Bool {

@@ -318,7 +318,7 @@ extension JobPreviewBuilder {
         var p = preview
         var removed = excluded
         if skipIgnoredSenders {
-            for h in p.toProcess where filter.ignoredSenders.contains(MailFilter.address(from: h.sender)) {
+            for h in p.toProcess where filter.matches(h.sender, in: .ignored) {
                 removed.insert(h.id)
             }
         }

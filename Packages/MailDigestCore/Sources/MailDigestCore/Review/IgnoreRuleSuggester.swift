@@ -25,7 +25,7 @@ public enum IgnoreRuleSuggester {
     public static func suggestion(for sender: String, decisions: [Decision], settings: DigestSettings) -> IgnoreSuggestion? {
         let address = MailFilter.address(from: sender)
         guard !address.isEmpty else { return nil }
-        func listed(_ list: [String]) -> Bool { list.contains { MailFilter.address(from: $0) == address } }
+        func listed(_ list: [String]) -> Bool { SenderRuleSet(list).matches(address) }
         guard !listed(settings.ignoredSenders), !listed(settings.blockedSenders), !listed(settings.vipSenders),
               !listed(settings.declinedIgnoreSuggestions) else { return nil }
         let mine = decisions.filter { MailFilter.address(from: $0.sender) == address }

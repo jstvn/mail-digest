@@ -923,8 +923,7 @@ final class DigestRunModel {
         for job in jobs.sorted(by: { $0.createdAt > $1.createdAt }).prefix(10) {
             items += (try? await store.items(job: job.id)) ?? []
         }
-        let listed = Set(settings.settings.senders(in: list).map(MailFilter.address(from:)))
-        return RecentSender.rank(items, excluding: listed)
+        return RecentSender.rank(items, excludingRules: settings.settings.senders(in: list))
     }
 
     // MARK: Delete all history
