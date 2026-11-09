@@ -404,3 +404,20 @@ Each item says what the spec leaves open and the interim choice the build uses, 
 75. **Dock icon follows real windows** (decided)
    - **Decision (approved by Justin, 2026-11-09):** the app launches menu-bar only (`LSUIElement = YES`). It switches to `.regular` and activates when a real window becomes visible (Review, New Processing Job, Mail Access, Welcome, Settings), and back to `.accessory` when the last real window closes. A real window is visible, can become main and is not an `NSPanel`. A Dock click with no real window opens Review. Replaces the Review-only Dock behaviour in Q70's Mac checks.
    - **Implementation choice, open to change:** a minimised window still counts as real, so closing another window cannot remove its Dock tile and strand it.
+
+## UI redesign (2026-11-09)
+
+76. **Recent Digests becomes a mini month calendar** (decided)
+   - **Decision (from the UI redesign package Justin asked to be implemented, 2026-11-09):** the sidebar's Recent Digests list is replaced by a mini month calendar with weeks starting on Monday. Days with a Daily digest are marked, and selecting one opens that day's digest. This supersedes the Recent Digests structure in Q73, and the listing of every retained day in Q54 and SPEC.md:654.
+
+77. **Review toolbar contents** (decided)
+   - **Decision (from the UI redesign package Justin asked to be implemented, 2026-11-09):** Today's toolbar holds Search and Run Now. The Review Queue's toolbar holds previous and next, the "1 of 10" position, Search and Run Now. This supersedes "the review toolbar holds only Run Now" in Q73.
+
+78. **Settings Jobs tab removed** (decided)
+   - **Decision (from the UI redesign package Justin asked to be implemented, 2026-11-09):** Activity is the only place for job history. A stopped job is resumed by explicit user action from the sidebar Backlog Jobs row, the menu bar panel or the job's row in Activity. This supersedes "from Past Jobs" in Q48 and "Past jobs in Settings > Jobs" at SPEC.md:620. The rest of Q48 stands: `.stopped` stays distinct from `.paused` and is never resumed automatically.
+
+79. **New-job time estimate** (decided)
+   - **Decision (from the UI redesign package Justin asked to be implemented, 2026-11-09):** the New Backlog Job window estimates with the median seconds per email from the last 5 completed jobs on the local model, falling back to 360 seconds per email. This supersedes the preview calculation in Q27. The running job's ETA keeps Q27's rolling average of the last 20 done items.
+
+80. **Daily mailboxes are chosen in Mail Access** (decided)
+   - **Decision (from the UI redesign package Justin asked to be implemented, 2026-11-09):** the Mail Access window becomes the single place to choose daily mailboxes, and Settings shows a read-only summary. This supersedes the "Daily mailboxes" Settings row at SPEC.md:718.

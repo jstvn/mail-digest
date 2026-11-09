@@ -57,9 +57,22 @@ struct CanvasScaffold<Content: View>: View {
             // The bar sits in a solid band under the scroll view, so rows never show behind the capsule.
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !records.isEmpty {
-                    TriageBar(coordinator: coordinator, records: records, isPartial: isPartial)
+                    TriageBar(
+                        selectedCount: coordinator.selectedCount(in: records),
+                        shownOf: isPartial ? records.count : nil,
+                        canAdd: coordinator.canAddSelected(in: records),
+                        canDismiss: coordinator.unselectedCount(in: records) > 0 && !coordinator.isWorking,
+                        dismissHelp: isPartial ? "Dismiss the suggestions shown that aren't ticked. Hidden suggestions aren't affected."
+                                               : "Dismiss the suggestions shown that aren't ticked",
+                        addHelp: coordinator.reminderWriter == nil ? "Reminders access isn't available"
+                            : (isPartial ? "Add the ticked suggestions shown to Reminders. Hidden suggestions aren't affected."
+                                         : "Add the ticked suggestions to Reminders"),
+                        dismissUnselected: { Task { await coordinator.dismissUnselected(in: records) } },
+                        addSelected: { Task { await coordinator.addSelected(in: records) } }
+                    )
                         .frame(maxWidth: .infinity)
                         .padding(.top, 10)
+                        .padding(.bottom, 14)
                         .background(Color(nsColor: .windowBackgroundColor))
                         .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                 }
