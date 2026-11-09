@@ -30,7 +30,7 @@ struct MailDigestApp: App {
         Window("Mail Digest", id: "review") {
             ReviewWindow(run: run, access: access)
         }
-        .defaultSize(width: 980, height: 680)
+        .defaultSize(width: 1200, height: 760)
         .commands { ReviewCommands(run: run) }
 
         Window("Mail Access", id: "mail-access") {

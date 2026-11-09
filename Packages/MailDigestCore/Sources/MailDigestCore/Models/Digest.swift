@@ -31,6 +31,14 @@ public struct InfoItem: Codable, Sendable, Equatable, Identifiable {
 
 public enum Priority: String, Codable, Sendable, Equatable { case high, medium, low }
 
+/// Where a suggestion's due date came from, so the inspector can say "found in email" or "set by you".
+public enum DueSource: String, Codable, Sendable, Equatable {
+    case email, user
+
+    /// The trailing hint of the inspector's Due row.
+    public var hintText: String { self == .user ? "set by you" : "found in email" }
+}
+
 public enum SuggestionStatus: String, Codable, Sendable, Equatable { case pending, approved, dismissed, failed }
 
 public struct Suggestion: Codable, Sendable, Equatable, Identifiable {
@@ -52,11 +60,26 @@ public struct Suggestion: Codable, Sendable, Equatable, Identifiable {
     /// When the suggestion became `.approved` or `.dismissed` (Q57); nil while pending or failed, and for
     /// records decided before this field existed (never back-filled).
     public var decidedAt: Date?
+    /// Who set the due date. Nil in older records and while there is no date; a date with no source reads as
+    /// found in the email (`effectiveDueSource`).
+    public var dueSource: DueSource?
+    /// A Reminders list chosen for this suggestion in the Review Queue inspector. Nil means the default list from
+    /// Settings; a list that no longer exists also falls back to the default when the reminder is written.
+    public var reminderListID: String?
+    /// The user's own notes, written above the email details in the reminder. Nil when empty.
+    public var notes: String?
+
+    /// `dueSource` as the UI should read it: nil without a date, and `.email` for older records.
+    public var effectiveDueSource: DueSource? { due == nil ? nil : (dueSource ?? .email) }
 
     public init(id: UUID, emailID: String, title: String, due: Date?, dueHasTime: Bool,
                 priority: Priority, evidence: String, confidence: Double, preselected: Bool,
                 flags: [String], status: SuggestionStatus, reminderID: String?, category: Category? = nil,
-                decidedAt: Date? = nil) {
+                decidedAt: Date? = nil, dueSource: DueSource? = nil, reminderListID: String? = nil,
+                notes: String? = nil) {
+        self.dueSource = dueSource
+        self.reminderListID = reminderListID
+        self.notes = notes
         self.category = category
         self.decidedAt = decidedAt
         self.id = id

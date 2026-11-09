@@ -1,7 +1,11 @@
 import SwiftUI
 
 /// Priority marks. Only High uses colour, and every level is also spelt out for VoiceOver.
+/// `.pill` (the default) shows High as a red "High" capsule, for cards. `.marks` shows "!!!", "!!" and "!" for
+/// list rows, with High in red.
 struct PriorityBadge: View {
+    enum Style { case pill, marks }
+
     enum Level { case high, medium, low
 
         var marks: String {
@@ -13,11 +17,18 @@ struct PriorityBadge: View {
     }
 
     let level: Level
+    var style: Style = .pill
     @Environment(\.colorScheme) private var scheme
+    /// On a selected list row the accent fill makes red unreadable, so the marks follow the row's text colour.
+    @Environment(\.backgroundProminence) private var prominence
 
     var body: some View {
         Group {
-            if level == .high {
+            if style == .marks {
+                Text(level.marks)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(level == .high && prominence != .increased ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            } else if level == .high {
                 Text("High")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.red)
@@ -69,6 +80,9 @@ struct ReviewPill: View {
         PriorityBadge(level: .high)
         PriorityBadge(level: .medium)
         PriorityBadge(level: .low)
+        PriorityBadge(level: .high, style: .marks)
+        PriorityBadge(level: .medium, style: .marks)
+        PriorityBadge(level: .low, style: .marks)
         TagPill(text: "#events")
         ReviewPill()
     }

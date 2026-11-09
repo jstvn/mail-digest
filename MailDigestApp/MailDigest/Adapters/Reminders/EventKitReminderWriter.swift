@@ -12,6 +12,12 @@ enum RemindersAuthorization: Sendable, Equatable {
     case unavailable
 }
 
+/// A Reminders list the user can pick in the Review Queue inspector.
+struct ReminderListOption: Sendable, Equatable, Identifiable {
+    var id: String
+    var title: String
+}
+
 /// Failures the app reacts to specially.
 enum RemindersError: Error, Equatable {
     case accessNotGranted
@@ -70,6 +76,20 @@ actor EventKitReminderWriter: ReminderWriter {
         try store.saveCalendar(list, commit: true)
         Self.log.info("created reminders list \(list.calendarIdentifier, privacy: .public)")
         return list.calendarIdentifier
+    }
+
+    func listExists(id: String) async -> Bool {
+        guard Self.authorization() == .granted, let list = store.calendar(withIdentifier: id) else { return false }
+        return list.allowsContentModifications && list.allowedEntityTypes.contains(.reminder)
+    }
+
+    /// The user's real Reminders lists that accept new reminders, by title.
+    func availableLists() -> [ReminderListOption] {
+        guard Self.authorization() == .granted else { return [] }
+        return store.calendars(for: .reminder)
+            .filter(\.allowsContentModifications)
+            .map { ReminderListOption(id: $0.calendarIdentifier, title: $0.title) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     func renameList(id: String, to name: String) async throws {

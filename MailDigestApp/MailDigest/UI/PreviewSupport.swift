@@ -173,7 +173,7 @@ enum PreviewSupport {
     let run = PreviewSupport.run(review: review, coordinator: coordinator, reminders: reminders, progress: progress,
                                  banner: banner, failedJobID: failedJobID, foundNothing: foundNothing)
     return ReviewWindow(run: run, access: MailAccessModel(preview: status))
-        .frame(width: 980, height: 680)
+        .frame(width: 1200, height: 760)
 }
 
 #Preview("Window · Today with carry-over") { window() }

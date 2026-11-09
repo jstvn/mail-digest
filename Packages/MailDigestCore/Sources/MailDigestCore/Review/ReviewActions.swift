@@ -52,9 +52,16 @@ public struct SuggestionEdit: Sendable, Equatable {
     public var dueHasTime: Bool?
     public var priority: Priority?
     public var category: Category?
+    /// `.some(nil)` goes back to the default list from Settings.
+    public var reminderListID: String??
+    /// Free text; blank clears the notes.
+    public var notes: String?
 
     public init(title: String? = nil, due: Date?? = nil, dueHasTime: Bool? = nil,
-                priority: Priority? = nil, category: Category? = nil) {
+                priority: Priority? = nil, category: Category? = nil,
+                reminderListID: String?? = nil, notes: String? = nil) {
+        self.reminderListID = reminderListID
+        self.notes = notes
         self.title = title
         self.due = due
         self.dueHasTime = dueHasTime
@@ -140,13 +147,21 @@ public enum ReviewActions {
         if let due = edit.due {
             sug.due = due
             if due == nil { sug.dueHasTime = false }
+            // Every date edit passes through here, so this is the one place the date becomes the user's.
+            sug.dueSource = due == nil ? nil : .user
         }
         if let hasTime = edit.dueHasTime {
             // A time without a date is meaningless.
             sug.dueHasTime = sug.due == nil ? false : hasTime
+            if sug.due != nil { sug.dueSource = .user }
         }
         if let priority = edit.priority { sug.priority = priority }
         if let category = edit.category { sug.category = category }
+        if let list = edit.reminderListID { sug.reminderListID = list }
+        if let notes = edit.notes {
+            let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            sug.notes = trimmed.isEmpty ? nil : trimmed
+        }
         return sug
     }
 
@@ -269,7 +284,10 @@ public enum ReviewActions {
         for entry in entries {
             var s = entry.suggestion
             do {
-                s.reminderID = try await writer.write(s, category: entry.category, email: entry.email, toList: listID)
+                // A list chosen in the inspector wins, unless it was deleted since: then the default list is used.
+                var target = listID
+                if let chosen = s.reminderListID, chosen != listID, await writer.listExists(id: chosen) { target = chosen }
+                s.reminderID = try await writer.write(s, category: entry.category, email: entry.email, toList: target)
                 s.status = .approved
                 s.decidedAt = clock.now()
                 if let email = entry.email {
@@ -313,6 +331,11 @@ public enum ReviewActions {
     /// Without email context the From and Subject lines are left out.
     public static func reminderNotes(for suggestion: Suggestion, email: EmailContext?, category: Category) -> String {
         var lines: [String] = []
+        // The user's own words come first, set apart from the email details.
+        if let notes = suggestion.notes, !notes.isEmpty {
+            lines.append(notes)
+            lines.append("")
+        }
         if let email {
             lines.append("From: \(email.sender)")
             lines.append("Subject: \(email.subject)")

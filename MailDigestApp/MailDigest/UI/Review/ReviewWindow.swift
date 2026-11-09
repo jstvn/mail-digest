@@ -21,7 +21,7 @@ struct ReviewWindow: View {
                 .navigationTitle(windowTitle)
                 .toolbar(removing: .title)
         }
-        .frame(minWidth: 760, minHeight: 520)
+        .frame(minWidth: 900, minHeight: 560)
         .toolbar {
             // A flexible item first: `.primaryAction` alone parks the button at the leading edge here.
             ToolbarItem(placement: .automatic) { Spacer() }

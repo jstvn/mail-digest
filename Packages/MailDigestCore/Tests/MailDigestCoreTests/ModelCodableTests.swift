@@ -51,6 +51,29 @@ final class ModelCodableTests: XCTestCase {
         try roundTrip(SuggestionStatus.failed)
     }
 
+    func testSuggestionWithoutInspectorFieldsStillDecodes() throws {
+        // Stored before dueSource, reminderListID and notes existed.
+        let json = """
+        {"id":"11111111-1111-1111-1111-111111111111","emailID":"m1","title":"Pay rent","due":1700003600,
+         "dueHasTime":true,"priority":"high","evidence":"Rent due Friday","confidence":0.9,"preselected":false,
+         "flags":[],"status":"pending"}
+        """
+        let decoder = JSONDecoder()
+        let old = try decoder.decode(Suggestion.self, from: Data(json.utf8))
+        XCTAssertNil(old.dueSource)
+        XCTAssertNil(old.reminderListID)
+        XCTAssertNil(old.notes)
+        XCTAssertEqual(old.effectiveDueSource, .email)
+    }
+
+    func testInspectorFieldsRoundTrip() throws {
+        var s = suggestion
+        s.dueSource = .user
+        s.reminderListID = "list-1"
+        s.notes = "Bring ID"
+        try roundTrip(s)
+    }
+
     func testMailboxAndActionModels() throws {
         try roundTrip(box)
         try roundTrip(MailboxInfo(ref: box, messageCount: 10, unreadCount: 2, kind: .inbox))

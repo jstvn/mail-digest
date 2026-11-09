@@ -211,9 +211,27 @@ final class ReviewCoordinator {
     }
 
     /// "Try Again" on a failed suggestion: keeps it selected and writes just that one.
-    func retry(_ record: SuggestionRecord) async {
+    func retry(_ record: SuggestionRecord) async { await add(record) }
+
+    /// Adds exactly this suggestion to Reminders, whether or not its checkbox is ticked (the Review Queue
+    /// inspector's Add acts on the selected row, not on the ticked ones).
+    func add(_ record: SuggestionRecord) async {
         if !isSelected(record) { toggle(record) }
         await addSelected(in: [record])
+    }
+
+    /// The name of the default Reminders list from Settings, for the inspector's List picker.
+    var defaultListName: String { review?.listName() ?? DigestSettings.defaultListName }
+
+    /// The stored id of the default list, so the picker doesn't list it twice.
+    var defaultListID: String? { UserDefaults.standard.string(forKey: ReviewViewModel.listIDKey) }
+
+    /// How the email behind a record was routed and run, read from its job's items; nil when not recorded.
+    /// Only the recorded routing is returned, never a guess.
+    func routing(for record: SuggestionRecord) async -> RoutingProvenance? {
+        guard let store else { return nil }
+        let items = (try? await store.items(job: record.digestID)) ?? []
+        return items.first { $0.messageID == record.suggestion.emailID }?.routing
     }
 
     /// "Dismiss Unselected": the pending, unselected suggestions among `records`.

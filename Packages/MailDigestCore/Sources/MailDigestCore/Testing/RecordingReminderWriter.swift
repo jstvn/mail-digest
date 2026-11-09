@@ -43,6 +43,8 @@ public actor RecordingReminderWriter: ReminderWriter {
         return id
     }
 
+    public func listExists(id: String) async -> Bool { lists[id] != nil }
+
     public func renameList(id: String, to name: String) async throws {
         guard lists[id] != nil else { throw RecordingReminderError.unknownList(id) }
         lists[id] = name

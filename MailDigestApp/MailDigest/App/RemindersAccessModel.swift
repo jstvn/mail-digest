@@ -8,6 +8,8 @@ import OSLog
 @MainActor @Observable
 final class RemindersAccessModel {
     private(set) var status: RemindersAuthorization
+    /// The user's Reminders lists, for the Review Queue inspector's List picker. Empty until access is granted.
+    private(set) var lists: [ReminderListOption] = []
 
     @ObservationIgnored private let writer: EventKitReminderWriter?
     @ObservationIgnored private weak var coordinator: ReviewCoordinator?
@@ -19,9 +21,10 @@ final class RemindersAccessModel {
     }
 
     /// Previews: a fixed status and no EventKit.
-    init(preview status: RemindersAuthorization) {
+    init(preview status: RemindersAuthorization, lists: [ReminderListOption] = []) {
         self.writer = nil
         self.status = status
+        self.lists = lists
     }
 
     /// Connects the cross-digest coordinator, which writes approvals, and applies the current status to it.
@@ -61,5 +64,12 @@ final class RemindersAccessModel {
     private func apply() {
         let granted: (any ReminderWriter)? = status == .granted ? writer : nil
         coordinator?.setReminderWriter(granted)
+        loadLists()
+    }
+
+    /// Re-reads the lists whenever the status is applied (launch, window focus, a permission change).
+    private func loadLists() {
+        guard let writer, status == .granted else { lists = []; return }
+        Task { lists = await writer.availableLists() }
     }
 }

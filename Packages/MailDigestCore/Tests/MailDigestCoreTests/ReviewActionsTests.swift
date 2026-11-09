@@ -296,3 +296,53 @@ private let emails: [String: EmailContext] = [
         #expect(ReviewActions.messageURL(for: "a b/c+d").absoluteString == "message://%3Ca%20b%2Fc%2Bd%3E")
     }
 }
+
+@Suite struct ReviewInspectorEditTests {
+    @Test func dueEditsMarkTheDateAsUserSet() throws {
+        let a = sug("Pay fees", due: t0)
+        #expect(a.effectiveDueSource == .email) // older data with a date reads as found in the email
+        let dated = try ReviewActions.applying(SuggestionEdit(due: .some(t0.addingTimeInterval(86_400))), to: a)
+        #expect(dated.dueSource == .user && dated.effectiveDueSource == .user)
+        let timed = try ReviewActions.applying(SuggestionEdit(dueHasTime: true), to: a)
+        #expect(timed.dueSource == .user)
+        // Other edits leave the source alone.
+        #expect(try ReviewActions.applying(SuggestionEdit(priority: .high), to: a).dueSource == nil)
+        // No date, no source.
+        let cleared = try ReviewActions.applying(SuggestionEdit(due: .some(nil)), to: dated)
+        #expect(cleared.dueSource == nil && cleared.effectiveDueSource == nil)
+        #expect(DueSource.email.hintText == "found in email" && DueSource.user.hintText == "set by you")
+    }
+
+    @Test func listAndNotesEdits() throws {
+        let a = sug("Pay fees")
+        let listed = try ReviewActions.applying(SuggestionEdit(reminderListID: .some("L1"), notes: "  Bring ID \n"), to: a)
+        #expect(listed.reminderListID == "L1" && listed.notes == "Bring ID")
+        let reset = try ReviewActions.applying(SuggestionEdit(reminderListID: .some(nil), notes: " "), to: listed)
+        #expect(reset.reminderListID == nil && reset.notes == nil)
+        // Nil means unchanged.
+        #expect(try ReviewActions.applying(SuggestionEdit(priority: .low), to: listed).reminderListID == "L1")
+    }
+
+    @Test func notesLeadTheReminderText() {
+        var s = sug("Pay fees")
+        s.notes = "Bring ID"
+        let text = ReviewActions.reminderNotes(for: s, email: emails["e1"], category: .finance)
+        #expect(text == "Bring ID\n\nFrom: Bursar <Bursar@Uni.edu>\nSubject: Fees due\n\"pay by Friday\"\n#finance")
+    }
+
+    @Test func chosenListIsWrittenToAndDeletedListFallsBack() async throws {
+        var chosen = sug("Pay fees"), gone = sug("Report")
+        chosen.reminderListID = "uni"
+        gone.reminderListID = "deleted"
+        let state = ReviewState(digest: digest([chosen, gone]))
+        let store = InMemoryDigestStore()
+        try await store.save(state.digest)
+        let writer = RecordingReminderWriter(lists: ["uni": "Uni"])
+        let out = await ReviewActions.approve([chosen, gone], state: state, emails: emails, writer: writer,
+                                              store: store, listName: "Mail Digest", storedListID: nil, clock: FixedClock(t0))
+        #expect(out.results.map(\.status) == [.approved, .approved])
+        let written = await writer.written
+        #expect(written[0].listID == "uni")
+        #expect(written[1].listID == out.listID) // the default list
+    }
+}
