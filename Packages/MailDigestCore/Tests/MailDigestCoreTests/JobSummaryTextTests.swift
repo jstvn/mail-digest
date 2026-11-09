@@ -37,6 +37,22 @@ import Testing
         #expect(JobSummaryText.scope(all, timeZone: tz, locale: us) == "Everything up to 26 Oct 2026")
     }
 
+    @Test func scopeCollapsesSameDayAndSameMonth() {
+        func at(_ iso: String) -> Date { ISO8601DateFormatter().date(from: iso)! }
+        func scoped(_ from: String, _ to: String) -> String {
+            var j = job(.finished)
+            j.scopeFrom = at(from)
+            j.scopeTo = at(to)
+            return JobSummaryText.scope(j, timeZone: tz, locale: us)
+        }
+        #expect(scoped("2026-10-21T00:00:00+10:00", "2026-10-21T23:59:59+10:00") == "21 Oct 2026")
+        #expect(scoped("2026-11-01T00:00:00+10:00", "2026-11-05T12:00:00+10:00") == "1\u{2013}5 Nov 2026")
+        #expect(scoped("2026-10-03T00:00:00+10:00", "2026-11-02T00:00:00+10:00") == "3 Oct 2026 to 2 Nov 2026")
+        #expect(scoped("2025-11-03T00:00:00+10:00", "2026-11-05T00:00:00+10:00") == "3 Nov 2025 to 5 Nov 2026")
+        // Brisbane is UTC+10: 15:00Z on the 31st is already 1 Nov locally.
+        #expect(scoped("2026-10-31T15:00:00Z", "2026-11-05T00:00:00Z") == "1\u{2013}5 Nov 2026")
+    }
+
     @Test func totalsLeaveOutZeroParts() {
         #expect(JobSummaryText.totals(job(.finished)) == "5 done")
         let t = JobTotals(queued: 2100, done: 812, failed: 6, skipped: 40)

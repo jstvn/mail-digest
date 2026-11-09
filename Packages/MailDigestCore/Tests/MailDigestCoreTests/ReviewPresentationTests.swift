@@ -159,8 +159,33 @@ private func sug(_ n: Int, confidence: Double, status: SuggestionStatus = .pendi
                        "Due 2026-12-01", "Total $17.45", "Brisbane"]) == ["Due 2026-12-01", "Total $17.45", "Brisbane"])
     }
 
+    @Test func dropsSenderVariantsWithCorporateSuffixes() {
+        #expect(facts(["Letterboxd HQ", "Letterboxd Pro", "Letterboxd Team"], sender: "Letterboxd <hi@letterboxd.example>", users: [])
+                == ["Letterboxd Pro"])
+        #expect(facts(["Letterboxd", "Letterboxd Pro"], sender: "Letterboxd HQ <hi@letterboxd.example>", users: [])
+                == ["Letterboxd Pro"])
+        #expect(facts(["Acme Support", "Acme Rewards"], sender: "Acme Inc <a@acme.example>", users: []) == ["Acme Rewards"])
+    }
+
+    @Test func dropsBareReadableDatesOnly() {
+        let dropped = ["8 Nov, 2026 at 10:36 am", "8 Nov 2026", "Nov 8, 2026", "November 8 2026 10:36 AM",
+                       "Sunday, 8 November 2026", "Sun 8 Nov 2026 at 10:36 am", "8th Nov 2026"]
+        #expect(facts(dropped, sender: nil, users: []).isEmpty)
+        #expect(facts(["Order completed 8 Nov 2026", "Due 2026-12-01", "8 Nov"], sender: nil, users: [])
+                == ["Order completed 8 Nov 2026", "Due 2026-12-01", "8 Nov"])
+    }
+
     @Test func keepsEverythingWithNoSenderOrNames() {
         #expect(facts(["A", "B"], sender: nil, users: []) == ["A", "B"])
         #expect(facts(["", "  "], sender: nil, users: []).isEmpty)
+    }
+}
+
+struct CompactAgeTests {
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test(arguments: [(30, "now"), (-30, "now"), (300, "5m ago"), (75_600, "21h ago"), (259_200, "3d ago"), (1_209_600, "2w ago")])
+    func formatsAges(seconds: Int, expected: String) {
+        #expect(ReviewPresentation.compactAge(of: now.addingTimeInterval(-Double(seconds)), now: now) == expected)
     }
 }

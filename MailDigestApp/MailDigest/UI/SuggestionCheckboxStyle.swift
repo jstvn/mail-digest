@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// A round check mark toggle for suggestion rows: a filled accent circle when selected, an empty one when not.
+/// A round check mark toggle for suggestion rows: a filled, softened accent circle when selected, an empty one when not.
 /// It is still a `Toggle` (keyboard, VoiceOver and `disabled` all work); only the look is custom.
 struct SuggestionCheckboxStyle: ToggleStyle {
-    /// Width of the control. The row indents the evidence quote by this much plus the row spacing.
+    /// Width of the control. The row indents the evidence quote by this much plus `SuggestionRow.columnSpacing`.
     static let width: CGFloat = 22
 
     func makeBody(configuration: Configuration) -> some View {
@@ -20,7 +20,7 @@ struct SuggestionCheckboxStyle: ToggleStyle {
             Button { configuration.isOn.toggle() } label: {
                 Image(systemName: configuration.isOn ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 16))
-                    .foregroundStyle(configuration.isOn ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(configuration.isOn ? Color.accentColor.opacity(0.7) : Color.secondary)
                     .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
                     .scaleEffect(configuration.isOn ? 1 : 0.92)
                     .frame(width: SuggestionCheckboxStyle.width, height: SuggestionCheckboxStyle.width)

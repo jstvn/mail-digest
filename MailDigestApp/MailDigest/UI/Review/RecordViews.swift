@@ -53,20 +53,23 @@ struct ActionableRecordsSection: View {
             if records.isEmpty {
                 Text(emptyText).foregroundStyle(.secondary)
             } else {
-                LazyVStack(spacing: 0) {
-                    ForEach(records) { record in
-                        SuggestionRow(
-                            record: record,
-                            isSelected: coordinator.isSelected(record),
-                            isFocused: focus.wrappedValue == record.id,
-                            onToggle: { coordinator.toggle(record) },
-                            onEdit: { try await coordinator.edit($0, record: record) },
-                            onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: record.suggestion.emailID)) })
-                        .focusable()
-                        .focusEffectDisabled()
-                        .focused(focus, equals: record.id)
-                        .id(record.id)
-                        Divider()
+                GroupedCard {
+                    LazyVStack(spacing: 0) {
+                        ForEach(records) { record in
+                            SuggestionRow(
+                                record: record,
+                                isSelected: coordinator.isSelected(record),
+                                isFocused: focus.wrappedValue == record.id,
+                                onToggle: { coordinator.toggle(record) },
+                                onEdit: { try await coordinator.edit($0, record: record) },
+                                onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: record.suggestion.emailID)) })
+                            .focusable()
+                            .focusEffectDisabled()
+                            .focused(focus, equals: record.id)
+                            .id(record.id)
+                            // Dividers sit between rows only, inset past the checkbox.
+                            if record.id != records.last?.id { Divider().padding(.leading, 36) }
+                        }
                     }
                 }
             }
@@ -108,9 +111,9 @@ struct SettledRecordRow: View {
             }
         }
         .padding(.vertical, 6)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 12)
         .background {
-            if hovering { RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.5)) }
+            if hovering { Rectangle().fill(.quaternary.opacity(0.5)) }
         }
         .onHover { hovering = $0 }
         .accessibilityElement(children: .contain)
@@ -132,11 +135,13 @@ struct SettledRecordsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("\(title) · \(records.count)")
-            LazyVStack(spacing: 0) {
-                ForEach(records) { record in
-                    SettledRecordRow(record: record)
-                        .id(record.id)
-                    Divider()
+            GroupedCard {
+                LazyVStack(spacing: 0) {
+                    ForEach(records) { record in
+                        SettledRecordRow(record: record)
+                            .id(record.id)
+                        if record.id != records.last?.id { Divider().padding(.leading, 12) }
+                    }
                 }
             }
         }

@@ -2,15 +2,13 @@ import AppKit
 import MailDigestCore
 import SwiftUI
 
-/// The review window's sidebar: workflows, Recent Digests by month, Backlog jobs and the job status pill.
+/// The review window's sidebar: workflows, Recent Digests grouped by month, Backlog jobs and the job status pill.
 /// It reads only the library's summaries, so it never loads a digest.
 struct SidebarView: View {
     let run: DigestRunModel
     let access: MailAccessModel
     @Environment(\.openWindow) private var openWindow
 
-    /// Months the user opened or closed this session; others follow the default (current month open).
-    @State private var monthExpansion: [DigestMonth: Bool] = [:]
     @State private var showsJob = false
 
     private var coordinator: ReviewCoordinator { run.coordinator }
@@ -24,24 +22,28 @@ struct SidebarView: View {
     var body: some View {
         List(selection: selection) {
             Section {
-                row(.today, badge: archive.todayCount, tint: .fixed(.orange)) { Label("Today", systemImage: "sun.max.fill") }
-                row(.reviewQueue, badge: archive.reviewQueueCount, tint: .fixed(.blue)) {
-                    Label("Review Queue", systemImage: "tray.fill")
+                row(.today, badge: archive.todayCount) {
+                    Label { Text("Today") } icon: { SidebarIconBadge(symbol: "sun.max.fill", color: .orange) }
                 }
-                row(.logbook, tint: .fixed(.green)) { Label("Logbook", systemImage: "checkmark.square.fill") }
-                row(.mailCleanup, tint: .fixed(.purple)) { Label("Mail Cleanup", systemImage: "archivebox.fill") }
-                row(.activity, tint: .monochrome) { Label("Activity", systemImage: "waveform.path.ecg") }
+                row(.reviewQueue, badge: archive.reviewQueueCount) {
+                    Label { Text("Review Queue") } icon: { SidebarIconBadge(symbol: "tray.fill", color: .blue) }
+                }
+                row(.logbook) {
+                    Label { Text("Logbook") } icon: { SidebarIconBadge(symbol: "checkmark", color: .green) }
+                }
+                row(.mailCleanup) {
+                    Label { Text("Mail Cleanup") } icon: { SidebarIconBadge(symbol: "archivebox.fill", color: .indigo) }
+                }
+                row(.activity) {
+                    Label { Text("Activity") } icon: { SidebarIconBadge(symbol: "waveform.path.ecg", color: .gray) }
+                }
             }
 
-            if !archive.months.isEmpty {
-                Section("Recent Digests") {
-                    ForEach(archive.months) { month in
-                        DisclosureGroup(isExpanded: expansion(of: month)) {
-                            ForEach(month.days) { day in dayRow(day) }
-                        } label: {
-                            Text(ReviewDateText.month(month.month, calendar: library.calendar))
-                        }
-                    }
+            // The newest month sits under "Recent Digests"; each older month gets its own header.
+            ForEach(Array(archive.months.enumerated()), id: \.element.id) { index, month in
+                let title = index == 0 ? "Recent Digests" : ReviewDateText.month(month.month, calendar: library.calendar)
+                Section(title) {
+                    ForEach(month.days) { day in dayRow(day) }
                 }
             }
 
@@ -69,10 +71,9 @@ struct SidebarView: View {
     }
 
     /// A selectable sidebar row; the order of `.badge` and `.tag` lives in `selectableRow`.
-    /// `tint` colours the row's icon. Fixed tints, so the colours stay distinct under any system accent colour.
-    private func row<Content: View>(_ item: SidebarItem, badge: Int? = nil, tint: ListItemTint? = nil,
+    private func row<Content: View>(_ item: SidebarItem, badge: Int? = nil,
                                     @ViewBuilder content: () -> Content) -> some View {
-        content().listItemTint(tint).selectableRow(item, badge: badge)
+        content().selectableRow(item, badge: badge)
     }
 
     /// The mailbox name (up to two lines) over the job's date scope.
@@ -107,19 +108,6 @@ struct SidebarView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), \(day.emailCount) \(day.emailCount == 1 ? "email" : "emails")")
         .selectableRow(.day(day.day), badge: day.actionableCount)
-    }
-
-    /// The current month, and the one holding the selected day, start open; the rest start collapsed.
-    private func expansion(of month: ArchiveMonth) -> Binding<Bool> {
-        Binding(
-            get: {
-                if let chosen = monthExpansion[month.month] { return chosen }
-                let current = DigestMonth(DigestDay(archive.startOfToday, calendar: library.calendar))
-                if month.month == current { return true }
-                if case .day(let d) = coordinator.selection { return DigestMonth(d) == month.month }
-                return false
-            },
-            set: { monthExpansion[month.month] = $0 })
     }
 
     // MARK: Job status
@@ -196,5 +184,23 @@ private extension View {
     func selectableRow(_ item: SidebarItem, badge: Int?) -> some View {
         self.badge(badge ?? 0)
             .tag(item)
+    }
+}
+
+/// A small colour-filled rounded square with a white glyph, the sidebar icon style of system apps.
+/// Fixed colours keep the icons distinct under any system accent colour.
+private struct SidebarIconBadge: View {
+    let symbol: String
+    let color: Color
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 5, style: .continuous).fill(color.gradient)
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .frame(width: 20, height: 20)
+        .accessibilityHidden(true)
     }
 }

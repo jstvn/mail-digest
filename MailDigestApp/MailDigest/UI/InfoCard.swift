@@ -3,8 +3,8 @@ import MailDigestCore
 import SwiftUI
 
 /// One email's summary with its key facts, as a row of the Info list. The sender and subject, the time and
-/// the actions (pin, save to Notes, open in Mail) sit on the first line; the actions appear on hover or
-/// keyboard focus, except a pin that is set and a Notes save in progress or finished.
+/// the actions (pin, save to Notes, open in Mail) sit on the first line. The actions take the place of the
+/// status (pin, Notes state, cloud, time) on hover or keyboard focus.
 struct InfoCard: View {
     let item: InfoItem
     let email: EmailContext?
@@ -23,27 +23,24 @@ struct InfoCard: View {
     @FocusState private var actionFocus: ActionFocus?
 
     private var isRevealed: Bool { hovering || actionFocus != nil }
-    private var showsPin: Bool { isRevealed || item.pinned }
-    private var showsNotes: Bool { isRevealed || notesState != .idle }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            topLine
+            if email != nil { topLine }
             Text(item.summary)
                 .font(.system(size: 13.5, weight: .medium))
                 .foregroundStyle(.primary)
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
             let facts = ReviewPresentation.displayFacts(item.keyFacts, sender: email?.sender, userNames: userNames)
-            // Offsets as ids: the model can repeat a fact, and `\.self` would then collide.
-            ForEach(Array(facts.enumerated()), id: \.offset) { _, fact in
-                Label {
-                    Text(fact).font(.callout)
-                } icon: {
-                    Image(systemName: "circle.fill").font(.system(size: 4))
-                        .accessibilityHidden(true)
-                }
-                .foregroundStyle(.secondary)
+            if !facts.isEmpty {
+                let line = facts.joined(separator: " · ")
+                Text(line)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .help(line)
             }
             if case .failed(let reason) = notesState {
                 Label(reason, systemImage: "exclamationmark.triangle.fill")
@@ -55,6 +52,10 @@ struct InfoCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+        // With no linked email there is no first line, so the status and actions sit in the row's corner.
+        .overlay(alignment: .topTrailing) {
+            if email == nil { trailing.padding(.top, 10).padding(.trailing, 12) }
+        }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: isRevealed)
@@ -76,34 +77,60 @@ struct InfoCard: View {
                     .truncationMode(.tail)
             }
             Spacer(minLength: 8)
+            trailing
+        }
+    }
+
+    /// The status and the actions share one trailing slot: the time sits flush right when idle and the
+    /// actions replace it on hover or focus. Hidden actions ignore clicks but stay focusable and visible to
+    /// VoiceOver.
+    private var trailing: some View {
+        ZStack(alignment: .trailing) {
+            status
+                .opacity(isRevealed ? 0 : 1)
+            actions
+                .opacity(isRevealed ? 1 : 0)
+                .allowsHitTesting(isRevealed)
+        }
+    }
+
+    private var status: some View {
+        HStack(spacing: 6) {
+            // The pin and Notes buttons already announce these states, so VoiceOver skips the glyphs.
+            if item.pinned {
+                Image(systemName: "pin.fill").accessibilityHidden(true)
+            }
+            switch notesState {
+            case .idle:
+                EmptyView()
+            case .saving:
+                ProgressView().controlSize(.mini).accessibilityHidden(true)
+            case .saved:
+                Image(systemName: "checkmark").foregroundStyle(.green).accessibilityHidden(true)
+            case .failed:
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red).accessibilityHidden(true)
+            }
             if provider == .cloud {
                 Image(systemName: "cloud")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
                     .help("Summarised by Gemini")
                     .accessibilityLabel("Summarised by Gemini")
             }
             if let received = email?.receivedAt {
-                Text(received.formatted(.relative(presentation: .named, unitsStyle: .abbreviated)))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                Text(ReviewPresentation.compactAge(of: received, now: .now))
                     .lineLimit(1)
                     .fixedSize()
             }
-            actions
         }
+        .font(.caption)
+        .foregroundStyle(.tertiary)
     }
 
-    /// The buttons keep their space when hidden so nothing shifts; hidden ones ignore clicks but stay
-    /// focusable and visible to VoiceOver.
     private var actions: some View {
         HStack(spacing: 6) {
             Button(action: onTogglePin) {
                 Image(systemName: item.pinned ? "pin.fill" : "pin")
             }
             .focused($actionFocus, equals: .pin)
-            .opacity(showsPin ? 1 : 0)
-            .allowsHitTesting(showsPin)
             .help(item.pinned ? "Unpin this item" : "Pin this item. It carries over to the next digest until unpinned.")
             .accessibilityLabel(item.pinned ? "Unpin" : "Pin")
 
@@ -121,17 +148,13 @@ struct InfoCard: View {
             }
             .disabled(notesState == .saving)
             .focused($actionFocus, equals: .notes)
-            .opacity(showsNotes ? 1 : 0)
-            .allowsHitTesting(showsNotes)
             .help("Save to Notes")
             .accessibilityLabel(accessibilityNotesLabel)
 
             Button(action: onOpen) {
-                Image(systemName: "arrow.up.forward.square")
+                Image(systemName: "arrow.up.forward.app")
             }
             .focused($actionFocus, equals: .open)
-            .opacity(isRevealed ? 1 : 0)
-            .allowsHitTesting(isRevealed)
             .help("Open this email in Mail")
             .accessibilityLabel("Open email in Mail")
         }
@@ -149,20 +172,9 @@ struct InfoCard: View {
     }
 }
 
-/// The surface that holds a group of info rows: one rounded card with dividers between the rows.
-struct InfoCardList<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) { content }
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
-    }
-}
-
 #Preview("Info card") {
     let items = PreviewFixtures.digest.info
-    return InfoCardList {
+    return GroupedCard {
         InfoCard(item: items[0], email: PreviewFixtures.emails["canvas@qut.example"], userNames: ["Justin Wang"])
         Divider()
         InfoCard(item: items[items.count > 1 ? 1 : 0], email: nil, provider: .cloud, notesState: .saved)

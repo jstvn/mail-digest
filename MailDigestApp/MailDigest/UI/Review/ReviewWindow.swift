@@ -7,7 +7,6 @@ import SwiftUI
 struct ReviewWindow: View {
     let run: DigestRunModel
     let access: MailAccessModel
-    @Environment(\.openSettings) private var openSettings
 
     private var coordinator: ReviewCoordinator { run.coordinator }
 
@@ -24,20 +23,14 @@ struct ReviewWindow: View {
         }
         .frame(minWidth: 760, minHeight: 520)
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            // A flexible item first: `.primaryAction` alone parks the button at the leading edge here.
+            ToolbarItem(placement: .automatic) { Spacer() }
+            ToolbarItem(placement: .automatic) {
                 Button { Task { await run.runNow() } } label: {
                     Label("Run Now", systemImage: "play.fill")
                 }
                 .disabled(!run.canStartDaily || access.status?.mode == .unavailable)
                 .help(run.dailyLifecycle == .none ? "Read your new mail now" : "Resume or review the unfinished Daily job first.")
-
-                Button {
-                    NSApp.activate()
-                    openSettings()
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .help("Open Settings")
             }
         }
         // Pick up a permission change made in System Settings.

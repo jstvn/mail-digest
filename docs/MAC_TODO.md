@@ -538,3 +538,14 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 - Redundant bullets (sender, your name, a bare date) are gone. The name comes from the macOS account, so a different name on the email isn't filtered.
 - Scroll Today and Review Queue to the end: the floating bar clears the last item, and content passes under its material while scrolling.
 - Run a real digest: new summaries and headlines don't say "User received…" or use your name. Summaries already stored keep their old wording.
+
+## Native visual pass (2026-11-09)
+
+Checked in screenshots of the real `ReviewWindow` on preview fixtures, light and dark: Run Now at the trailing edge, sidebar badges, month headers, grouped cards on Today, Review Queue and Logbook, the bar's band at the top and end of the scroll, and Info rows with and without a linked email. Still to check by hand:
+
+- Live data: the same views on your real mail, and Mail Cleanup with entries (the fixture list was empty).
+- ⌘, opens Settings from the app menu while the review window is open, and the menu bar popover's Settings row works when it's closed.
+- Activity's centred pickers still sit correctly beside the toolbar spacer.
+- Hover and keyboard focus: Info actions replace the age without shifting the row; row hover and focus fills stay inside the card corners.
+- Dismiss Unselected reads as dimmed but legible when every suggestion is ticked, and clear when it's available.
+- VoiceOver reads sidebar rows without announcing the badges, and the Info row actions when hidden.

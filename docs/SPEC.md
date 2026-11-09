@@ -623,22 +623,22 @@ The aim is a clear sense of where the job is, not a firehose of logs.
 
 ## Review panel UI
 
-The review window is a two-column `NavigationSplitView` (Q54): a sidebar for navigation and a detail canvas for the selected view. Nothing reaches Reminders until the user clicks **Add to Reminders**. Layout, typography, controls and accessibility follow Apple's Human Interface Guidelines; the sidebar uses the system sidebar list style and material, not a custom background tint. Workflow icons carry fixed semantic colours through `listItemTint`: Today orange `sun.max.fill`, Review Queue blue `tray.fill`, Logbook green `checkmark.square.fill`, Mail Cleanup purple `archivebox.fill`, Activity monochrome `waveform.path.ecg`.
+The review window is a two-column `NavigationSplitView` (Q54): a sidebar for navigation and a detail canvas for the selected view. Nothing reaches Reminders until the user clicks **Add to Reminders**. Layout, typography, controls and accessibility follow Apple's Human Interface Guidelines; the sidebar uses the system sidebar list style and material, not a custom background tint. Workflow icons are 20 × 20 pt continuous rounded-rect badges (radius 5) in `Label`'s icon slot, with a white 11 pt semibold glyph on a gradient fill: Today orange `sun.max.fill`, Review Queue blue `tray.fill`, Logbook green `checkmark`, Mail Cleanup indigo `archivebox.fill`, Activity gray `waveform.path.ecg`.
 
 **Window layout (about 980 × 680, resizable; sidebar about 220 pt)**
 
 ```text
 ┌──────────────────┬───────────────────────────────────────────────────────┐
-│ ☀︎ Today       5 │  Today · Fri 6 Nov                         [Run Now] ⚙︎ │
+│ ☀︎ Today       5 │  Today · Fri 6 Nov                           [Run Now] │
 │ ☰ Review Queue 9 │  14 emails processed                                  │
 │ ✓ Logbook        │  "IFN735 exam timetable is out and rent is due Fri."  │
 │ ✉︎ Mail Cleanup   │                                                       │
 │                  │  UNREVIEWED FROM EARLIER (2)                          │
 │ RECENT DIGESTS   │  ☐ Renew library loan   [Thu 12 Nov] [Low] [#uni]     │
-│ ▾ November       │    ┃ QUT Library  "Your loan is due back…"         ↗  │
+│   Fri 6 Nov  14  │    ┃ QUT Library  "Your loan is due back…"         ↗  │
 │   Thu 5 Nov  12  │                                                       │
 │   Wed 4 Nov   9  │  SUGGESTED REMINDERS (3)          Select All · None   │
-│ ▸ October        │  ☑ Pay rent        [Fri 6 Nov] [High] [#finance]      │
+│ OCTOBER 2026     │  ☑ Pay rent        [Fri 6 Nov] [High] [#finance]      │
 │                  │    ┃ Ray White  "Rent of $… is due this Friday"     ↗  │
 │ BACKLOG JOBS     │                                                       │
 │   Inbox 2025  40 │  INFO  ▸ Uni (3)  ▸ Deliveries (2)  ▸ Newsletters (9) │
@@ -651,13 +651,13 @@ The review window is a two-column `NavigationSplitView` (Q54): a sidebar for nav
 **Sidebar (`SidebarView`)** — selection is a `SidebarItem`: `today`, `reviewQueue`, `logbook`, `mailCleanup`, `day(DigestDay)`, `backlog(UUID)`.
 
 - **Workflows:** Today (default), Review Queue, Logbook, Mail Cleanup. Every row is selectable with the mouse and the keyboard; `.tag` is applied after `.badge` so `List(selection:)` sees it.
-- **Recent Digests:** every retained day before today that has at least one Daily digest, newest first, grouped into collapsible months (the current month expanded by default). Several Daily runs on one calendar day (in the settings time zone) merge into one entry with their summed email count.
-- **Backlog Jobs:** each Backlog job with a digest, plus **New Backlog Job…**. A row shows the mailbox text without the job-kind prefix (the section header already says it; INBOX in any case reads "Inbox") over a caption with the date scope.
+- **Recent Digests:** every retained day before today that has at least one Daily digest, newest first, grouped by month under plain section headers: the newest month under "Recent Digests", each older month under its own name (Q73). Several Daily runs on one calendar day (in the settings time zone) merge into one entry with their summed email count.
+- **Backlog Jobs:** each Backlog job with a digest, plus **New Backlog Job…**. A row shows the mailbox text without the job-kind prefix (the section header already says it; INBOX in any case reads "Inbox") over a caption with the date scope (`21 Oct 2026` for one day, `1–5 Nov 2026` within a month, otherwise `3 Oct 2026 to 2 Nov 2026`).
 - **Badges (Q58).** A suggestion is *actionable* while `pending` or `failed` (a failed Reminders write stays selectable and editable, and Add retries it). Every badge counts actionable suggestions: Review Queue = all digests, Daily and Backlog; Today = today's Daily digests plus the Daily carry-over; a day = that day's Daily digests; a Backlog job = that job. The menu bar badge equals the Review Queue count, so it never under-reports. A zero badge is hidden.
 - **Job status:** a compact pill pinned to the bottom of the sidebar while a job is listing, running, pausing or paused. It shows the job name and counts with a small progress indicator; clicking it opens a popover with the full progress strip (Pause / Pause Now / Resume / Stop), Recent, per-mailbox counts and the Activity log. None of these appear in the canvas.
 - The sidebar is built only from `digestSummaries()` and `jobs()`; it never loads digest contents.
 
-**Canvas (`DigestCanvasView` and friends)** — content is centred with a maximum width of 780 pt and generous horizontal padding. A large title and a secondary subtitle head every view (for example "Today · Fri 6 Nov" / "14 emails processed · 3 suggestions", counting every suggestion in the view's digests whatever its status and omitting the suggestions part at zero), followed by the headline in reading typography where there is one. The count-only fallback headline is not shown, since the subtitle already says it. The canvas header is the single visible title: the window keeps its `navigationTitle` for the Window menu, Mission Control and VoiceOver, and the toolbar title is removed. Alert banners (States table) sit under the header. The toolbar holds **Run Now** and a Settings button (a menu bar agent has no app menu, so Settings must stay reachable from the window).
+**Canvas (`DigestCanvasView` and friends)** — content is centred with a maximum width of 780 pt and generous horizontal padding. A large title and a secondary subtitle head every view (for example "Today · Fri 6 Nov" / "14 emails processed · 3 suggestions", counting every suggestion in the view's digests whatever its status and omitting the suggestions part at zero), followed by the headline in reading typography where there is one. The count-only fallback headline is not shown, since the subtitle already says it. The canvas header is the single visible title: the window keeps its `navigationTitle` for the Window menu, Mission Control and VoiceOver, and the toolbar title is removed. Alert banners (States table) sit under the header. The canvas sits on `windowBackgroundColor`, and each list is an inset grouped card (`GroupedCard`: `controlBackgroundColor`, continuous radius 10, 1 pt `Color.primary.opacity(0.07)` border) with dividers only between rows. The toolbar holds only **Run Now**, at the trailing edge. Settings is the native `Settings` scene: ⌘, in the app menu while the review window gives the app its Dock presence, and the menu bar popover's Settings row otherwise.
 
 | View | Shows | Loads |
 | --- | --- | --- |
@@ -668,7 +668,7 @@ The review window is a two-column `NavigationSplitView` (Q54): a sidebar for nav
 | Logbook | A flat list (no date sections) of approved and dismissed suggestions, ordered by `decidedAt` descending, falling back to the digest's `createdAt` for older records (Q57), with their outcome and decision time | `decidedSuggestions`, paged |
 | Mail Cleanup | The Mail cleanup list (see Mail cleanup), still scoped to the latest digest (Q55) | as before |
 
-**Selection and triage (cross-digest).** Selection is one session-wide map keyed by suggestion id: a suggestion is selected when the user ticked it, or when untouched and `preselected`. It survives navigation. Each canvas acts on the suggestions it shows: a translucent floating bar (`.ultraThinMaterial` capsule, bottom-centred, floating over the scroll view, which keeps an 80 pt bottom content margin while the bar shows) reads "N selected · **Dismiss Unselected** · **Add to Reminders** ⌘↩". Add approves the selected suggestions in view; Dismiss Unselected dismisses the pending suggestions in view that are not selected (Q54 keeps this meaning). Both may span several digests; each suggestion is written, recorded as a decision and persisted against its own digest. Select All / Select None in each section header apply to that section.
+**Selection and triage (cross-digest).** Selection is one session-wide map keyed by suggestion id: a suggestion is selected when the user ticked it, or when untouched and `preselected`. It survives navigation. Each canvas acts on the suggestions it shows: a translucent floating bar (`.ultraThinMaterial` capsule, bottom-centred, in a `safeAreaInset` band filled with the canvas colour, so rows never show behind it at any scroll position) reads "N selected · **Dismiss Unselected** · **Add to Reminders** ⌘↩". Add approves the selected suggestions in view; Dismiss Unselected dismisses the pending suggestions in view that are not selected (Q54 keeps this meaning). Both may span several digests; each suggestion is written, recorded as a decision and persisted against its own digest. Select All / Select None in each section header apply to that section.
 
 **Action scope (Q58).** The triage bar acts only on the actionable suggestions currently displayed: Today = the carry-over loaded on screen plus today's visible page; a Day = its visible page; a Backlog = the current batch; Review Queue = the loaded pages. Suggestions hidden by the Daily 25 limit (Q16) or not yet loaded are never implicitly approved or dismissed. **Show All** makes the whole day's digests the scope. A partial scope is always visible: the section header reads "25 of 42" beside Show All, carry-over and Review Queue read "Showing 100 of 130" beside their links, and the triage bar names the shown count ("3 selected of 25 shown"). Failed suggestions stay in the actionable section with their failure note and are never dismissed by Dismiss Unselected.
 
@@ -680,9 +680,9 @@ The review window is a two-column `NavigationSplitView` (Q54): a sidebar for nav
 
 **Suggestion row (`SuggestionRow`)**
 
-- Borderless two-line row (8 pt vertical padding, faint hover fill). Line 1: round custom-styled `Toggle` bound to selection (`checkmark.circle.fill` / `circle`); inline-editable title (plain `TextField`, one line); pills on the trailing edge. Line 2: the evidence, on the title's leading edge
-- Due date, priority and category tag are compact tinted pills (`MetaPill`). The date pill opens a popover with a graphical date picker, an "Include time" toggle and **Remove Date**; with no date a muted **Add Date** pill appears on hover or keyboard focus (and is always exposed to VoiceOver). Priority and category pills open menus. Category defaults to the email's category
-- Evidence is a quote tile (`Color.primary.opacity(0.03)`, corner radius 6) with a 2 pt accent bar on the leading edge: sender in medium weight, the quote in secondary italic (truncated, full text on hover), and an ↗ button that opens the email via `message://%3C<message-id>%3E`, emphasised on hover and always reachable by keyboard and VoiceOver
+- Borderless two-line row (8 pt vertical padding, faint hover fill). Line 1: round custom-styled `Toggle` bound to selection (`checkmark.circle.fill` in muted accent / `circle`); inline-editable title (plain `TextField`, one line); pills on the trailing edge. Line 2: the evidence, on the title's leading edge
+- Due date, priority and category tag are compact neutral pills (`MetaPill`, `Color.primary.opacity(0.05)` fill) with secondary text; only High priority uses red text. The date pill opens a popover with a graphical date picker, an "Include time" toggle and **Remove Date**; with no date a muted **Add Date** pill appears on hover or keyboard focus (and is always exposed to VoiceOver). Priority and category pills open menus. Category defaults to the email's category
+- Evidence is a quote tile (`Color.primary.opacity(0.03)`, corner radius 6) with a 2.5 pt capsule bar (`Color.accentColor.opacity(0.35)`) on the leading edge: "From: sender" in medium weight, the quote in secondary italic (truncated, full text on hover), and an ↗ button that opens the email via `message://%3C<message-id>%3E`, emphasised on hover and always reachable by keyboard and VoiceOver
 - Flags show as a ⚠︎ badge with a tooltip (for example "Payment request from a new sender")
 - Keyboard: ↑/↓ moves focus, space toggles, ⌘↩ adds selected, ⌫ dismisses the focused row
 
@@ -696,8 +696,8 @@ The review window is a two-column `NavigationSplitView` (Q54): a sidebar for nav
 
 - Grouped by `Category`, sorted by highest importance; newsletters collapsed by default
 - Each group's rows share one surface card (`controlBackgroundColor`, corner radius 10, 1 pt `Color.primary.opacity(0.06)` border) with dividers between rows
-- Each row: a top line with sender (12 pt semibold), subject, relative received time and the actions; the summary in 13.5 pt medium; key facts as small bullets. Facts that only repeat the sender, the reader's name or a bare ISO date are not shown; labelled facts such as "Due 2026-12-01" are
-- Actions: pin button, "Save to Notes" button (Mac-only adapter, JXA to Notes), ↗ to open the email. They appear on hover or keyboard focus and are always exposed to VoiceOver; a set pin and a Notes save in progress, finished or failed stay visible
+- Each row is 2 to 3 lines: sender (12 pt semibold), subject and compact received age (`21h ago`); the summary in 13.5 pt medium; key facts on one truncating line joined by " · " (12 pt secondary). Facts that only repeat the sender (including a corporate-suffix variant such as "Letterboxd HQ"), the reader's name or a bare date are not shown; labelled facts such as "Due 2026-12-01" are
+- Actions: pin button, "Save to Notes" button (Mac-only adapter, JXA to Notes), ↗ to open the email. They replace the age on hover or keyboard focus and are always exposed to VoiceOver; while idle, small glyphs beside the age show a set pin and a Notes save in progress, finished or failed
 - Pinned items carry over to the next digest until unpinned
 
 **States**

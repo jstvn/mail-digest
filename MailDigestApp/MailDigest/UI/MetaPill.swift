@@ -30,7 +30,7 @@ struct MetaPillLabel: View {
                 Capsule().strokeBorder(.tertiary, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
                     .opacity(hovering ? 1 : 0.8)
             } else {
-                Capsule().fill(tint.opacity(hovering && isInteractive ? 0.22 : 0.12))
+                Capsule().fill(Color.primary.opacity(hovering && isInteractive ? 0.10 : 0.05))
             }
         }
         .contentShape(Capsule())
@@ -79,12 +79,11 @@ enum PillDateText {
 }
 
 extension Priority {
-    /// Soft tints: loud only for High.
+    /// Text and icon tint: red for High, neutral secondary for Medium and Low.
     var pillTint: Color {
         switch self {
         case .high: return .red
-        case .medium: return .orange
-        case .low: return .secondary
+        case .medium, .low: return .secondary
         }
     }
 }
@@ -104,13 +103,13 @@ struct StaticSuggestionPills: View {
             }
             MetaPillLabel(text: suggestion.priority.label, tint: suggestion.priority.pillTint)
                 .metaPillAccessibility(title: "Priority", value: suggestion.priority.label)
-            MetaPillLabel(text: "#\(category.rawValue)", tint: .accentColor)
+            MetaPillLabel(text: "#\(category.rawValue)", tint: .secondary)
                 .metaPillAccessibility(title: "Category", value: category.rawValue)
         }
     }
 }
 
-/// The evidence quote: an accent bar, the sender, the quote and the open-in-Mail button, on a faint tile.
+/// The evidence quote: an accent bar, "From: sender" then the quote, and the open-in-Mail button on the right.
 struct EvidenceQuote: View {
     let sender: String
     let evidence: String
@@ -120,16 +119,16 @@ struct EvidenceQuote: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            RoundedRectangle(cornerRadius: 1).fill(Color.accentColor.opacity(0.6)).frame(width: 2)
+            Capsule().fill(Color.accentColor.opacity(0.35)).frame(width: 2.5)
                 .accessibilityHidden(true)
-            (Text(sender).font(.callout.weight(.medium)).foregroundStyle(.primary)
-                + Text("  “\(evidence)”").font(.callout).italic().foregroundStyle(.secondary))
+            (Text("From: \(sender)  ").font(.callout.weight(.medium)).foregroundStyle(.primary)
+                + Text("“\(evidence)”").font(.callout).italic().foregroundStyle(.secondary))
                 .lineLimit(2)
                 .truncationMode(.tail)
                 .help("“\(evidence)”")
                 .accessibilityLabel("Evidence from \(sender): \(evidence)")
             Spacer(minLength: 4)
-            Button(action: onOpen) { Image(systemName: "arrow.up.forward.square") }
+            Button(action: onOpen) { Image(systemName: "arrow.up.forward.app") }
                 .buttonStyle(.borderless)
                 .opacity(emphasised ? 1 : 0.5)
                 .help("Open this email in Mail")

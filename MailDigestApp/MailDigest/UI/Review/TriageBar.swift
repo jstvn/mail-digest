@@ -16,6 +16,7 @@ struct TriageBar: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
             Button("Dismiss Unselected") { Task { await coordinator.dismissUnselected(in: records) } }
+                .buttonStyle(QuietBarButtonStyle())
                 .disabled(coordinator.unselectedCount(in: records) == 0 || coordinator.isWorking)
                 .help(isPartial ? "Dismiss the suggestions shown that aren't ticked. Hidden suggestions aren't affected."
                                 : "Dismiss the suggestions shown that aren't ticked")
@@ -33,5 +34,21 @@ struct TriageBar: View {
         .padding(.bottom, 14)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Triage")
+    }
+}
+
+/// A quiet neutral button for the bar's secondary action: a faint fill, softer text when disabled, and the
+/// same control height as the bordered-prominent button beside it.
+private struct QuietBarButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.primary.opacity(isEnabled ? 0.8 : 0.45))
+            .padding(.horizontal, 10)
+            .frame(minHeight: 22)
+            .background(Color.primary.opacity(configuration.isPressed ? 0.12 : 0.06),
+                        in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }

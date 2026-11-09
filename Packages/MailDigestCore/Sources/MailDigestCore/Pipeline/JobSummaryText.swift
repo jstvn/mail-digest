@@ -25,7 +25,8 @@ public enum JobSummaryText {
         mailbox.name.caseInsensitiveCompare("INBOX") == .orderedSame ? "Inbox" : mailbox.name
     }
 
-    /// "3 Oct 2026 to 2 Nov 2026", or "Everything up to 2 Nov 2026" when the scope starts before 1990.
+    /// The job's date scope: "21 Oct 2026" for one day, "1–5 Nov 2026" within one month, otherwise
+    /// "3 Oct 2026 to 2 Nov 2026"; "Everything up to 2 Nov 2026" when the scope starts before 1990.
     public static func scope(_ job: Job, timeZone: TimeZone, locale: Locale = .current) -> String {
         let f = DateFormatter()
         f.locale = locale
@@ -33,6 +34,15 @@ public enum JobSummaryText {
         f.dateFormat = "d MMM yyyy"
         let to = f.string(from: job.scopeTo)
         if job.scopeFrom.timeIntervalSince1970 < 631_152_000 { return "Everything up to \(to)" }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let a = calendar.dateComponents([.year, .month, .day], from: job.scopeFrom)
+        let b = calendar.dateComponents([.year, .month, .day], from: job.scopeTo)
+        if a.year == b.year, a.month == b.month {
+            if a.day == b.day { return to }
+            f.dateFormat = "d"
+            return "\(f.string(from: job.scopeFrom))\u{2013}\(to)"
+        }
         return "\(f.string(from: job.scopeFrom)) to \(to)"
     }
 

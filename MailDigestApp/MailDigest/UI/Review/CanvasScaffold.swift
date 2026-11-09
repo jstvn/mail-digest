@@ -53,8 +53,17 @@ struct CanvasScaffold<Content: View>: View {
                 .padding(.vertical, 28)
                 .frame(maxWidth: .infinity)
             }
-            // Room under the last row for the floating bar, only while the bar is showing.
-            .contentMargins(.bottom, records.isEmpty ? 0 : 80, for: .scrollContent)
+            .background(Color(nsColor: .windowBackgroundColor))
+            // The bar sits in a solid band under the scroll view, so rows never show behind the capsule.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !records.isEmpty {
+                    TriageBar(coordinator: coordinator, records: records, isPartial: isPartial)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 10)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                }
+            }
             // A Recent row asked to show an email: scroll to its first suggestion or info card.
             .onChange(of: coordinator.revealedEmailID) { _, emailID in
                 guard let emailID else { return }
@@ -68,12 +77,6 @@ struct CanvasScaffold<Content: View>: View {
             }
             .onChange(of: focusedID) { _, id in
                 if let id { proxy.scrollTo(id) }
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if !records.isEmpty {
-                TriageBar(coordinator: coordinator, records: records, isPartial: isPartial)
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: records.isEmpty)

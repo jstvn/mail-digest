@@ -53,6 +53,9 @@ struct SuggestionRow: View {
         _draft = State(initialValue: Draft(record.suggestion, category: record.category))
     }
 
+    /// Gap between the checkbox and the title; the quote's indent uses it too so both start at the same edge.
+    static let columnSpacing: CGFloat = 6
+
     private var suggestion: Suggestion { record.suggestion }
     private var category: Category { record.category }
     private var email: EmailContext? { record.email }
@@ -64,7 +67,7 @@ struct SuggestionRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Line 1: checkbox, title (truncates), then the pills on the trailing edge.
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .center, spacing: Self.columnSpacing) {
                 Toggle(isOn: Binding(get: { isSelected }, set: { _ in onToggle() })) { EmptyView() }
                     .toggleStyle(SuggestionCheckboxStyle())
                     .labelsHidden()
@@ -87,15 +90,17 @@ struct SuggestionRow: View {
                         .font(.caption).foregroundStyle(.orange)
                 }
             }
-            .padding(.leading, SuggestionCheckboxStyle.width + 10)
+            .padding(.leading, SuggestionCheckboxStyle.width + Self.columnSpacing)
         }
         .padding(.vertical, 8)
-        .padding(.horizontal, 8)
+        .padding(.leading, 8)
+        .padding(.trailing, 12)
+        // Square fills: the card clips them to its own corners.
         .background {
             if isFocused {
-                RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.12))
+                Rectangle().fill(Color.accentColor.opacity(0.12))
             } else if hovering {
-                RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.02))
+                Rectangle().fill(Color.primary.opacity(0.02))
             }
         }
         .contentShape(Rectangle())
@@ -226,7 +231,7 @@ struct SuggestionRow: View {
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
-            MetaPillLabel(text: "#\(draft.category.rawValue)", tint: .accentColor, isInteractive: true)
+            MetaPillLabel(text: "#\(draft.category.rawValue)", tint: .secondary, isInteractive: true)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)

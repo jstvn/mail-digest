@@ -115,9 +115,21 @@ public enum ReviewPresentation {
         DigestPipeline.isFallbackHeadline(headline.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
+    /// "now", "5m ago", "21h ago", "3d ago" or "2w ago": the short age the system's relative formatter doesn't give.
+    public static func compactAge(of date: Date, now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(date))
+        switch seconds {
+        case ..<60: return "now"
+        case ..<3_600: return "\(seconds / 60)m ago"
+        case ..<86_400: return "\(seconds / 3_600)h ago"
+        case ..<604_800: return "\(seconds / 86_400)d ago"
+        default: return "\(seconds / 604_800)w ago"
+        }
+    }
+
     // MARK: Key facts
 
-    /// Key facts worth showing: drops a fact that is only the sender, the reader or a bare date, because the
+    /// Key facts worth showing: drops a fact that is only the sender (or the sender with a corporate suffix), the reader or a bare date, because the
     /// row already shows (or implies) those. Compared whole-string, case-insensitively, after trimming
     /// whitespace, leading bullets and surrounding punctuation. "Due 2026-12-01" and "Total $17.45" stay.
     /// `userNames` are full names; the full name and each single word of it count as the reader.
@@ -133,10 +145,39 @@ public enum ReviewPresentation {
             for token in name.split(whereSeparator: \.isWhitespace) { banned.insert(factKey(String(token))) }
         }
         banned.remove("")
+        let senderWords = sender.map { factWords(senderName($0)) } ?? []
         return facts.filter { fact in
             let key = factKey(fact)
-            return !key.isEmpty && !banned.contains(key) && !isBareISODate(key)
+            return !key.isEmpty && !banned.contains(key) && !isBareISODate(key) && !isBareReadableDate(key)
+                && !isSenderVariant(key, senderWords: senderWords)
         }
+    }
+
+    private static let corporateSuffixes: Set<String> = ["hq", "team", "inc", "ltd", "pty", "llc", "co", "support"]
+
+    private static func factWords(_ text: String) -> [String] {
+        text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+    }
+
+    /// True when the fact and the sender's display name differ only by corporate suffixes ("Letterboxd HQ"
+    /// for sender "Letterboxd", or the reverse). A fact with any other extra word ("Letterboxd Pro") is kept.
+    private static func isSenderVariant(_ key: String, senderWords: [String]) -> Bool {
+        let fact = factWords(key)
+        guard !fact.isEmpty, !senderWords.isEmpty else { return false }
+        let nonSuffix: ([String]) -> [String] = { $0.filter { !corporateSuffixes.contains($0) } }
+        let (f, s) = (nonSuffix(fact), nonSuffix(senderWords))
+        // Equal once suffixes are removed: one side is the other plus suffix words only.
+        return !f.isEmpty && f == s
+    }
+
+    /// "8 Nov, 2026 at 10:36 am", "8 Nov 2026", "Nov 8, 2026", "Friday, November 8 2026 10:36 AM" on their own.
+    private static func isBareReadableDate(_ key: String) -> Bool {
+        let weekday = #"((mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\.?,?\s+)?"#
+        let month = #"(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"#
+        let time = #"(,?\s+(at\s+)?\d{1,2}:\d{2}(:\d{2})?(\s*[ap]\.?m\.?)?)?"#
+        let dayFirst = "^\(weekday)\\d{1,2}(st|nd|rd|th)?\\s+\(month),?\\s+\\d{4}\(time)$"
+        let monthFirst = "^\(weekday)\(month)\\s+\\d{1,2}(st|nd|rd|th)?,?\\s+\\d{4}\(time)$"
+        return [dayFirst, monthFirst].contains { key.range(of: $0, options: .regularExpression) != nil }
     }
 
     private static func factKey(_ text: String) -> String {

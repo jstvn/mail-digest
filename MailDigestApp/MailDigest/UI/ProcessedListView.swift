@@ -41,13 +41,14 @@ struct ProcessedListView: View {
             Text("\(title) (\(entries.count))")
                 .font(.body.weight(.medium))
                 .accessibilityAddTraits(.isHeader)
-            VStack(spacing: 0) {
+            GroupedCard {
                 ForEach(entries) { entry in
                     ProcessedRow(entry: entry,
                                  isTicked: model.isTicked(entry.id),
                                  onTick: { model.setTicked($0, id: entry.id) },
                                  onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: entry.emailID)) })
-                    Divider()
+                    // Inset to the row's text, past the checkbox.
+                    if entry.id != entries.last?.id { Divider().padding(.leading, 36) }
                 }
             }
         }
@@ -117,6 +118,7 @@ private struct ProcessedRow: View {
                 .accessibilityLabel("Open email in Mail")
         }
         .padding(.vertical, 6)
+        .padding(.horizontal, 12)
         .accessibilityElement(children: .contain)
     }
 }

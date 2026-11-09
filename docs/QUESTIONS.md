@@ -150,7 +150,7 @@ Each item says what the spec leaves open and the interim choice the build uses, 
      - A compact job status pill at the bottom of the sidebar. Its popover holds the progress strip, Recent, mailbox counts and the Activity log (removed from the canvas).
      - Today shows "Unreviewed from Earlier" = pending/failed suggestions from earlier **Daily** digests only (never Backlog), then today's suggestions, info and skipped mail scoped to today's Daily digests only.
      - Review Queue is the global entry point for all pending and failed suggestions across Daily and Backlog. Backlog jobs in the sidebar show their pending count.
-     - Recent Digests lists every retained day that has a Daily digest (no 7/14-day cap), grouped by month. Months are collapsible, and the current month is expanded by default. Several Daily runs on one calendar day merge into one entry with aggregated email counts.
+     - Recent Digests lists every retained day that has a Daily digest (no 7/14-day cap), grouped by month. Months are collapsible, and the current month is expanded by default. *(Superseded by Q73: months are plain section headers.)* Several Daily runs on one calendar day merge into one entry with aggregated email counts.
      - Selection semantics are unchanged: suggestions start selected when preselected; the floating bar keeps **Dismiss Unselected** (not Dismiss Selected) and **Add to Reminders** approves the selected ones. Selection, approval and dismissal work across digests.
      - Preserve keyboard shortcuts, the Daily 25-suggestion presentation limit (Q16), Backlog 50-email batches (Q47) and all job lifecycle behaviour (Q52, Q53).
 55. **Where email cleanup lives.** Logbook (reminder triage outcomes) and email cleanup (Move to Trash / Move to Mail Digest / Keep / Undo / auto-file) are different jobs.
@@ -384,3 +384,7 @@ Each item says what the spec leaves open and the interim choice the build uses, 
    - **Context:** the 2026-11-09 visual pass asked for hover actions "pin/archive/open mail" on info rows. Neither `docs/SPEC.md` nor the code has an archive action for info items, and the only existing mail-moving actions are Mail Cleanup's Trash and Move to Mail Digest folder.
    - **Interim:** info rows offer the spec's three actions: pin, Save to Notes and open in Mail.
    - **To decide:** whether Archive should dismiss the item within Mail Digest only, or move the email in Mail.app, which needs a target mailbox per account, Undo and the Mail automation error handling Mail Cleanup has.
+
+73. **Native window chrome and Recent Digests structure** (decided)
+   - **Decision (approved by Justin, 2026-11-09):** the review toolbar holds only Run Now, at the trailing edge; Settings lives in the native `Settings` scene and the menu bar popover. Recent Digests no longer collapses by month: the newest month sits under "Recent Digests" and each older month has a plain section header, which supersedes that part of Q54.
+   - **Consequence:** with long history retention the sidebar scrolls through every retained day, since months can no longer be collapsed.

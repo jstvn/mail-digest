@@ -304,7 +304,7 @@ struct DigestCanvasView: View {
     }
 
     private func infoCards(_ items: [InfoItem]) -> some View {
-        InfoCardList {
+        GroupedCard {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(items) { item in
                     InfoCard(item: item, email: email(for: item.emailID), provider: provider(for: item.emailID),
@@ -314,7 +314,7 @@ struct DigestCanvasView: View {
                              onTogglePin: { Task { await coordinator.setPinned(!item.pinned, item: item) } },
                              onSaveToNotes: { Task { await coordinator.saveToNotes(item) } })
                     .id(item.id)
-                    if item.id != items.last?.id { Divider() }
+                    if item.id != items.last?.id { Divider().padding(.leading, 12) }
                 }
             }
         }
@@ -326,19 +326,24 @@ struct DigestCanvasView: View {
     @ViewBuilder private var skippedSection: some View {
         if let skipped = content?.skipped, !skipped.isEmpty {
             DisclosureGroup(isExpanded: $skippedExpanded) {
-                LazyVStack(alignment: .leading, spacing: 6) {
-                    ForEach(skipped) { item in
-                        HStack(alignment: .firstTextBaseline) {
-                            Text("\(ReviewPresentation.senderName(item.sender)) · \(item.subject)")
-                                .lineLimit(1).truncationMode(.tail)
-                            Spacer()
-                            Text(item.reason).foregroundStyle(.secondary)
+                GroupedCard {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(skipped) { item in
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("\(ReviewPresentation.senderName(item.sender)) · \(item.subject)")
+                                    .lineLimit(1).truncationMode(.tail)
+                                Spacer()
+                                Text(item.reason).foregroundStyle(.secondary)
+                            }
+                            .font(.callout)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .accessibilityElement(children: .combine)
+                            if item.id != skipped.last?.id { Divider().padding(.leading, 12) }
                         }
-                        .font(.callout)
-                        .accessibilityElement(children: .combine)
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, 6)
             } label: {
                 Text("Skipped (\(skipped.count))").font(.body.weight(.medium))
             }
