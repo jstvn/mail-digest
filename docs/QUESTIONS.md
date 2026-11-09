@@ -421,3 +421,25 @@ Each item says what the spec leaves open and the interim choice the build uses, 
 
 80. **Daily mailboxes are chosen in Mail Access** (decided)
    - **Decision (from the UI redesign package Justin asked to be implemented, 2026-11-09):** the Mail Access window becomes the single place to choose daily mailboxes, and Settings shows a read-only summary. This supersedes the "Daily mailboxes" Settings row at SPEC.md:718.
+
+81. **Overnight jobs start on their own, after a relaunch and on wake** (decided)
+   - **Decision (approved by Justin, 2026-11-10):** a Backlog job created as overnight starts automatically. Inside the Background Work window it starts at once; outside it, it waits. This also applies after the app restarts. If the Mac was asleep when the window started, the job starts on wake if it's still inside the window. An overnight job cut off by a quit or crash mid-run also restarts. While it runs on power, the app holds an IOPMAssertion that prevents idle sleep, released when the job stops or pauses. No wake events are scheduled. The window times are read from Settings (default 10 pm to 7 am).
+   - **Scope:** this is an exception to Q44 for jobs created as overnight only. The rest of Q43, Q44 and Q48 stands.
+
+82. **Today has no carry-over section** (decided)
+   - **Decision (approved by Justin, 2026-11-10):** Today no longer shows "Unreviewed from Earlier". Suggestions from earlier days appear only as the "N more waiting from earlier days" link under the stat strip. The link shows whenever N > 0 and opens Review Queue. This supersedes SPEC.md:664, :656 and :673 on "Unreviewed from Earlier". Sidebar badges are unchanged, and the badge rule that counts Daily carry-over stands.
+
+83. **Reminder notes format** (decided)
+   - **Decision (approved by Justin, 2026-11-10):** the reminder's notes are "From <sender> · <subject>" (prefilled when Notes is empty and editable before adding, or the user's own text), then the evidence quote, then the `#category` tag. This supersedes the From and Subject lines at SPEC.md:755-757. The URL is unchanged: `message://%3C<Message-ID>%3E`.
+
+84. **A stopped Daily job resumes from the menu and the main window** (decided)
+   - **Decision (approved by Justin, 2026-11-10):** a stopped Daily job resumes with "Resume Daily Digest" in the menu bar, or with the main window's Run Now button, whose label reads Resume. Resume starts the job in place and doesn't open Activity. This supersedes the "Review Daily Job…" title from Q52 and "from Activity" in Q78 for that case.
+
+85. **Whole-domain sender rules** (decided)
+   - **Decision (approved by Justin, 2026-11-10):** an entry starting with "@" matches that domain and its subdomains, shown as "Whole domain". Precedence stays Blocked > VIP > Ignored > Newsletters. Within one list, an exact-address rule wins over a domain rule.
+
+86. **Sender logos: local BIMI header first, website fetch off by default** (decided)
+   - **Decision (approved by Justin, 2026-11-10):** avatars are initials by default, with no Contacts photos. A logo from a `BIMI-Indicator` header (base64 SVG) is decoded locally, used as the avatar and cached by sender domain, with no network. Website logo fetching is the Settings › General option "Show Sender Logos", off by default. When it's on, the app fetches by sender domain only: the BIMI DNS record, then `https://<domain>/apple-touch-icon.png`, with the rules in DESIGN_SPEC §5.3. No third-party icon services are used.
+
+87. **Model downloads use the local Ollama URL** (decided)
+   - **Decision (approved by Justin, 2026-11-10):** when the chosen digest or privacy model isn't installed, Settings › Models offers "Download Model". It calls the local Ollama `POST /api/pull` with `stream: true`, shows downloaded / total, the percentage and Cancel, and refreshes the installed list when finished. Only the local Ollama URL is contacted.
