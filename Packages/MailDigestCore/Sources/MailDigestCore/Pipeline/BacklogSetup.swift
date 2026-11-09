@@ -46,14 +46,13 @@ public struct BacklogDateRange: Sendable, Equatable {
     }
 }
 
-/// Default and final names of a new Backlog job, and the date-range wording.
+/// The title of a Backlog job, and the date-range wording.
 public enum BacklogJobNaming {
-    /// "October Backlog" when the range covers a whole month (or the month so far), "1–14 Oct Backlog" for
-    /// part of a month, "20 Sep–14 Oct Backlog" across months and "20 Dec 2025–14 Jan 2026 Backlog" across years.
-    public static func defaultName(from: Date, to: Date, now: Date, calendar: Calendar,
+    /// The job's date range as a title: "21 Oct 2026" for one day, "1–31 Oct 2026" within a month,
+    /// "21 Oct – 4 Nov 2026" across months and "21 Dec 2025 – 4 Jan 2026" across years. Shown whenever the
+    /// user has not named the job, and as the Name field's placeholder.
+    public static func defaultName(from: Date, to: Date, calendar: Calendar,
                                    locale: Locale = Locale(identifier: "en_AU")) -> String {
-        let a = calendar.dateComponents([.year, .month, .day], from: from)
-        let b = calendar.dateComponents([.year, .month, .day], from: to)
         func fmt(_ pattern: String, _ date: Date) -> String {
             let f = DateFormatter()
             f.locale = locale
@@ -62,21 +61,20 @@ public enum BacklogJobNaming {
             f.dateFormat = pattern
             return f.string(from: date)
         }
-        if a.year == b.year, a.month == b.month {
-            let lastDay = calendar.range(of: .day, in: .month, for: from)?.count ?? 31
-            let reachesEnd = b.day == lastDay || calendar.isDate(to, inSameDayAs: now)
-            if a.day == 1, reachesEnd { return "\(fmt("MMMM", from)) Backlog" }
-            if a.day == b.day { return "\(fmt("d MMM", from)) Backlog" }
-            return "\(fmt("d", from))\u{2013}\(fmt("d MMM", to)) Backlog"
-        }
-        if a.year == b.year { return "\(fmt("d MMM", from))\u{2013}\(fmt("d MMM", to)) Backlog" }
-        return "\(fmt("d MMM yyyy", from))\u{2013}\(fmt("d MMM yyyy", to)) Backlog"
+        let a = calendar.dateComponents([.year, .month, .day], from: from)
+        let b = calendar.dateComponents([.year, .month, .day], from: to)
+        if a == b { return fmt("d MMM yyyy", to) }
+        // Spaced en dash across months, tight en dash within one month.
+        if a.year == b.year, a.month == b.month { return "\(fmt("d", from))\u{2013}\(fmt("d MMM yyyy", to))" }
+        if a.year == b.year { return "\(fmt("d MMM", from)) \u{2013} \(fmt("d MMM yyyy", to))" }
+        return "\(fmt("d MMM yyyy", from)) \u{2013} \(fmt("d MMM yyyy", to))"
     }
 
-    /// The name to store: the typed text trimmed, or `defaultName` when it is blank.
-    public static func resolvedName(_ typed: String, defaultName: String) -> String {
+    /// The name to store: nil when the typed text is blank or just the default, so the job keeps showing its
+    /// date range; otherwise the trimmed text, which is the user's own name.
+    public static func resolvedName(_ typed: String, defaultName: String) -> String? {
         let trimmed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? defaultName : trimmed
+        return trimmed.isEmpty || trimmed == defaultName ? nil : trimmed
     }
 
     /// "1 to 31 Oct 2026", "9 Nov 2026", "20 Sep to 14 Oct 2026" or "20 Dec 2025 to 14 Jan 2026".

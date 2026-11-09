@@ -138,20 +138,15 @@ final class ReviewLibrary {
         }
     }
 
-    /// The job's own name when it has one, else "Backlog · iCloud Inbox"; plain "Backlog" when the job row is gone.
+    /// The job's own name when the user set one, else its date range ("1–31 Oct 2026"); plain "Backlog" when
+    /// the job row is gone. The same line 1 as the sidebar row.
     func title(forBacklog id: UUID) -> String {
-        if let name = backlogJobs[id]?.name { return name }
-        return backlogJobs[id].map(JobSummaryText.title) ?? ReviewPresentation.jobName(.backlog)
+        backlogJobs[id].map { BacklogRowText.title($0, calendar: calendar) } ?? ReviewPresentation.jobName(.backlog)
     }
 
     /// Whether the job exists but has stored no digest yet, so its canvas has nothing to load.
     func isDigestless(backlog id: UUID) -> Bool {
         archive.backlogs.first { $0.id == id }.map { !$0.hasDigest } ?? false
-    }
-
-    /// "iCloud Inbox"; plain "Backlog" when the job row is gone. The sidebar row, which has no kind prefix.
-    func sidebarTitle(forBacklog id: UUID) -> String {
-        backlogJobs[id].map(JobSummaryText.mailboxTitle) ?? ReviewPresentation.jobName(.backlog)
     }
 
     /// "Everything up to 2 Nov 2026"; nil when the job row is gone.

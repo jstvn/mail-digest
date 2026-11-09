@@ -131,10 +131,8 @@ import Testing
         let job = Job(id: UUID(), kind: .backlog, mailboxes: mailboxes, scopeFrom: .distantPast, scopeTo: .now,
                       state: .running, createdAt: .now, totals: JobTotals(queued: 48, done: 52, failed: 0, skipped: 0),
                       autoPaused: false)
-        #expect(BacklogRowText.accounts(of: job) == "iCloud, Outlook")
         #expect(BacklogRowText.percent(job.totals) == 52)
         #expect(BacklogRowText.percent(JobTotals(queued: 0, done: 0, failed: 0, skipped: 0)) == nil)
-        #expect(BacklogRowText.runningSubtitle(accounts: "iCloud, Outlook", percent: 52) == "iCloud, Outlook · 52%")
     }
 
     @Test func jobNameDecodesFromOlderData() throws {

@@ -50,6 +50,8 @@ struct SuggestionCard: View {
     @State private var errorText: String?
     @State private var hovering = false
     @State private var showDatePopover = false
+    /// The title is plain `Text` until editing starts: a `TextField` is greedy and would push the pills away.
+    @State private var isEditingTitle = false
     @FocusState private var titleFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.cardEditRequest) private var editRequest
@@ -90,10 +92,10 @@ struct SuggestionCard: View {
             leadingControl
             SenderAvatar(sender: record.email?.sender ?? "", size: .large)
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    titleView.layoutPriority(1)
-                    pills.fixedSize()
-                    Spacer(minLength: 0)
+                // No Spacer here: the pills follow the title, and a long title truncates before they are squeezed.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    titleView
+                    pills
                 }
                 quoteLine
                 if let errorText {
@@ -101,6 +103,8 @@ struct SuggestionCard: View {
                 }
                 if suggestion.status == .failed { failureNote }
             }
+            // Takes the free width so the due-date column stays at the trailing edge.
+            .frame(maxWidth: .infinity, alignment: .leading)
             dueColumn
         }
         .padding(.vertical, 14)
@@ -117,7 +121,7 @@ struct SuggestionCard: View {
         .onChange(of: editRequest.wrappedValue) { _, id in
             guard id == record.id else { return }
             editRequest.wrappedValue = nil
-            if isEditable { titleFocused = true }
+            if isEditable { beginTitleEdit() }
         }
         .contextMenu {
             if isEditable { contextMenuItems } else { Button("Open in Mail", action: onOpen) }
@@ -149,27 +153,38 @@ struct SuggestionCard: View {
     // MARK: Title and pills
 
     @ViewBuilder private var titleView: some View {
-        if isEditable {
+        if isEditable, isEditingTitle {
             TextField("Title", text: $draft.title)
                 .textFieldStyle(.plain)
                 .font(.system(size: 15, weight: .semibold))
                 .focused($titleFocused)
+                .onAppear { titleFocused = true }
                 .onSubmit { commitTitle(); titleFocused = false; onEndTitleEdit() }
                 .onExitCommand { draft.title = suggestion.title; titleFocused = false; onEndTitleEdit() }
-                .onChange(of: titleFocused) { _, focused in if !focused { commitTitle() } }
+                .onChange(of: titleFocused) { _, focused in
+                    if !focused { commitTitle(); isEditingTitle = false }
+                }
                 .accessibilityLabel("Reminder Title")
         } else {
-            Text(suggestion.title)
+            Text(isEditable ? draft.title : suggestion.title)
                 .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .onTapGesture(count: 2) { if isEditable { beginTitleEdit() } }
         }
+    }
+
+    private func beginTitleEdit() {
+        isEditingTitle = true
+        titleFocused = true
     }
 
     @ViewBuilder private var pills: some View {
         HStack(spacing: 6) {
             if isEditable {
-                priorityMenu
+                // High is always on show, so it leads. Medium and Low appear only on hover, so they trail the
+                // tag: their hidden slot then never leaves a gap between the title and the next pill.
+                if draft.priority == .high { priorityMenu }
             } else if suggestion.priority == .high {
                 PriorityBadge(level: .high)
             }
@@ -177,6 +192,12 @@ struct SuggestionCard: View {
                 ReviewPill().help(suggestion.flags.map(ReviewPresentation.flagDescription).joined(separator: "\n"))
             }
             if isEditable { categoryMenu } else { TagPill(text: "#\(category.rawValue)") }
+            if isEditable, draft.priority != .high { priorityMenu }
+        }
+        .fixedSize()
+        // On the row, not the menu: the menu moves when High changes, and its own onChange would go with it.
+        .onChange(of: draft.priority) { _, new in
+            if new != suggestion.priority { commit(SuggestionEdit(priority: new)) }
         }
     }
 
@@ -203,9 +224,6 @@ struct SuggestionCard: View {
         .fixedSize()
         .opacity(draft.priority == .high || isRevealed ? 1 : 0)
         .allowsHitTesting(draft.priority == .high || isRevealed)
-        .onChange(of: draft.priority) { _, new in
-            if new != suggestion.priority { commit(SuggestionEdit(priority: new)) }
-        }
         .help("Change the priority")
         .accessibilityLabel("Priority")
         .accessibilityValue(draft.priority.label)
@@ -336,7 +354,7 @@ struct SuggestionCard: View {
 
     @ViewBuilder private var contextMenuItems: some View {
         Button(isSelected ? "Deselect" : "Select", action: onToggle)
-        Button("Edit Title") { titleFocused = true }
+        Button("Edit Title", action: beginTitleEdit)
         Button(draft.hasDue ? "Change Due Date…" : "Add Due Date…") { draft.hasDue ? (showDatePopover = true) : addDate() }
         Menu("Priority") {
             Picker("Priority", selection: $draft.priority) {
@@ -359,7 +377,7 @@ struct SuggestionCard: View {
         if isEditable {
             Button(isSelected ? "Deselect" : "Select", action: onToggle)
             if suggestion.status == .pending { Button("Dismiss", action: onDismiss) }
-            Button("Edit Title") { titleFocused = true }
+            Button("Edit Title", action: beginTitleEdit)
             Button(draft.hasDue ? "Change Due Date" : "Add Due Date") { draft.hasDue ? (showDatePopover = true) : addDate() }
             if suggestion.status == .failed, canRetry { Button("Try Again", action: onRetry) }
         }

@@ -20,8 +20,8 @@ extension FocusedValues {
 /// floating triage bar, keyboard handling and scroll-to-reveal.
 ///
 /// `records` are the actionable suggestions the canvas shows, in on-screen order. ↑/↓ move focus through
-/// them, space ticks, ⌫ dismisses the focused card, Return edits its title, ⌘A and ⌘⇧A select and clear the
-/// focused card's section, and the triage bar acts on exactly these records.
+/// them, space ticks, ⌫ dismisses the focused card, Return edits its title, ⌘A and ⌘⇧A select and clear them, and the
+/// triage bar acts on exactly these records.
 struct CanvasScaffold<Content: View>: View {
     let run: DigestRunModel
     let access: MailAccessModel
@@ -36,8 +36,6 @@ struct CanvasScaffold<Content: View>: View {
     let revealTarget: (String) -> AnyHashable?
     /// Replaces the large title block (Today draws its own greeting).
     let header: AnyView?
-    /// The records ⌘A and ⌘⇧A act on for the focused card: its own section, or all shown records.
-    let sectionRecords: (UUID?) -> [SuggestionRecord]
     let content: (FocusState<UUID?>.Binding) -> Content
 
     @FocusState private var focusedID: UUID?
@@ -46,7 +44,6 @@ struct CanvasScaffold<Content: View>: View {
 
     init(run: DigestRunModel, access: MailAccessModel, title: String, subtitle: String? = nil, headline: String = "",
          records: [SuggestionRecord] = [], isPartial: Bool = false, header: AnyView? = nil,
-         sectionRecords: ((UUID?) -> [SuggestionRecord])? = nil,
          revealTarget: @escaping (String) -> AnyHashable? = { _ in nil },
          @ViewBuilder content: @escaping (FocusState<UUID?>.Binding) -> Content) {
         self.run = run
@@ -57,7 +54,6 @@ struct CanvasScaffold<Content: View>: View {
         self.records = records
         self.isPartial = isPartial
         self.header = header
-        self.sectionRecords = sectionRecords ?? { _ in records }
         self.revealTarget = revealTarget
         self.content = content
     }
@@ -80,7 +76,8 @@ struct CanvasScaffold<Content: View>: View {
             }
             // Room for the last card to scroll clear of the floating bar.
             .contentMargins(.bottom, records.isEmpty ? 0 : 90, for: .scrollContent)
-            .background(Color(nsColor: .windowBackgroundColor))
+            // Also behind the toolbar.
+            .background(Color.pageBackground.ignoresSafeArea())
             .overlay(alignment: .bottom) {
                 if !records.isEmpty {
                     triageBar
@@ -94,10 +91,10 @@ struct CanvasScaffold<Content: View>: View {
             .environment(\.cardEditRequest, $editRequest)
             // ⌘A reaches here only when no text field is editing, so a field keeps its own Select All.
             .onCommand(#selector(NSResponder.selectAll(_:))) {
-                coordinator.selectAll(sectionRecords(focusedID))
+                coordinator.selectAll(records)
             }
             .focusedSceneValue(\.canvasSelection, CanvasSelectionActions {
-                coordinator.selectNone(sectionRecords(focusedID))
+                coordinator.selectNone(records)
             })
             // A Recent row asked to show an email: scroll to its first suggestion or info card.
             .onChange(of: coordinator.revealedEmailID) { _, emailID in

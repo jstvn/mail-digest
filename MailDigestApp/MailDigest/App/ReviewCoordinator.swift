@@ -106,7 +106,7 @@ final class ReviewCoordinator {
         let calendar = library.calendar
         switch selection {
         case .today:
-            await today.load(digestIDs: archive.todayDigestIDs, startOfToday: archive.startOfToday, store: store, calendar: calendar)
+            await today.load(digestIDs: archive.todayDigestIDs, store: store)
         case .day(let d):
             await day.load(digestIDs: archive.digestIDs(for: d), store: store)
         case .backlog(let id):

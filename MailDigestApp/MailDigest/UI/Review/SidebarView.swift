@@ -80,7 +80,7 @@ struct SidebarView: View {
             }
             Button("Cancel", role: .cancel) { renaming = nil }
         } message: {
-            Text("Leave it empty to use the mailbox name.")
+            Text("Leave it empty to show the date range.")
         }
         .alert("Delete This Backlog Job?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
             Button("Delete", role: .destructive) {
@@ -131,17 +131,16 @@ struct SidebarView: View {
         }
     }
 
-    /// The job's name (or, until it has one, the mailbox name) over its subtitle, with a progress ring while it runs.
+    /// The job's name or date range over "accounts · status", with a progress ring while it runs. Both lines
+    /// stay on one line each and truncate at the tail.
     private func backlogLabel(_ id: UUID, job: Job?, state: JobState, isRunning: Bool) -> some View {
-        let name = job?.name
-        let title = name ?? library.sidebarTitle(forBacklog: id)
-        let scope = library.scope(forBacklog: id)
-        let subtitle = rowSubtitle(job: job, state: state, id: id, named: name != nil, scope: scope)
+        let title = library.title(forBacklog: id)
+        let subtitle = job.map { rowSubtitle($0, state: state, id: id) }
         return Label {
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).lineLimit(2)
-                if let subtitle {
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(title).lineLimit(1).truncationMode(.tail)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                 }
             }
             .help(subtitle.map { "\(title)\n\($0)" } ?? title)
@@ -154,28 +153,16 @@ struct SidebarView: View {
         }
     }
 
-    /// Named running job: "iCloud, Outlook · 52%". Paused and Stopped say so, so the two stay distinct (Q48, Q78).
-    private func rowSubtitle(job: Job?, state: JobState, id: UUID, named: Bool, scope: String?) -> String? {
+    /// "iCloud, Outlook · 52%", "… · Waiting for 10 pm", "… · Paused", "… · Stopped", "… · Done".
+    private func rowSubtitle(_ job: Job, state: JobState, id: UUID) -> String {
         let percent: Int?
         if let live = run.activeProgress, live.jobID == id, live.total > 0 {
             percent = Int(Double(min(live.done, live.total)) / Double(live.total) * 100)
         } else {
-            percent = job.flatMap { BacklogRowText.percent($0.totals) }
+            percent = BacklogRowText.percent(job.totals)
         }
-        switch state {
-        case .listing, .running, .pausing:
-            guard named, let job else { return scope }
-            return BacklogRowText.runningSubtitle(accounts: BacklogRowText.accounts(of: job), percent: percent)
-        case .paused where job.map(BacklogRowText.isScheduled) == true:
-            // An overnight job waiting for its window; the app starts it when the window opens.
-            return BacklogRowText.scheduledSubtitle(percent: named ? percent : nil)
-        case .paused, .stopped, .stopping:
-            let word = state == .paused ? "Paused" : "Stopped"
-            let detail = named ? percent.map { "\($0)%" } : scope
-            return detail.map { "\(word) · \($0)" } ?? word
-        default:
-            return scope
-        }
+        return BacklogRowText.subtitle(job, state: state, percent: percent,
+                                       startMinute: run.settings.settings.quietHoursStartMinute)
     }
 
     // MARK: Footer

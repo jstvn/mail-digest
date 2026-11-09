@@ -93,32 +93,18 @@ private func item(_ jobID: UUID, seconds: Double?, state: JobItemState = .done, 
 }
 
 @Suite struct BacklogNamingTests {
-    @Test func wholeMonthUsesTheMonthName() {
-        let name = BacklogJobNaming.defaultName(from: at(2026, 10, 1, 0), to: at(2026, 10, 31, 23, 59), now: at(2026, 11, 9), calendar: cal)
-        #expect(name == "October Backlog")
+    @Test func defaultNameIsTheDateRange() {
+        func d(_ a: Date, _ b: Date, _ c: Calendar) -> String { BacklogJobNaming.defaultName(from: a, to: b, calendar: c) }
+        #expect(d(at(2026, 10, 21, 0), at(2026, 10, 21, 23), cal) == "21 Oct 2026")
+        #expect(d(at(2026, 10, 1, 0), at(2026, 10, 31, 23, 59), cal) == "1\u{2013}31 Oct 2026")
+        #expect(d(at(2026, 10, 21), at(2026, 11, 4), cal) == "21 Oct \u{2013} 4 Nov 2026")
+        #expect(d(at(2025, 12, 21), at(2026, 1, 4), cal) == "21 Dec 2025 \u{2013} 4 Jan 2026")
     }
 
-    @Test func monthSoFarCountsAsTheMonth() {
-        let now = at(2026, 11, 9)
-        #expect(BacklogJobNaming.defaultName(from: at(2026, 11, 1, 0), to: now, now: now, calendar: cal) == "November Backlog")
-    }
-
-    @Test func partOfAMonthShowsTheDays() {
-        let name = BacklogJobNaming.defaultName(from: at(2026, 10, 1, 0), to: at(2026, 10, 14, 23, 59), now: at(2026, 11, 9), calendar: cal)
-        #expect(name == "1\u{2013}14 Oct Backlog")
-        #expect(BacklogJobNaming.defaultName(from: at(2026, 10, 5, 0), to: at(2026, 10, 5, 23), now: at(2026, 11, 9), calendar: cal) == "5 Oct Backlog")
-    }
-
-    @Test func acrossMonthsAndYears() {
-        #expect(BacklogJobNaming.defaultName(from: at(2026, 9, 20), to: at(2026, 10, 14), now: at(2026, 11, 9), calendar: cal)
-                == "20 Sep\u{2013}14 Oct Backlog")
-        #expect(BacklogJobNaming.defaultName(from: at(2025, 12, 20), to: at(2026, 1, 14), now: at(2026, 11, 9), calendar: cal)
-                == "20 Dec 2025\u{2013}14 Jan 2026 Backlog")
-    }
-
-    @Test func blankNamesFallBackAndOthersAreTrimmed() {
-        #expect(BacklogJobNaming.resolvedName("  \n ", defaultName: "October Backlog") == "October Backlog")
-        #expect(BacklogJobNaming.resolvedName("  Tax time ", defaultName: "October Backlog") == "Tax time")
+    @Test func untouchedOrBlankNamesStoreNil() {
+        #expect(BacklogJobNaming.resolvedName("  \n ", defaultName: "1\u{2013}31 Oct 2026") == nil)
+        #expect(BacklogJobNaming.resolvedName("1\u{2013}31 Oct 2026", defaultName: "1\u{2013}31 Oct 2026") == nil)
+        #expect(BacklogJobNaming.resolvedName("  Tax time ", defaultName: "1\u{2013}31 Oct 2026") == "Tax time")
     }
 
     @Test func rangeText() {
@@ -340,9 +326,6 @@ private func item(_ jobID: UUID, seconds: Double?, state: JobItemState = .done, 
     @Test func scheduledSubtitleOnlyForAnOvernightJobWaitingForItsWindow() {
         let waiting = backlog(.paused, at: .now, overnight: true, reason: .quietHours)
         #expect(BacklogRowText.isScheduled(waiting))
-        #expect(BacklogRowText.scheduledSubtitle(percent: nil) == "Scheduled")
-        #expect(BacklogRowText.scheduledSubtitle(percent: 0) == "Scheduled")
-        #expect(BacklogRowText.scheduledSubtitle(percent: 52) == "Scheduled · 52%")
         #expect(!BacklogRowText.isScheduled(backlog(.paused, at: .now, overnight: true, reason: .battery)))
         #expect(!BacklogRowText.isScheduled(backlog(.paused, at: .now, overnight: true, reason: nil)))
         #expect(!BacklogRowText.isScheduled(backlog(.stopped, at: .now, overnight: true, reason: .quietHours)))

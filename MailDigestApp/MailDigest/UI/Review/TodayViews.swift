@@ -62,6 +62,7 @@ struct TodayRunLine: View {
             if waitingCount > 0 {
                 Button("\(waitingCount) more waiting from earlier days", action: openReviewQueue)
                     .buttonStyle(.link)
+                    .foregroundStyle(.tint)
                     .help("Open the Review Queue")
             }
         }

@@ -103,23 +103,11 @@ public struct BacklogJobActions: Sendable, Equatable {
 
 /// Text for a Backlog job's sidebar row.
 public enum BacklogRowText {
-    /// "iCloud, Outlook": the distinct account names, in order.
-    public static func accounts(of job: Job) -> String {
-        var seen = Set<String>()
-        return job.mailboxes.map(\.account).filter { seen.insert($0).inserted }.joined(separator: ", ")
-    }
-
     /// Whole-percent progress from stored totals; nil when the job has no emails.
     public static func percent(_ totals: JobTotals) -> Int? {
         let total = totals.queued + totals.done + totals.failed + totals.skipped
         guard total > 0 else { return nil }
         return Int((Double(total - totals.queued) / Double(total) * 100).rounded(.down))
-    }
-
-    /// "iCloud, Outlook · 52%". Falls back to the accounts alone when the percentage is unknown.
-    public static func runningSubtitle(accounts: String, percent: Int?) -> String {
-        guard let percent else { return accounts }
-        return accounts.isEmpty ? "\(percent)%" : "\(accounts) · \(percent)%"
     }
 
     /// True while an overnight-only job waits for its window (paused, "outside the run window"). A job the user
@@ -128,9 +116,48 @@ public enum BacklogRowText {
         job.overnightOnly && job.state == .paused && job.pauseReason == .quietHours
     }
 
-    /// "Scheduled", or "Scheduled · 52%" once the job has started and is waiting for the next night.
-    public static func scheduledSubtitle(percent: Int?) -> String {
-        guard let percent, percent > 0 else { return "Scheduled" }
-        return "Scheduled · \(percent)%"
+    // MARK: Two-line sidebar row
+
+    /// Line 1: the name the user typed, or the job's date range ("1–31 Oct 2026"). A job that reads
+    /// everything up to a date (scope starting before 1990) says so.
+    public static func title(_ job: Job, calendar: Calendar, locale: Locale = Locale(identifier: "en_AU")) -> String {
+        if let name = job.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty { return name }
+        if job.scopeFrom.timeIntervalSince1970 < 631_152_000 {
+            return JobSummaryText.scope(job, timeZone: calendar.timeZone, locale: locale)
+        }
+        return BacklogJobNaming.defaultName(from: job.scopeFrom, to: job.scopeTo, calendar: calendar, locale: locale)
+    }
+
+    /// "iCloud, Outlook Archive": distinct account names for Inbox mailboxes, and "Account Folder" for any
+    /// other folder, so an Inbox is never spelled out.
+    public static func locations(of job: Job) -> String {
+        var seen = Set<String>()
+        return job.mailboxes
+            .map { JobSummaryText.displayName(of: $0) == "Inbox" ? $0.account : "\($0.account) \(JobSummaryText.displayName(of: $0))" }
+            .filter { seen.insert($0).inserted }
+            .joined(separator: ", ")
+    }
+
+    /// Line 2: the locations, then the status: "iCloud, Outlook · 52%", "… · Waiting for 10 pm",
+    /// "… · Paused", "… · Stopped", "… · Done".
+    /// - Parameters:
+    ///   - state: the job's effective state (the runner's live one when it holds the job).
+    ///   - percent: whole-percent progress, shown while the job runs.
+    ///   - startMinute: when the overnight window opens (`quietHoursStartMinute`), for a waiting job.
+    public static func subtitle(_ job: Job, state: JobState, percent: Int?, startMinute: Int) -> String {
+        let status: String?
+        switch state {
+        case .listing, .running, .pausing:
+            status = percent.map { "\($0)%" } ?? "Starting…"
+        case .paused:
+            status = isScheduled(job) ? "Waiting for \(BacklogEstimate.clockText(minute: startMinute))" : "Paused"
+        case .stopped, .stopping: status = "Stopped"
+        case .finished: status = "Done"
+        case .failed: status = "Failed"
+        case .idle: status = "Not started"
+        }
+        let places = locations(of: job)
+        guard let status else { return places }
+        return places.isEmpty ? status : "\(places) · \(status)"
     }
 }

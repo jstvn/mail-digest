@@ -109,7 +109,7 @@ final class JobSetupModel {
 
     var defaultName: String {
         let r = range
-        return BacklogJobNaming.defaultName(from: r.from, to: r.to, now: .now, calendar: calendar)
+        return BacklogJobNaming.defaultName(from: r.from, to: r.to, calendar: calendar)
     }
 
     /// The text of the Name field: the default until the user types.
@@ -121,8 +121,8 @@ final class JobSetupModel {
         }
     }
 
-    /// The name to store: trimmed, or the default when blank.
-    var resolvedName: String { BacklogJobNaming.resolvedName(name, defaultName: defaultName) }
+    /// The name to store: nil for an untouched or blank field, so the job shows its date range.
+    var resolvedName: String? { BacklogJobNaming.resolvedName(name, defaultName: defaultName) }
 
     /// Anything that changes what the counts mean.
     struct Inputs: Hashable {

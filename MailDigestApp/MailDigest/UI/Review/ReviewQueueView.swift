@@ -79,7 +79,7 @@ struct ReviewQueueView: View {
                 }
             }
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color.pageBackground.ignoresSafeArea())
         .searchable(text: $searchText, placement: .toolbar, prompt: "Search Review Queue")
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {

@@ -20,26 +20,64 @@ struct ReviewWindow: View {
                 // Named for the Window menu, Mission Control and VoiceOver; the canvas header shows it instead.
                 .navigationTitle(windowTitle)
                 .toolbar(removing: .title)
+                .toolbar {
+                    // Items sit at the leading edge unless a flexible item pushes them. The system pins the search
+                    // field to the trailing edge itself, so Run Now is the last item before it.
+                    if #available(macOS 26, *) {
+                        ToolbarSpacer(.flexible)
+                    } else {
+                        ToolbarItem(placement: .automatic) { Spacer() }
+                    }
+                    ToolbarItem(placement: .primaryAction) { runButton }
+                }
         }
         .frame(minWidth: 900, minHeight: 560)
         .environment(\.senderRules, SenderRuleActions(store: run.settings))
-        .toolbar {
-            // A flexible item first: `.primaryAction` alone parks the button at the leading edge here.
-            ToolbarItem(placement: .automatic) { Spacer() }
-            ToolbarItem(placement: .automatic) {
-                Button { Task { await run.runNow() } } label: {
-                    Label("Run Now", systemImage: "play.fill")
-                }
-                .keyboardShortcut("r", modifiers: .command)
-                .accessibilityLabel("Run Now")
-                .disabled(!run.canStartDaily || access.status?.mode == .unavailable)
-                .help(run.dailyLifecycle == .none ? "Read your new mail now" : "Resume or review the unfinished Daily job first.")
-            }
-        }
         // Pick up a permission change made in System Settings.
         .onAppear { run.reminders.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             run.reminders.refresh()
+        }
+    }
+
+    // MARK: Run button
+
+    private var runAction: ToolbarRunAction {
+        ToolbarRunAction(progress: run.activeProgress, daily: run.dailyAction)
+    }
+
+    /// Run Now, or whatever the job state calls for (Pause, Resume, Retry), the same way the menu bar does.
+    private var runButton: some View {
+        let action = runAction
+        return Button { perform(action) } label: {
+            Label(action.title, systemImage: action.systemImage)
+        }
+        .labelStyle(.titleAndIcon)
+        .keyboardShortcut("r", modifiers: .command)
+        .accessibilityLabel(action.title)
+        .disabled(!isEnabled(action))
+        .help(action.help)
+    }
+
+    private func isEnabled(_ action: ToolbarRunAction) -> Bool {
+        let mailUnavailable = access.status?.mode == .unavailable
+        switch action.behavior {
+        case .runNow: return run.canStartDaily && !mailUnavailable
+        case .pause: return true
+        case .resumeJob: return !run.isRunning && !mailUnavailable
+        case .resumeDaily, .retryDaily: return run.isDailyActionEnabled && !mailUnavailable
+        case .unavailable: return false
+        }
+    }
+
+    private func perform(_ action: ToolbarRunAction) {
+        switch action.behavior {
+        case .runNow: Task { await run.runNow() }
+        case .pause: run.pause()
+        case .resumeJob(let id): Task { await run.resumeJob(id) }
+        case .resumeDaily(let id): Task { await run.resumeDailyJob(id, expecting: .paused) }
+        case .retryDaily(let id): Task { await run.resumeDailyJob(id, expecting: .failed) }
+        case .unavailable: break
         }
     }
 

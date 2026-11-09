@@ -133,12 +133,10 @@ final class DayCanvasModel {
 
 // MARK: Paged record lists
 
-/// A cross-digest list loaded in pages: Today's carry-over, the Review Queue and the Logbook.
+/// A cross-digest list loaded in pages: the Review Queue and the Logbook.
 @MainActor @Observable
 final class PagedRecordsModel {
     enum Source: Equatable {
-        /// Pending and failed Daily suggestions from digests created before this date.
-        case carryOver(before: Date)
         /// Every pending and failed suggestion, Daily and Backlog.
         case reviewQueue
         /// Approved and dismissed suggestions, newest decision first (Q57).
@@ -206,8 +204,6 @@ final class PagedRecordsModel {
 
     private static func fetch(_ source: Source, store: any DigestStore, limit: Int) async throws -> [SuggestionRecord] {
         switch source {
-        case .carryOver(let before):
-            return try await store.actionableSuggestions(SuggestionQuery(kinds: [.daily], digestsCreatedBefore: before, limit: limit))
         case .reviewQueue:
             return try await store.actionableSuggestions(SuggestionQuery(limit: limit))
         case .logbook:
@@ -223,16 +219,12 @@ final class PagedRecordsModel {
 
 // MARK: Today
 
-/// Today: Daily carry-over, today's merged digests and pins carried from earlier digests.
+/// Today: today's merged digests and pins carried from earlier digests. Suggestions from earlier days live in
+/// the Review Queue, not here.
 @MainActor @Observable
 final class TodayCanvasModel {
-    /// Q16 first page of carry-over; the rest is in the Review Queue.
-    static let carryOverPageSize = 100
-
     /// Today's Daily digests only.
     let digests: DayCanvasModel
-    /// Pending and failed Daily suggestions from digests created before today.
-    let carryOver: PagedRecordsModel
     /// Pinned info from earlier digests, newest first; today's own pins stay in its categories.
     private(set) var carriedPins: [PinnedInfo] = []
     private(set) var pinEmails: [String: EmailContext] = [:]
@@ -241,33 +233,27 @@ final class TodayCanvasModel {
     private(set) var runInfo: RunInfo?
 
     @ObservationIgnored private let gate = ReloadGate()
-    @ObservationIgnored private var requested: (ids: [UUID], start: Date)?
+    @ObservationIgnored private var requested: [UUID]?
 
     init() {
         digests = DayCanvasModel()
-        carryOver = PagedRecordsModel(pageSize: Self.carryOverPageSize)
     }
 
     /// Previews: fixed content.
-    init(preview digests: DayCanvasModel, carryOver: PagedRecordsModel, carriedPins: [PinnedInfo] = [], runInfo: RunInfo? = nil) {
+    init(preview digests: DayCanvasModel, carriedPins: [PinnedInfo] = [], runInfo: RunInfo? = nil) {
         self.digests = digests
-        self.carryOver = carryOver
         self.carriedPins = carriedPins
         self.runInfo = runInfo
     }
 
-    /// Whether more carry-over exists than the first page; the UI links to the Review Queue.
-    var hasMoreCarryOver: Bool { carryOver.hasMore }
-
-    func load(digestIDs: [UUID], startOfToday: Date, store: any DigestStore, calendar: Calendar) async {
-        requested = (digestIDs, startOfToday)
+    func load(digestIDs: [UUID], store: any DigestStore) async {
+        requested = digestIDs
         await gate.run {
-            guard let request = requested else { return }
+            guard let ids = requested else { return }
             // Independent loads; each coalesces on its own.
-            await digests.load(digestIDs: request.ids, store: store)
-            await carryOver.load(.carryOver(before: request.start), store: store, calendar: calendar)
-            await loadPins(excluding: request.ids, store: store)
-            await loadRunInfo(ids: request.ids, store: store)
+            await digests.load(digestIDs: ids, store: store)
+            await loadPins(excluding: ids, store: store)
+            await loadRunInfo(ids: ids, store: store)
         }
     }
 
@@ -313,7 +299,6 @@ final class TodayCanvasModel {
 
     func patch(_ suggestions: [Suggestion]) {
         digests.patch(suggestions)
-        carryOver.patch(suggestions)
     }
 
     func setPinned(_ pinned: Bool, infoID: String) {

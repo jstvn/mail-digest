@@ -86,15 +86,14 @@ enum PreviewSupport {
         return ReviewLibrary(preview: archive, calendar: calendar, backlogJobs: backlogJob.map { [$0] } ?? [])
     }
 
-    /// Today with no digest and no carry-over, for the "Inbox zero" state.
+    /// Today with no digest, for the "Inbox zero" state.
     static func emptyTodayCoordinator(review: ReviewViewModel) -> ReviewCoordinator {
         let today = TodayCanvasModel(
-            preview: DayCanvasModel(preview: DayContent(digests: []), emails: [:]),
-            carryOver: PagedRecordsModel(preview: [], pageSize: 100))
+            preview: DayCanvasModel(preview: DayContent(digests: []), emails: [:]))
         return ReviewCoordinator(preview: library(), review: review, today: today)
     }
 
-    /// A coordinator with multi-day fixtures and no store: Today (with carry-over), a Day, a Backlog batch,
+    /// A coordinator with multi-day fixtures and no store: Today, a Day, a Backlog batch,
     /// the Review Queue and the Logbook all filled, so each canvas can be previewed by `selection`.
     static func coordinator(selection: SidebarItem = .today, review: ReviewViewModel = review(),
                             writer: (any ReminderWriter)? = RecordingReminderWriter()) -> ReviewCoordinator {
@@ -125,7 +124,6 @@ enum PreviewSupport {
         })
         let today = TodayCanvasModel(
             preview: DayCanvasModel(preview: todayContent, emails: emails, owners: owners),
-            carryOver: PagedRecordsModel(preview: carry, pageSize: 100),
             runInfo: RunInfo(localEmails: 20, cloudEmails: 3, localModel: "qwen3:4b", cloudModel: "gemini-3.5-flash-lite",
                              finishedAt: PreviewFixtures.now, duration: 46 * 60))
         let day = DayCanvasModel(preview: DayContent(digests: [earlier], kind: .daily, emails: emails), emails: emails)
@@ -176,7 +174,7 @@ enum PreviewSupport {
         .frame(width: 1200, height: 760)
 }
 
-#Preview("Window · Today with carry-over") { window() }
+#Preview("Window · Today") { window() }
 
 #Preview("Window · Day") { window(.day(PreviewSupport.yesterday)) }
 

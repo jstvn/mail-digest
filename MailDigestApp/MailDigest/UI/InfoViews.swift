@@ -66,7 +66,7 @@ struct InfoClusterCard: View {
                 }
             }
         }
-        .cardSurface(cornerRadius: layout == .card ? 14 : 10)
+        .cardSurface()
         .contextMenu { menuItems }
         .modifier(ClusterAccessibility(cluster: cluster, isExpanded: $isExpanded, context: context))
     }

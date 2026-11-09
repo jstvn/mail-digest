@@ -2,8 +2,9 @@ import AppKit
 import MailDigestCore
 import SwiftUI
 
-/// Today, a past day or a Backlog job: suggestions, info and skipped mail of one digest set. Today adds the
-/// carry-over of unreviewed Daily suggestions and pinned info from earlier digests; a Backlog adds the batch bar.
+/// Today, a past day or a Backlog job: suggestions, info and skipped mail of one digest set. Today adds pinned
+/// info from earlier digests and a link to the Review Queue for suggestions still waiting from earlier days; a
+/// Backlog adds the batch bar.
 struct DigestCanvasView: View {
     enum Kind: Equatable {
         case today
@@ -29,7 +30,6 @@ struct DigestCanvasView: View {
     private enum Phase {
         case loading
         case failed
-        case neverRun
         case noDigestToday
         case noNewMail(lastRun: Date?)
         /// A Backlog job that has stored no digest yet, for example one waiting for the overnight window.
@@ -73,11 +73,6 @@ struct DigestCanvasView: View {
         }
     }
 
-    /// Today's carry-over; empty elsewhere.
-    private var carryOverAll: [SuggestionRecord] {
-        kind == .today ? todayModel.carryOver.records.filter(\.isActionable) : []
-    }
-
     // MARK: Search
 
     private var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -89,9 +84,6 @@ struct DigestCanvasView: View {
     private func matches(_ item: InfoItem) -> Bool {
         ReviewSearch.matches(searchText, fields: ReviewSearch.fields(for: item, email: email(for: item.emailID)))
     }
-
-    /// Today's carry-over after the search filter.
-    private var carryOver: [SuggestionRecord] { carryOverAll.filter(matches) }
 
     /// The suggestions of this canvas's own digests that are shown, after the Q16 page and the search filter.
     private var visibleRecords: [SuggestionRecord] { page.visible.filter(matches) }
@@ -138,22 +130,16 @@ struct DigestCanvasView: View {
     }
 
     /// Exactly the actionable records this canvas shows, in on-screen order.
-    private var shownRecords: [SuggestionRecord] { carryOver + visibleRecords }
+    private var shownRecords: [SuggestionRecord] { visibleRecords }
 
-    /// Whether actionable suggestions of this view are hidden from the triage scope, by the Q16 page, unloaded
-    /// carry-over pages or the search filter. The triage bar then says "N selected of M shown".
+    /// Whether actionable suggestions of this view are hidden from the triage scope, by the Q16 page or the
+    /// search filter. The triage bar then says "N selected of M shown".
     private var isPartial: Bool {
-        page.isPartial || (kind == .today && todayModel.hasMoreCarryOver)
-            || (isSearching && carryOverAll.count + page.visible.count > shownRecords.count)
+        page.isPartial || (isSearching && page.visible.count > shownRecords.count)
     }
 
-    /// ⌘A and ⌘⇧A act on the focused card's section, or on everything shown when no card has focus.
-    private func sectionRecords(_ focusedID: UUID?) -> [SuggestionRecord] {
-        guard let id = focusedID else { return shownRecords }
-        if carryOver.contains(where: { $0.id == id }) { return carryOver }
-        if visibleRecords.contains(where: { $0.id == id }) { return visibleRecords }
-        return shownRecords
-    }
+    /// Suggestions from earlier days that Today does not show; they are in the Review Queue.
+    private var waitingFromEarlier: Int { kind == .today ? library.archive.carryOverCount : 0 }
 
     // MARK: Phase and titles
 
@@ -173,8 +159,7 @@ struct DigestCanvasView: View {
                let last = run.lastRunAt, last >= library.archive.startOfToday {
                 return .noNewMail(lastRun: last)
             }
-            let hasHistory = !library.archive.months.isEmpty || !library.archive.backlogs.isEmpty || !carryOverAll.isEmpty
-            return hasHistory ? .noDigestToday : .neverRun
+            return .noDigestToday
         case .day, .backlog:
             return .digest
         }
@@ -193,7 +178,8 @@ struct DigestCanvasView: View {
     private var subtitle: String? {
         switch kind {
         case .backlog(let id):
-            if let scope = library.scope(forBacklog: id) { return scope }
+            // The title already is the date range unless the user named the job.
+            if library.backlogJobs[id]?.name != nil, let scope = library.scope(forBacklog: id) { return scope }
         default: break
         }
         guard let content, !content.digestIDs.isEmpty else { return nil }
@@ -206,24 +192,23 @@ struct DigestCanvasView: View {
     var body: some View {
         CanvasScaffold(run: run, access: access, title: title, subtitle: subtitle,
                        headline: content?.headline ?? "", records: shownRecords, isPartial: isPartial,
-                       header: kind == .today ? AnyView(todayHeader) : nil, sectionRecords: sectionRecords,
-                       revealTarget: revealTarget) { focus in
+                       header: kind == .today ? AnyView(todayHeader) : nil, revealTarget: revealTarget) { focus in
             if kind == .today, case .digest = phase { todaySummary }
             if case .backlog = kind { batchBar }
-            if !carryOverAll.isEmpty, !carryOver.isEmpty || !isSearching { carryOverSection(focus) }
             switch phase {
             case .loading:
-                ProgressView("Loading…").frame(maxWidth: .infinity, minHeight: carryOverAll.isEmpty ? 160 : 40)
+                ProgressView("Loading…").frame(maxWidth: .infinity, minHeight: 160)
             case .failed:
                 emptyState("Couldn't Load This Digest", systemImage: "exclamationmark.triangle",
                            "Mail Digest couldn't read this digest from its database.",
-                           action: EmptyAction(title: "Try Again") { Task { await coordinator.loadSelected() } })
-            case .neverRun, .noDigestToday:
-                emptyState("No Digest Yet", systemImage: "envelope.open", nextDigestLine,
-                           action: EmptyAction(title: "Run Now", isDisabled: run.isRunning) { Task { await run.runNow() } })
+                           actions: [EmptyAction(title: "Try Again") { Task { await coordinator.loadSelected() } }])
+            case .noDigestToday:
+                waitingLink
+                noDigestState
             case .backlogPending:
                 backlogPendingState
             case .noNewMail:
+                waitingLink
                 emptyState("Inbox Zero for Today", systemImage: "tray", "No new mail since yesterday's digest.")
             case .digest:
                 if isSearching, shownRecords.isEmpty, settled.filter(matches).isEmpty, shownInfo.isEmpty,
@@ -272,7 +257,7 @@ struct DigestCanvasView: View {
                 TodayStatStrip(emailsRead: content.emailCount, toReview: actionable.count, worthKnowing: content.info.count,
                                skipped: content.skipped.count, onShowSkipped: { skippedExpanded = true })
                 TodayRunLine(info: todayModel.runInfo, calendar: library.calendar,
-                             waitingCount: max(0, library.archive.carryOverCount - carryOverAll.count),
+                             waitingCount: waitingFromEarlier,
                              openReviewQueue: { coordinator.select(.reviewQueue) })
             }
         }
@@ -285,31 +270,47 @@ struct DigestCanvasView: View {
         let perform: () -> Void
     }
 
-    /// "Your first digest runs tomorrow at 6:30 am." with the configured time.
+    /// "Your next digest runs today at 6:30 am." with the configured time.
     private var nextDigestLine: String {
         let s = run.settings.settings
         let when = NextDigestText.when(now: .now, hour: s.runHour, minute: s.runMinute, timeZone: library.calendar.timeZone)
         return "Your \(library.archive.months.isEmpty && library.archive.backlogs.isEmpty ? "first" : "next") digest runs \(when)."
     }
 
-    /// A full-size empty state, or one quiet line beneath the carry-over when that is on screen. The empty
-    /// state describes only this canvas's own digests, so it never replaces the carry-over.
-    @ViewBuilder
-    private func emptyState(_ title: String, systemImage: String, _ detail: String, action: EmptyAction? = nil) -> some View {
-        if carryOverAll.isEmpty {
-            ContentUnavailableView {
-                Label(title, systemImage: systemImage)
-            } description: {
-                Text(detail)
-            } actions: {
-                if let action {
-                    Button(action.title, action: action.perform).disabled(action.isDisabled)
-                }
+    /// The "N more waiting from earlier days" link, for a day that has no stat strip to carry it.
+    @ViewBuilder private var waitingLink: some View {
+        if waitingFromEarlier > 0 {
+            HStack {
+                Spacer(minLength: 0)
+                Button("\(waitingFromEarlier) more waiting from earlier days") { coordinator.select(.reviewQueue) }
+                    .buttonStyle(.link)
+                    .font(.system(size: 12.5))
+                    .help("Open the Review Queue")
             }
-            .frame(maxWidth: .infinity, minHeight: 200)
-        } else {
-            Text(detail.isEmpty ? title : "\(title). \(detail)").foregroundStyle(.secondary)
+            .padding(.horizontal, 6)
         }
+    }
+
+    /// Today before its digest exists: when the next one runs, Run Now, and a way into earlier suggestions.
+    private var noDigestState: some View {
+        var actions = [EmptyAction(title: "Run Now", isDisabled: run.isRunning) { Task { await run.runNow() } }]
+        if waitingFromEarlier > 0 {
+            actions.append(EmptyAction(title: "Review \(waitingFromEarlier) from Earlier Days") { coordinator.select(.reviewQueue) })
+        }
+        return emptyState("No Digest Yet", systemImage: "sun.max", nextDigestLine, actions: actions)
+    }
+
+    private func emptyState(_ title: String, systemImage: String, _ detail: String, actions: [EmptyAction] = []) -> some View {
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage)
+        } description: {
+            Text(detail)
+        } actions: {
+            ForEach(actions, id: \.title) { action in
+                Button(action.title, action: action.perform).disabled(action.isDisabled)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 200)
     }
 
     // MARK: Backlog batches
@@ -336,28 +337,10 @@ struct DigestCanvasView: View {
 
     // MARK: Suggestions
 
-    private func carryOverSection(_ focus: FocusState<UUID?>.Binding) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ActionableRecordsSection(coordinator: coordinator, title: "Unreviewed from Earlier",
-                                     count: carryOverAll.count, records: carryOver, focus: focus,
-                                     countText: isSearching ? ReviewCanvasLogic.countText(shown: carryOver.count, total: carryOverAll.count) : nil,
-                                     headingStyle: .heading)
-            if todayModel.hasMoreCarryOver {
-                HStack {
-                    Text(ReviewCanvasLogic.showingText(
-                        shown: carryOverAll.count, total: max(library.archive.carryOverCount, carryOverAll.count)))
-                        .foregroundStyle(.secondary)
-                    Button("More unreviewed suggestions are in the Review Queue") { coordinator.select(.reviewQueue) }
-                        .buttonStyle(.link)
-                }
-            }
-        }
-    }
-
     private func suggestionsSection(_ focus: FocusState<UUID?>.Binding) -> some View {
         let settledShown = settled.filter(matches)
         // Today with every suggestion decided: the empty state replaces the empty "To Review" list.
-        let allDecided = kind == .today && !isSearching && actionable.isEmpty && carryOverAll.isEmpty && !settled.isEmpty
+        let allDecided = kind == .today && !isSearching && actionable.isEmpty && !settled.isEmpty
         return VStack(alignment: .leading, spacing: 26) {
             if allDecided {
                 ContentUnavailableView {
@@ -526,7 +509,7 @@ struct DigestCanvasView: View {
     /// pinned group that holds it.
     private func revealTarget(_ emailID: String) -> AnyHashable? {
         searchText = ""
-        if let record = (carryOverAll + actionable + settled).first(where: { $0.suggestion.emailID == emailID }) {
+        if let record = (actionable + settled).first(where: { $0.suggestion.emailID == emailID }) {
             return record.id
         }
         if let item = content?.info.first(where: { $0.emailID == emailID }),
