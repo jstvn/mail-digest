@@ -15,9 +15,12 @@ struct DigestCanvasView: View {
     let run: DigestRunModel
     let access: MailAccessModel
 
-    @State private var collapsedGroups: Set<Category> = [.newsletters]
+    /// Group cards (several emails from one sender) that are open.
+    @State private var expandedClusters: Set<String> = []
     @State private var skippedExpanded = false
     @State private var pinnedExpanded = true
+    /// The local search filter; never persisted.
+    @State private var searchText = ""
 
     private var coordinator: ReviewCoordinator { run.coordinator }
     private var library: ReviewLibrary { run.library }
@@ -69,9 +72,27 @@ struct DigestCanvasView: View {
     }
 
     /// Today's carry-over; empty elsewhere.
-    private var carryOver: [SuggestionRecord] {
+    private var carryOverAll: [SuggestionRecord] {
         kind == .today ? todayModel.carryOver.records.filter(\.isActionable) : []
     }
+
+    // MARK: Search
+
+    private var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private func matches(_ record: SuggestionRecord) -> Bool {
+        ReviewSearch.matches(searchText, fields: ReviewSearch.fields(for: record))
+    }
+
+    private func matches(_ item: InfoItem) -> Bool {
+        ReviewSearch.matches(searchText, fields: ReviewSearch.fields(for: item, email: email(for: item.emailID)))
+    }
+
+    /// Today's carry-over after the search filter.
+    private var carryOver: [SuggestionRecord] { carryOverAll.filter(matches) }
+
+    /// The suggestions of this canvas's own digests that are shown, after the Q16 page and the search filter.
+    private var visibleRecords: [SuggestionRecord] { page.visible.filter(matches) }
 
     private var actionable: [SuggestionRecord] {
         switch kind {
@@ -99,6 +120,11 @@ struct DigestCanvasView: View {
     }
 
     private var pinned: [PinnedInfo] { kind == .today ? todayModel.carriedPins : [] }
+    private var shownInfo: [InfoItem] { (content?.info ?? []).filter(matches) }
+    private var shownPinned: [InfoItem] { pinned.map(\.item).filter(matches) }
+    private var shownSkipped: [SkippedEmail] {
+        (content?.skipped ?? []).filter { ReviewSearch.matches(searchText, fields: ReviewSearch.fields(for: $0)) }
+    }
 
     /// The model behind "Show all" for Today and a Day.
     private var pagedModel: DayCanvasModel? {
@@ -110,11 +136,21 @@ struct DigestCanvasView: View {
     }
 
     /// Exactly the actionable records this canvas shows, in on-screen order.
-    private var shownRecords: [SuggestionRecord] { carryOver + page.visible }
+    private var shownRecords: [SuggestionRecord] { carryOver + visibleRecords }
 
-    /// Whether actionable suggestions of this view are hidden from the triage scope.
+    /// Whether actionable suggestions of this view are hidden from the triage scope, by the Q16 page, unloaded
+    /// carry-over pages or the search filter. The triage bar then says "N selected of M shown".
     private var isPartial: Bool {
         page.isPartial || (kind == .today && todayModel.hasMoreCarryOver)
+            || (isSearching && carryOverAll.count + page.visible.count > shownRecords.count)
+    }
+
+    /// ⌘A and ⌘⇧A act on the focused card's section, or on everything shown when no card has focus.
+    private func sectionRecords(_ focusedID: UUID?) -> [SuggestionRecord] {
+        guard let id = focusedID else { return shownRecords }
+        if carryOver.contains(where: { $0.id == id }) { return carryOver }
+        if visibleRecords.contains(where: { $0.id == id }) { return visibleRecords }
+        return shownRecords
     }
 
     // MARK: Phase and titles
@@ -132,7 +168,7 @@ struct DigestCanvasView: View {
                let last = run.lastRunAt, last >= library.archive.startOfToday {
                 return .noNewMail(lastRun: last)
             }
-            let hasHistory = !library.archive.months.isEmpty || !library.archive.backlogs.isEmpty || !carryOver.isEmpty
+            let hasHistory = !library.archive.months.isEmpty || !library.archive.backlogs.isEmpty || !carryOverAll.isEmpty
             return hasHistory ? .noDigestToday : .neverRun
         case .day, .backlog:
             return .digest
@@ -165,12 +201,14 @@ struct DigestCanvasView: View {
     var body: some View {
         CanvasScaffold(run: run, access: access, title: title, subtitle: subtitle,
                        headline: content?.headline ?? "", records: shownRecords, isPartial: isPartial,
+                       header: kind == .today ? AnyView(todayHeader) : nil, sectionRecords: sectionRecords,
                        revealTarget: revealTarget) { focus in
+            if kind == .today, case .digest = phase { todaySummary }
             if case .backlog = kind { batchBar }
-            if !carryOver.isEmpty { carryOverSection(focus) }
+            if !carryOverAll.isEmpty, !carryOver.isEmpty || !isSearching { carryOverSection(focus) }
             switch phase {
             case .loading:
-                ProgressView("Loading…").frame(maxWidth: .infinity, minHeight: carryOver.isEmpty ? 160 : 40)
+                ProgressView("Loading…").frame(maxWidth: .infinity, minHeight: carryOverAll.isEmpty ? 160 : 40)
             case .failed:
                 emptyState("Couldn't load this digest", systemImage: "exclamationmark.triangle", "Try again in a moment.")
             case .neverRun:
@@ -181,9 +219,35 @@ struct DigestCanvasView: View {
                 emptyState("Inbox zero for today", systemImage: "tray",
                            lastRun.map { "Last run \($0.formatted(date: .omitted, time: .shortened))" } ?? "")
             case .digest:
-                suggestionsSection(focus)
-                infoSection
-                skippedSection
+                if isSearching, shownRecords.isEmpty, settled.filter(matches).isEmpty, shownInfo.isEmpty,
+                   shownPinned.isEmpty, shownSkipped.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                } else {
+                    suggestionsSection(focus)
+                    infoSection
+                    skippedSection
+                }
+            }
+        }
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search This Page")
+    }
+
+    // MARK: Today header
+
+    private var todayHeader: some View {
+        TodayHeader(now: .now, calendar: library.calendar, fullName: NSFullUserName(), headline: content?.headline ?? "")
+    }
+
+    /// The stat strip and the run line under it.
+    @ViewBuilder private var todaySummary: some View {
+        if let content {
+            VStack(alignment: .leading, spacing: 10) {
+                TodayStatStrip(emailsRead: content.emailCount, toReview: actionable.count, worthKnowing: content.info.count,
+                               skipped: content.skipped.count, onShowSkipped: { skippedExpanded = true })
+                TodayRunLine(info: todayModel.runInfo, calendar: library.calendar,
+                             waitingCount: max(0, library.archive.carryOverCount - carryOverAll.count),
+                             openReviewQueue: { coordinator.select(.reviewQueue) })
             }
         }
     }
@@ -192,7 +256,7 @@ struct DigestCanvasView: View {
     /// state describes only this canvas's own digests, so it never replaces the carry-over.
     @ViewBuilder
     private func emptyState(_ title: String, systemImage: String, _ detail: String) -> some View {
-        if carryOver.isEmpty {
+        if carryOverAll.isEmpty {
             ContentUnavailableView(title, systemImage: systemImage, description: Text(detail))
                 .frame(maxWidth: .infinity, minHeight: 200)
         } else {
@@ -227,11 +291,13 @@ struct DigestCanvasView: View {
     private func carryOverSection(_ focus: FocusState<UUID?>.Binding) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             ActionableRecordsSection(coordinator: coordinator, title: "Unreviewed from Earlier",
-                                     count: carryOver.count, records: carryOver, focus: focus)
+                                     count: carryOverAll.count, records: carryOver, focus: focus,
+                                     countText: isSearching ? ReviewCanvasLogic.countText(shown: carryOver.count, total: carryOverAll.count) : nil,
+                                     headingStyle: .heading)
             if todayModel.hasMoreCarryOver {
                 HStack {
                     Text(ReviewCanvasLogic.showingText(
-                        shown: carryOver.count, total: max(library.archive.carryOverCount, carryOver.count)))
+                        shown: carryOverAll.count, total: max(library.archive.carryOverCount, carryOverAll.count)))
                         .foregroundStyle(.secondary)
                     Button("More unreviewed suggestions are in the Review Queue") { coordinator.select(.reviewQueue) }
                         .buttonStyle(.link)
@@ -241,13 +307,18 @@ struct DigestCanvasView: View {
     }
 
     private func suggestionsSection(_ focus: FocusState<UUID?>.Binding) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            ActionableRecordsSection(coordinator: coordinator, title: "Suggested Reminders",
-                                     count: actionable.count, records: page.visible, focus: focus,
-                                     emptyText: settled.isEmpty ? "No reminders suggested." : "Nothing left to review.",
-                                     countText: page.countText, scopeAction: scopeAction)
-            if !settled.isEmpty {
-                SettledRecordsSection(title: "Reviewed", records: settled)
+        let settledShown = settled.filter(matches)
+        return VStack(alignment: .leading, spacing: 26) {
+            ActionableRecordsSection(coordinator: coordinator, title: "To Review",
+                                     count: actionable.count, records: visibleRecords, focus: focus,
+                                     emptyText: isSearching ? "No matching suggestions."
+                                         : (settled.isEmpty ? "No reminders suggested." : "Nothing left to review."),
+                                     countText: isSearching ? ReviewCanvasLogic.countText(shown: visibleRecords.count, total: page.totalCount)
+                                                            : page.countText,
+                                     scopeAction: scopeAction, headingStyle: .heading)
+                .id(TodayStatStrip.reviewID)
+            if !settledShown.isEmpty {
+                SettledRecordsSection(title: "Reviewed", records: settledShown, calendar: library.calendar)
             }
         }
     }
@@ -272,59 +343,91 @@ struct DigestCanvasView: View {
 
     // MARK: Info
 
+    private var infoContext: InfoContext {
+        InfoContext(
+            email: { email(for: $0) }, provider: { provider(for: $0) },
+            notesState: { coordinator.notes.states[$0.id] ?? .idle }, userNames: [NSFullUserName()],
+            onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: $0.emailID)) },
+            onTogglePin: { item in Task { await coordinator.setPinned(!item.pinned, item: item) } },
+            onSaveToNotes: { item in Task { await coordinator.saveToNotes(item) } })
+    }
+
+    /// When an info item's digest was created, in the settings time zone: the "same digest day" of grouping.
+    private func infoDay(_ item: InfoItem) -> DigestDay? {
+        let created: Date?
+        switch kind {
+        case .today:
+            created = todayModel.digests.infoOwners[item.id]?.createdAt
+                ?? todayModel.carriedPins.first { $0.item.id == item.id }?.digestCreatedAt
+        case .day: created = coordinator.day.infoOwners[item.id]?.createdAt
+        case .backlog: created = coordinator.backlog.infoOwners[item.id]?.createdAt
+        }
+        return created.map { DigestDay($0, calendar: library.calendar) }
+    }
+
+    private func clusters(_ items: [InfoItem]) -> [InfoCluster] {
+        var emails: [String: EmailContext] = [:]
+        for item in items { emails[item.emailID] = email(for: item.emailID) }
+        return InfoClustering.clusters(items, emails: emails, day: infoDay)
+    }
+
     @ViewBuilder private var infoSection: some View {
-        let groups = ReviewPresentation.infoGroups(content?.info ?? [])
-        let pinnedItems = pinned.map(\.item)
-        if !groups.isEmpty || !pinnedItems.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeader("Info")
+        let items = shownInfo
+        let pinnedItems = shownPinned
+        if !items.isEmpty || !pinnedItems.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeading(title: "Worth Knowing", detail: nil) { EmptyView() }
                 // Pinned items from earlier digests come first, as their own group, until they are unpinned.
                 if !pinnedItems.isEmpty {
                     DisclosureGroup(isExpanded: $pinnedExpanded) {
-                        infoCards(pinnedItems)
+                        clusterViews(pinnedItems).padding(.top, 8)
                     } label: {
                         Label("Pinned (\(pinnedItems.count))", systemImage: "pin.fill")
                             .font(.body.weight(.medium))
                     }
                 }
-                ForEach(groups) { group in
-                    DisclosureGroup(isExpanded: Binding(
-                        get: { !collapsedGroups.contains(group.category) },
-                        set: { open in
-                            if open { collapsedGroups.remove(group.category) } else { collapsedGroups.insert(group.category) }
-                        })) {
-                        infoCards(group.items)
-                    } label: {
-                        Text("\(group.category.rawValue.capitalized) (\(group.items.count))")
-                            .font(.body.weight(.medium))
-                    }
-                }
+                clusterViews(items)
+            }
+            .id(TodayStatStrip.infoID)
+        }
+    }
+
+    /// Cards in a two-column grid; newsletters get slim full-width rows below.
+    @ViewBuilder private func clusterViews(_ items: [InfoItem]) -> some View {
+        let all = clusters(items)
+        let cards = all.filter { $0.category != .newsletters }
+        let slim = all.filter { $0.category == .newsletters }
+        if !cards.isEmpty {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 14, alignment: .top), GridItem(.flexible(), spacing: 14, alignment: .top)],
+                      alignment: .leading, spacing: 14) {
+                ForEach(cards) { clusterCard($0, layout: .card) }
+            }
+        }
+        if !slim.isEmpty {
+            LazyVStack(spacing: 8) {
+                ForEach(slim) { clusterCard($0, layout: .slim) }
             }
         }
     }
 
-    private func infoCards(_ items: [InfoItem]) -> some View {
-        GroupedCard {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(items) { item in
-                    InfoCard(item: item, email: email(for: item.emailID), provider: provider(for: item.emailID),
-                             notesState: coordinator.notes.states[item.id] ?? .idle,
-                             userNames: [NSFullUserName()],
-                             onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: item.emailID)) },
-                             onTogglePin: { Task { await coordinator.setPinned(!item.pinned, item: item) } },
-                             onSaveToNotes: { Task { await coordinator.saveToNotes(item) } })
-                    .id(item.id)
-                    if item.id != items.last?.id { Divider().padding(.leading, 12) }
-                }
-            }
-        }
-        .padding(.top, 6)
+    private func clusterCard(_ cluster: InfoCluster, layout: InfoClusterCard.Layout) -> some View {
+        InfoClusterCard(cluster: cluster, layout: layout, context: infoContext,
+                        isExpanded: Binding(
+                            get: { expandedClusters.contains(cluster.id) },
+                            set: { open in
+                                if open { expandedClusters.insert(cluster.id) } else { expandedClusters.remove(cluster.id) }
+                            }))
+            .id(Self.clusterScrollID(cluster))
     }
+
+    private static func clusterScrollID(_ cluster: InfoCluster) -> String { "cluster-\(cluster.id)" }
 
     // MARK: Skipped
 
     @ViewBuilder private var skippedSection: some View {
-        if let skipped = content?.skipped, !skipped.isEmpty {
+        let skipped = shownSkipped
+        if !skipped.isEmpty {
+            // Collapsed by default; a search that matches opens nothing on its own.
             DisclosureGroup(isExpanded: $skippedExpanded) {
                 GroupedCard {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -343,23 +446,37 @@ struct DigestCanvasView: View {
                         }
                     }
                 }
-                .padding(.top, 6)
+                .padding(.top, 8)
             } label: {
-                Text("Skipped (\(skipped.count))").font(.body.weight(.medium))
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("Skipped").font(.system(size: 20, weight: .bold))
+                        .accessibilityAddTraits(.isHeader)
+                    Text("\(skipped.count)").font(.callout).foregroundStyle(.secondary).monospacedDigit()
+                }
             }
+            .id(TodayStatStrip.skippedID)
         }
     }
 
     // MARK: Reveal
 
-    /// The scroll id for an email a job popover asked to show; opens a collapsed group that holds it.
+    /// The scroll id for an email a job popover asked to show; clears the search and opens a group card or
+    /// pinned group that holds it.
     private func revealTarget(_ emailID: String) -> AnyHashable? {
-        if let record = (carryOver + actionable + settled).first(where: { $0.suggestion.emailID == emailID }) {
+        searchText = ""
+        if let record = (carryOverAll + actionable + settled).first(where: { $0.suggestion.emailID == emailID }) {
             return record.id
         }
-        if let item = content?.info.first(where: { $0.emailID == emailID }) {
-            collapsedGroups.remove(item.category)
-            return item.id
+        if let item = content?.info.first(where: { $0.emailID == emailID }),
+           let cluster = clusters(content?.info ?? []).first(where: { $0.items.contains { $0.id == item.id } }) {
+            if cluster.isGroup { expandedClusters.insert(cluster.id) }
+            return Self.clusterScrollID(cluster)
+        }
+        if let item = pinned.map(\.item).first(where: { $0.emailID == emailID }),
+           let cluster = clusters(pinned.map(\.item)).first(where: { $0.items.contains { $0.id == item.id } }) {
+            pinnedExpanded = true
+            if cluster.isGroup { expandedClusters.insert(cluster.id) }
+            return Self.clusterScrollID(cluster)
         }
         return nil
     }

@@ -573,3 +573,17 @@ Builds and Core and Persistence tests pass; nothing below has been checked in th
 - Minimise Review, then close Settings: the minimised window keeps its Dock tile and restores from it. Cmd-H does not remove the Dock icon.
 - Clicking the Dock icon with only a minimised window restores it, without opening a second copy.
 - With the new icon: not inside a grey rounded square on macOS 26; Dock and Finder show Letter List; dark appearance shows the dark blue background; the Icon Composer preview shows the light background lighter at the top.
+
+## UI redesign Phase 2: Today (2026-11-09)
+
+Builds and Core tests pass; nothing below has been checked in the running app or against `Today@2x.png`.
+
+- Compare Today with the design in light and dark: header, stat strip, run line, cards, two-column Worth Knowing grid, slim newsletter rows, Skipped disclosure and the floating triage bar (Liquid Glass on macOS 26, material on 15, solid with Reduce Transparency).
+- Card states in `#Preview` "Suggestion cards" and "Window · Today with carry-over": selected, unselected, focused (2 pt ring), needs review, write failed with Try Again, read-only added and dismissed.
+- Keyboard without a mouse: ↑ ↓ move focus, Space ticks, ⌫ dismisses, Return edits the focused title and returns focus to the card on Return or Escape, ⌘↩ adds, ⌘F opens search, ⌘R runs now, ⌘1 to ⌘5 switch view. None of these fire while a title or the search field is being edited.
+- ⌘A on a focused card selects its section (uses `onCommand(selectAll:)`), and ⌘A inside a text field still selects the text. Confirm Edit > Select All is enabled when a card has focus. ⌘⇧A (Edit > Select None) clears the focused section. If either misbehaves, the fallback is explicit key handling in `CanvasScaffold`.
+- Search (⌘F) filters Today, a past day and a Backlog by title, sender and evidence (and info and skipped text). With a filter hiding suggestions, the triage bar reads "N selected of M shown" and acts on the shown ones only.
+- VoiceOver: a card reads as one element ("Title. High priority. Due in 11 days, Friday 20 November at 5:30 pm. From Philip Fraser. Selected.") with actions Select or Deselect, Dismiss, Edit Title, Change Due Date, Open in Mail. Check that Edit Title moves VoiceOver into the title field. Worth Knowing cards offer Pin, Save to Notes and Open in Mail; a group card offers Show or Hide Details.
+- Hover Pin, Save to Notes and Open in Mail on a Worth Knowing card; the same three are in the right-click menu.
+- Run line on a real day: "Processed on this Mac with Qwen3 4B", and the mixed "On this Mac and Gemini (N emails)" after a run that used Gemini. Finish time and duration need the job's start and end times.
+- Info grouping with real mail: several emails from one sender on one day collapse into one card; a total shows only when every item has one clear amount in one currency.

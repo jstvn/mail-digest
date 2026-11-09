@@ -237,6 +237,8 @@ final class TodayCanvasModel {
     private(set) var carriedPins: [PinnedInfo] = []
     private(set) var pinEmails: [String: EmailContext] = [:]
     private(set) var pinProviders: [String: ExecutionProvider] = [:]
+    /// Where today's emails were processed and when the runs finished, for the run line. Nil until loaded.
+    private(set) var runInfo: RunInfo?
 
     @ObservationIgnored private let gate = ReloadGate()
     @ObservationIgnored private var requested: (ids: [UUID], start: Date)?
@@ -247,10 +249,11 @@ final class TodayCanvasModel {
     }
 
     /// Previews: fixed content.
-    init(preview digests: DayCanvasModel, carryOver: PagedRecordsModel, carriedPins: [PinnedInfo] = []) {
+    init(preview digests: DayCanvasModel, carryOver: PagedRecordsModel, carriedPins: [PinnedInfo] = [], runInfo: RunInfo? = nil) {
         self.digests = digests
         self.carryOver = carryOver
         self.carriedPins = carriedPins
+        self.runInfo = runInfo
     }
 
     /// Whether more carry-over exists than the first page; the UI links to the Review Queue.
@@ -264,6 +267,20 @@ final class TodayCanvasModel {
             await digests.load(digestIDs: request.ids, store: store)
             await carryOver.load(.carryOver(before: request.start), store: store, calendar: calendar)
             await loadPins(excluding: request.ids, store: store)
+            await loadRunInfo(ids: request.ids, store: store)
+        }
+    }
+
+    /// The jobs behind today's digests (a digest shares its job's id) and their items' executors.
+    private func loadRunInfo(ids: [UUID], store: any DigestStore) async {
+        guard !ids.isEmpty else { runInfo = nil; return }
+        do {
+            let jobs = try await store.jobs().filter { ids.contains($0.id) }
+            var items: [JobItem] = []
+            for id in ids { items += try await store.items(job: id) }
+            runInfo = RunInfo.make(jobs: jobs, items: items)
+        } catch {
+            canvasLog.error("could not load run info: \(String(describing: error), privacy: .public)")
         }
     }
 

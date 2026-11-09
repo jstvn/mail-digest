@@ -5,6 +5,10 @@ struct StatStrip: View {
     struct Stat: Identifiable {
         let value: String
         let caption: String
+        /// Shows the number in the accent colour (the one that needs a decision).
+        var isAccent = false
+        /// When set, the tile is a button (for example, scroll to its section).
+        var action: (() -> Void)?
         var id: String { caption }
     }
 
@@ -14,19 +18,33 @@ struct StatStrip: View {
         HStack(spacing: 0) {
             ForEach(Array(stats.enumerated()), id: \.element.id) { index, stat in
                 if index > 0 { Divider().padding(.vertical, 12) }
-                VStack(spacing: 2) {
-                    Text(stat.value)
-                        .font(.system(size: 24, weight: .semibold))
-                        .monospacedDigit()
-                    Text(stat.caption).font(.caption).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .accessibilityElement(children: .combine)
+                tile(stat)
             }
         }
-        .background(.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator, lineWidth: 0.5))
+        .cardSurface()
+    }
+
+    @ViewBuilder private func tile(_ stat: Stat) -> some View {
+        let content = VStack(alignment: .leading, spacing: 2) {
+            Text(stat.value)
+                .font(.system(size: 24, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(stat.isAccent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
+            Text(stat.caption).font(.callout).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 20)
+        .contentShape(Rectangle())
+        if let action = stat.action {
+            Button(action: action) { content }
+                .buttonStyle(.plain)
+                .help("Go to \(stat.caption)")
+                .accessibilityElement(children: .combine)
+                .accessibilityHint("Scrolls to this section")
+        } else {
+            content.accessibilityElement(children: .combine)
+        }
     }
 }
 

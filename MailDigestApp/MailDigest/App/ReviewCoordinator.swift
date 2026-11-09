@@ -210,6 +210,12 @@ final class ReviewCoordinator {
         await settled()
     }
 
+    /// "Try Again" on a failed suggestion: keeps it selected and writes just that one.
+    func retry(_ record: SuggestionRecord) async {
+        if !isSelected(record) { toggle(record) }
+        await addSelected(in: [record])
+    }
+
     /// "Dismiss Unselected": the pending, unselected suggestions among `records`.
     func dismissUnselected(in records: [SuggestionRecord]) async {
         await dismiss(session.recordSplit(records).dismiss)

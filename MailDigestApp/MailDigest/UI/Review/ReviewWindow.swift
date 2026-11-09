@@ -29,6 +29,7 @@ struct ReviewWindow: View {
                 Button { Task { await run.runNow() } } label: {
                     Label("Run Now", systemImage: "play.fill")
                 }
+                .keyboardShortcut("r", modifiers: .command)
                 .disabled(!run.canStartDaily || access.status?.mode == .unavailable)
                 .help(run.dailyLifecycle == .none ? "Read your new mail now" : "Resume or review the unfinished Daily job first.")
             }

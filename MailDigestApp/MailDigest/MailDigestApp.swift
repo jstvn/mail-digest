@@ -31,6 +31,7 @@ struct MailDigestApp: App {
             ReviewWindow(run: run, access: access)
         }
         .defaultSize(width: 980, height: 680)
+        .commands { ReviewCommands(run: run) }
 
         Window("Mail Access", id: "mail-access") {
             MailAccessView(model: access, run: run)
@@ -88,5 +89,35 @@ struct MailDigestApp: App {
             NSApp.activate()
         }
         morning.start()
+    }
+}
+
+/// Menu commands of the review window: ⌘1 to ⌘5 switch the sidebar view, ⌘⇧A clears the focused section's
+/// selection (⌘A is the standard Select All, handled by the canvas when no text field is editing).
+struct ReviewCommands: Commands {
+    let run: DigestRunModel
+    @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.canvasSelection) private var selection
+
+    var body: some Commands {
+        CommandGroup(after: .sidebar) {
+            Divider()
+            Button("Today") { show(.today) }.keyboardShortcut("1", modifiers: .command)
+            Button("Review Queue") { show(.reviewQueue) }.keyboardShortcut("2", modifiers: .command)
+            Button("Logbook") { show(.logbook) }.keyboardShortcut("3", modifiers: .command)
+            Button("Mail Cleanup") { show(.mailCleanup) }.keyboardShortcut("4", modifiers: .command)
+            Button("Activity") { show(.activity) }.keyboardShortcut("5", modifiers: .command)
+        }
+        CommandGroup(after: .textEditing) {
+            Button("Select None") { selection?.selectNone() }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
+                .disabled(selection == nil)
+        }
+    }
+
+    private func show(_ item: SidebarItem) {
+        run.coordinator.select(item)
+        openWindow(id: "review")
+        NSApp.activate()
     }
 }

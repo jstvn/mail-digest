@@ -8,16 +8,39 @@ struct SelectionButtons: View {
     let records: [SuggestionRecord]
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 14) {
             Button("Select All") { coordinator.selectAll(records) }
             Button("Select None") { coordinator.selectNone(records) }
         }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
+        .buttonStyle(.link)
     }
 }
 
-/// A titled list of actionable suggestion rows. `count` is the section's full size, which may exceed
+/// How a section names itself: the small upper-case label of the Review Queue's day groups, or the 20 pt
+/// heading of the Today design.
+enum SectionHeadingStyle { case overline, heading }
+
+/// A section title in the 20 pt bold heading style, with an optional secondary count and trailing controls.
+struct SectionHeading<Trailing: View>: View {
+    let title: String
+    var detail: String?
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(.system(size: 20, weight: .bold))
+                .accessibilityAddTraits(.isHeader)
+            if let detail {
+                Text(detail).font(.callout).foregroundStyle(.secondary).monospacedDigit()
+            }
+            Spacer()
+            trailing.font(.callout)
+        }
+    }
+}
+
+/// A titled list of actionable suggestion cards. `count` is the section's full size, which may exceed
 /// `records` when the Q16 page hides some; keyboard focus is shared across all sections of a canvas.
 struct ScopeAction {
     var title: String
@@ -36,40 +59,49 @@ struct ActionableRecordsSection: View {
     var countText: String?
     /// Header button that widens or narrows the section, e.g. Show All.
     var scopeAction: ScopeAction?
+    var headingStyle: SectionHeadingStyle = .overline
+
+    private var controls: some View {
+        HStack(spacing: 14) {
+            if let scopeAction {
+                Button(scopeAction.title, action: scopeAction.action)
+                    .buttonStyle(.link)
+                    .help(scopeAction.help)
+            }
+            SelectionButtons(coordinator: coordinator, records: records)
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "\(title) · \(countText ?? String(count))") {
-                HStack(spacing: 10) {
-                    if let scopeAction {
-                        Button(scopeAction.title, action: scopeAction.action)
-                            .buttonStyle(.borderless)
-                            .controlSize(.small)
-                            .help(scopeAction.help)
-                    }
-                    SelectionButtons(coordinator: coordinator, records: records)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            switch headingStyle {
+            case .overline:
+                SectionHeader(title: "\(title) · \(countText ?? String(count))") { controls.controlSize(.small) }
+            case .heading:
+                // The count shows only when part of the section is hidden, so "25 of 42" stays visible.
+                SectionHeading(title: title, detail: countText.flatMap { $0 == String(count) ? nil : $0 }) { controls }
             }
             if records.isEmpty {
                 Text(emptyText).foregroundStyle(.secondary)
             } else {
-                GroupedCard {
-                    LazyVStack(spacing: 0) {
-                        ForEach(records) { record in
-                            SuggestionRow(
-                                record: record,
-                                isSelected: coordinator.isSelected(record),
-                                isFocused: focus.wrappedValue == record.id,
-                                onToggle: { coordinator.toggle(record) },
-                                onEdit: { try await coordinator.edit($0, record: record) },
-                                onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: record.suggestion.emailID)) })
-                            .focusable()
-                            .focusEffectDisabled()
-                            .focused(focus, equals: record.id)
-                            .id(record.id)
-                            // Dividers sit between rows only, inset past the checkbox.
-                            if record.id != records.last?.id { Divider().padding(.leading, 36) }
-                        }
+                LazyVStack(spacing: 12) {
+                    ForEach(records) { record in
+                        SuggestionCard(
+                            record: record,
+                            isSelected: coordinator.isSelected(record),
+                            isFocused: focus.wrappedValue == record.id,
+                            calendar: coordinator.library.calendar,
+                            canRetry: coordinator.reminderWriter != nil && !coordinator.isWorking,
+                            onToggle: { coordinator.toggle(record) },
+                            onEdit: { try await coordinator.edit($0, record: record) },
+                            onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: record.suggestion.emailID)) },
+                            onDismiss: { Task { await coordinator.dismiss(record) } },
+                            onRetry: { Task { await coordinator.retry(record) } },
+                            onEndTitleEdit: { focus.wrappedValue = record.id })
+                        .focusable()
+                        .focusEffectDisabled()
+                        .focused(focus, equals: record.id)
+                        .id(record.id)
                     }
                 }
             }
@@ -127,21 +159,20 @@ struct SettledRecordRow: View {
     }
 }
 
-/// Read-only settled rows under a section header.
+/// Read-only cards for approved and dismissed suggestions, under a section heading.
 struct SettledRecordsSection: View {
     let title: String
     let records: [SuggestionRecord]
+    let calendar: Calendar
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionHeader("\(title) · \(records.count)")
-            GroupedCard {
-                LazyVStack(spacing: 0) {
-                    ForEach(records) { record in
-                        SettledRecordRow(record: record)
-                            .id(record.id)
-                        if record.id != records.last?.id { Divider().padding(.leading, 12) }
-                    }
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeading(title: title, detail: String(records.count)) { EmptyView() }
+            LazyVStack(spacing: 12) {
+                ForEach(records) { record in
+                    SuggestionCard(record: record, isSelected: false, isFocused: false, calendar: calendar,
+                                   onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: record.suggestion.emailID)) })
+                        .id(record.id)
                 }
             }
         }

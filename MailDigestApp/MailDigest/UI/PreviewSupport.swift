@@ -98,8 +98,24 @@ enum PreviewSupport {
     /// the Review Queue and the Logbook all filled, so each canvas can be previewed by `selection`.
     static func coordinator(selection: SidebarItem = .today, review: ReviewViewModel = review(),
                             writer: (any ReminderWriter)? = RecordingReminderWriter()) -> ReviewCoordinator {
-        let emails = PreviewFixtures.emails
-        let todayDigest = digest(daysAgo: 0)
+        var emails = PreviewFixtures.emails
+        var todayDigest = digest(daysAgo: 0)
+        // Every card state on Today: a failed write, a decided (read-only) suggestion, and two orders from one
+        // sender that collapse into one Worth Knowing card with a total.
+        if todayDigest.suggestions.count >= 4 {
+            todayDigest.suggestions[3].status = .failed
+            var added = todayDigest.suggestions[0]
+            added.id = UUID()
+            added.status = .approved
+            todayDigest.suggestions.append(added)
+        }
+        let box = MailboxRef(account: "iCloud", name: "Inbox")
+        for (id, total) in [("coles1@example.com", "$17.45"), ("coles2@example.com", "$33.90")] {
+            todayDigest.info.append(InfoItem(id: id, emailID: id, category: .personal, importance: 3,
+                                             summary: "Your Coles order was delivered.", keyFacts: ["Total \(total)"], pinned: false))
+            emails[id] = EmailContext(sender: "Coles <orders@coles.example>", subject: "Your order", mailbox: box,
+                                      receivedAt: PreviewFixtures.now.addingTimeInterval(-86_400))
+        }
         let earlier = digest(daysAgo: 1)
         let carry = SuggestionRecord.records(from: earlier, kind: .daily, emails: emails)
             .filter { $0.suggestion.status == .pending }
@@ -109,7 +125,9 @@ enum PreviewSupport {
         })
         let today = TodayCanvasModel(
             preview: DayCanvasModel(preview: todayContent, emails: emails, owners: owners),
-            carryOver: PagedRecordsModel(preview: carry, pageSize: 100))
+            carryOver: PagedRecordsModel(preview: carry, pageSize: 100),
+            runInfo: RunInfo(localEmails: 20, cloudEmails: 3, localModel: "qwen3:4b", cloudModel: "gemini-3.5-flash-lite",
+                             finishedAt: PreviewFixtures.now, duration: 46 * 60))
         let day = DayCanvasModel(preview: DayContent(digests: [earlier], kind: .daily, emails: emails), emails: emails)
         let backlogDigest = digest(daysAgo: 0)
         let batching = BacklogBatching(jobOrder: backlogDigest.suggestions.map(\.emailID),
