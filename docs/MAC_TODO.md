@@ -549,3 +549,17 @@ Checked in screenshots of the real `ReviewWindow` on preview fixtures, light and
 - Hover and keyboard focus: Info actions replace the age without shifting the row; row hover and focus fills stay inside the card corners.
 - Dismiss Unselected reads as dimmed but legible when every suggestion is ticked, and clear when it's available.
 - VoiceOver reads sidebar rows without announcing the badges, and the Info row actions when hidden.
+
+## Menu bar panel redesign (2026-11-09)
+
+Builds and Core and Persistence tests pass; nothing below has been checked in the running app.
+
+- Compare the panel with the design in light and dark: width, spacing, capsule buttons, sun tile and the warm card.
+- Warning badge on the icon at 1x and 2x, light and dark, with and without the count.
+- Quit Ollama and run the Daily digest: the panel shows "Daily Digest", the "Started… stopped before reading any emails" line, the card with Start Ollama and Retry, and the "Retry Daily Digest ⌘R" row. The card updates when the banner changes.
+- Start Ollama with the app installed (it launches without taking focus and the panel stays open) and with it missing (the download page opens).
+- ⌘O, ⌘N, ⌘R, ⌘, and ⌘Q work while the panel is open.
+- A running Backlog job shows its date range in the title.
+- The suggestion count updates after approving or dismissing a suggestion, and "this morning" becomes "today" at noon.
+- The Review window's job popover still has Pause Now and the Now line.
+- VoiceOver reads the attention card and the suggestions row. SwiftUI posts no automatic announcement when the card appears, so judge whether that's acceptable.

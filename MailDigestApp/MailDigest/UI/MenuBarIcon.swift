@@ -10,6 +10,8 @@ enum MenuBarIconState: Hashable {
     case progress(step: Int)
     /// A job is paused.
     case paused
+    /// A failed job or an error needs the user: the envelope with an exclamation badge.
+    case warning
 
     /// Spoken after "Mail Digest".
     var accessibilityText: String? {
@@ -18,11 +20,12 @@ enum MenuBarIconState: Hashable {
         case .listing: return "looking for mail"
         case .progress(let step): return "processing, \(min(step * 5, 100)) percent"
         case .paused: return "job paused"
+        case .warning: return "needs attention"
         }
     }
 }
 
-/// Draws the menu bar icon with a progress ring or pause badge as a template image, so the status item
+/// Draws the menu bar icon with a progress ring, pause badge or warning badge as a template image, so the status item
 /// stays a standard `NSStatusBarButton` image: the system tints it for light, dark and highlighted states.
 @MainActor
 enum MenuBarIconRenderer {
@@ -79,6 +82,17 @@ enum MenuBarIconRenderer {
                     HStack(spacing: 1.5) {
                         Rectangle().frame(width: 1.5, height: 4)
                         Rectangle().frame(width: 1.5, height: 4)
+                    }
+                    .blendMode(.destinationOut)
+                }
+                .compositingGroup()
+            case .warning:
+                ZStack {
+                    Circle().fill(.black)
+                    // An exclamation mark knocked out of the filled disc.
+                    VStack(spacing: 1) {
+                        RoundedRectangle(cornerRadius: 0.7).frame(width: 1.5, height: 3.5)
+                        Circle().frame(width: 1.5, height: 1.5)
                     }
                     .blendMode(.destinationOut)
                 }

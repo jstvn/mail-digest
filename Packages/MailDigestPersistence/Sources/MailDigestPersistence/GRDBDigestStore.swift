@@ -172,6 +172,10 @@ public final class GRDBDigestStore: DigestStore, Sendable {
                 CREATE INDEX job_event_job_at ON job_event (job_id, at, id);
                 """)
         }
+        // v6: why a failed job stopped, so the menu can offer the matching fix. Older rows stay NULL.
+        migrator.registerMigration("v6") { db in
+            try db.execute(sql: "ALTER TABLE job ADD COLUMN failure_kind TEXT")
+        }
         return migrator
     }
 
@@ -564,8 +568,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             try db.execute(sql: """
                 INSERT INTO job (id, kind, mailboxes, scope_from, scope_to, state, created_at,
                                  queued, done, failed, skipped, auto_paused, last_error, pause_reason,
-                                 started_at, ended_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 started_at, ended_at, failure_kind)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, arguments: Self.jobArguments(job, mailboxes: mailboxes))
             try Self.insertEvent(db, created, payload: payload)
         }
@@ -579,7 +583,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             try db.execute(sql: """
                 UPDATE job SET kind = ?2, mailboxes = ?3, scope_from = ?4, scope_to = ?5, state = ?6,
                     created_at = ?7, queued = ?8, done = ?9, failed = ?10, skipped = ?11, auto_paused = ?12,
-                    last_error = ?13, pause_reason = ?14, started_at = ?15, ended_at = ?16
+                    last_error = ?13, pause_reason = ?14, started_at = ?15, ended_at = ?16,
+                    failure_kind = ?17
                 WHERE id = ?1
                 """, arguments: Self.jobArguments(job, mailboxes: mailboxes))
             if db.changesCount > 0, let (payload, event) = encoded {
@@ -597,7 +602,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         [job.id.uuidString, job.kind.rawValue, mailboxes, job.scopeFrom.timeIntervalSince1970,
          job.scopeTo.timeIntervalSince1970, job.state.rawValue, job.createdAt.timeIntervalSince1970,
          job.totals.queued, job.totals.done, job.totals.failed, job.totals.skipped, job.autoPaused, job.lastError,
-         job.pauseReason?.rawValue, job.startedAt?.timeIntervalSince1970, job.endedAt?.timeIntervalSince1970]
+         job.pauseReason?.rawValue, job.startedAt?.timeIntervalSince1970, job.endedAt?.timeIntervalSince1970,
+         job.failureKind?.rawValue]
     }
 
     public func jobEvents(job jobID: UUID) async throws -> [JobEvent] {
@@ -658,7 +664,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             autoPaused: row["auto_paused"], lastError: row["last_error"],
             pauseReason: (row["pause_reason"] as String?).flatMap(PauseReason.init(rawValue:)),
             startedAt: (row["started_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
-            endedAt: (row["ended_at"] as Double?).map(Date.init(timeIntervalSince1970:)))
+            endedAt: (row["ended_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
+            failureKind: (row["failure_kind"] as String?).flatMap(JobFailureKind.init(rawValue:)))
     }
 
     // MARK: Queue

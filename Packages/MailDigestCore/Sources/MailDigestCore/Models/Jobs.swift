@@ -48,6 +48,25 @@ public enum JobItemState: String, Codable, Sendable, Equatable {
     case queued, processing, done, failed, skipped
 }
 
+/// Why a job stopped as `.failed`, in a form the UI can act on (for example offering Start Ollama).
+public enum JobFailureKind: String, Codable, Sendable, Equatable {
+    /// Ollama did not answer: not running, or not reachable.
+    case ollamaUnreachable
+    /// Ollama runs but the configured model is not installed.
+    case modelMissing
+    /// Anything else: Mail, the store, a timeout or an unexpected model reply.
+    case other
+
+    /// Classifies an error from the model provider.
+    public init(_ error: Error) {
+        switch error as? LLMError {
+        case .unreachable: self = .ollamaUnreachable
+        case .modelMissing: self = .modelMissing
+        default: self = .other
+        }
+    }
+}
+
 /// What the user confirmed in the preview; saved with the job unchanged.
 public struct JobPlan: Codable, Sendable, Equatable {
     public var kind: JobKind
@@ -102,6 +121,8 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
     /// Why the job stopped as `.failed` (for example "Ollama is not reachable…"). Safe to show; never
     /// contains email content. Cleared when the job is resumed.
     public var lastError: String?
+    /// Structured form of `lastError`; nil for jobs stored before it existed (they show the generic failure).
+    public var failureKind: JobFailureKind?
     /// When the job first started running; nil for jobs stored before v5 and jobs never started.
     public var startedAt: Date?
     /// When the job last reached a terminal state (stopped, finished, failed); cleared when it runs again.
@@ -109,7 +130,9 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
 
     public init(id: UUID, kind: JobKind, mailboxes: [MailboxRef], scopeFrom: Date, scopeTo: Date,
                 state: JobState, createdAt: Date, totals: JobTotals, autoPaused: Bool, lastError: String? = nil,
-                pauseReason: PauseReason? = nil, startedAt: Date? = nil, endedAt: Date? = nil) {
+                pauseReason: PauseReason? = nil, startedAt: Date? = nil, endedAt: Date? = nil,
+                failureKind: JobFailureKind? = nil) {
+        self.failureKind = failureKind
         self.startedAt = startedAt
         self.endedAt = endedAt
         self.pauseReason = pauseReason

@@ -118,6 +118,30 @@ private func oldMessages(_ count: Int, prefix: String = "old") -> [EmailMessage]
         #expect(await h.store.allItems().allSatisfy { $0.state == .done && $0.attempts == 0 })
     }
 
+    @Test(arguments: [(LLMError.unreachable("refused"), JobFailureKind.ollamaUnreachable),
+                      (LLMError.modelMissing("qwen3:4b"), JobFailureKind.modelMissing),
+                      (LLMError.timedOut, JobFailureKind.other)])
+    func failedJobStoresTheFailureKindAndResumeClearsIt(error: LLMError, kind: JobFailureKind) async throws {
+        let h = Harness(source: FixtureMailSource(messages: oldMessages(2)), llm: StubLLMClient())
+        let llm = h.llm
+        await llm.setOnExtract { email in
+            if email.id == "old-1@fixture" {
+                await llm.setHealthFailure(error)
+                throw error
+            }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        #expect(try await h.job().failureKind == kind)
+
+        await llm.setOnExtract(nil)
+        await llm.setHealthy(true)
+        try await h.runner.resume(jobID: try await h.job().id)
+        await h.runner.waitUntilIdle()
+        let done = try await h.job()
+        #expect(done.state == .finished && done.failureKind == nil)
+    }
+
     @Test func itemErrorWithHealthyProviderUsesTheRetryBudget() async throws {
         // StubLLMError.malformed while the provider is healthy is an item failure, not a job failure.
         let h = Harness(source: FixtureMailSource(messages: oldMessages(2)),

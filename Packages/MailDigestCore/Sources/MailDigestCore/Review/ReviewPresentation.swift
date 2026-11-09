@@ -209,9 +209,10 @@ public enum ReviewPresentation {
         return parts.joined(separator: " · ")
     }
 
-    /// Compact line for the States table: "Reading 12 of 23 emails · about 4 min left".
+    /// Compact line for the States table: "Reading 12 of 23 emails · 2 failed · about 4 min left".
     public static func readingSummary(_ p: JobProgress, locale: Locale = .current) -> String {
         var text = "Reading \(number(min(p.done + 1, max(p.total, 1)), locale)) of \(number(p.total, locale)) emails"
+        if p.failed > 0 { text += " · \(number(p.failed, locale)) failed" }
         if let eta = p.eta, let left = etaText(eta) { text += " · \(left)" }
         return text
     }

@@ -25,13 +25,18 @@ import Testing
                     nextUp: nil, countsByMailbox: [:])
     }
 
+    @Test func retryStartKeepsTheStartBehaviourWithRetryWording() {
+        #expect(DailyMenuAction.retryStart.title == "Retry Daily Digest")
+        #expect(DailyMenuAction.retryStart.behavior == .startNew)
+    }
+
     // MARK: Derivation
 
     @Test func finishedDailyHistoryIsNotUnresolved() {
         let jobs = [job(.finished, queued: 0), job(.finished, queued: 0), job(.idle, queued: 0)]
         #expect(DailyLifecycle(jobs: jobs) == .none)
         #expect(DailyLifecycle(jobs: []).menuAction.behavior == .startNew)
-        #expect(DailyLifecycle(jobs: []).menuAction.title == "Run Now")
+        #expect(DailyLifecycle(jobs: []).menuAction.title == "Run Daily Digest Now")
     }
 
     @Test func eachUnresolvedStateMapsToItsAction() {

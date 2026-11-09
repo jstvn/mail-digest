@@ -388,3 +388,13 @@ Each item says what the spec leaves open and the interim choice the build uses, 
 73. **Native window chrome and Recent Digests structure** (decided)
    - **Decision (approved by Justin, 2026-11-09):** the review toolbar holds only Run Now, at the trailing edge; Settings lives in the native `Settings` scene and the menu bar popover. Recent Digests no longer collapses by month: the newest month sits under "Recent Digests" and each older month has a plain section header, which supersedes that part of Q54.
    - **Consequence:** with long history retention the sidebar scrolls through every retained day, since months can no longer be collapsed.
+
+## Menu bar panel redesign (2026-11-09)
+
+74. **Menu bar panel follows the new design** (decided)
+   - **Decision (approved by Justin, 2026-11-09):** the panel follows the "Menu Bar Panel" design: job section, last Daily digest row, warm attention card and menu rows with trailing shortcut hints (⌘O, ⌘N, ⌘, and ⌘Q, plus ⌘R while the row retries).
+   - **Supersedes for the menu only:** Q49 gains a warning badge state for the icon. Q52's "Run Now" and "Retry Daily Job" titles become "Run Daily Digest Now" and "Retry Daily Digest"; its other titles stay. The review toolbar keeps "Run Now" (Q73).
+   - **Backlog title:** derived from the job's date scope, with no stored name: "Backlog · 12 Nov" for one day, "Backlog · 10 Oct – 12 Nov" for several.
+   - **Pause Now and the Now line:** removed from the menu panel only. The Review window's job popover keeps both, so SPEC's behaviour remains available there.
+   - **Start Ollama:** launches `com.electron.ollama` without taking focus, or opens https://ollama.com/download when it is not installed. It does not retry by itself. A job's failure kind is persisted (`job.failure_kind`, migration v6); jobs stored earlier show the generic card.
+   - **Implementation choices, open to change:** a Backlog scope starting before 1990 reads "Backlog · Up to 12 Nov". A banner that belongs to no job and has no known kind is titled "Needs Attention". A failed Backlog job shows the card only in the session it failed in, while a failed Daily job also shows it after a relaunch.

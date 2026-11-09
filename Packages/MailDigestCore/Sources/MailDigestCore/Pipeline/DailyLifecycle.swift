@@ -66,7 +66,7 @@ public enum DailyLifecycle: Equatable, Sendable {
     public var menuAction: DailyMenuAction {
         switch self {
         case .none:
-            return DailyMenuAction(title: "Run Now", systemImage: "play", behavior: .startNew)
+            return DailyMenuAction(title: "Run Daily Digest Now", systemImage: "play", behavior: .startNew)
         case .running:
             return .running
         case .stopping:
@@ -79,7 +79,7 @@ public enum DailyLifecycle: Equatable, Sendable {
                                    behavior: .review,
                                    note: "The Daily job was stopped. Resume it from Settings > Jobs before a new Daily digest can run.")
         case .failed(let job):
-            return DailyMenuAction(title: "Retry Daily Job", systemImage: "arrow.clockwise", behavior: .retry(job.id),
+            return DailyMenuAction(title: "Retry Daily Digest", systemImage: "arrow.clockwise", behavior: .retry(job.id),
                                    note: job.lastError ?? "The Daily job stopped before it finished.")
         case .conflict(let jobs):
             return DailyMenuAction(title: "Review Daily Jobs…", systemImage: "list.bullet.rectangle",
@@ -124,6 +124,10 @@ public struct DailyMenuAction: Equatable, Sendable {
     /// A Daily job is listing, running or pausing, or a Daily run or resume is starting.
     public static let running = DailyMenuAction(title: "Daily Digest Running…", systemImage: "hourglass",
                                                 behavior: .none)
+
+    /// After a Daily start failed its Ollama check, before any job existed: the same start, offered as Retry.
+    public static let retryStart = DailyMenuAction(title: "Retry Daily Digest", systemImage: "arrow.clockwise",
+                                                   behavior: .startNew)
 
     /// Whether the row can be clicked at all; the app adds its own conditions (Mail access, a running job).
     public var isActionable: Bool { behavior != .none }

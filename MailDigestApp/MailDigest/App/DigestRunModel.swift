@@ -33,7 +33,14 @@ final class DigestRunModel {
     let reminders: RemindersAccessModel
     /// The Processed tab: cleanup, Undo history and auto-file.
     let processed: ProcessedMailModel
-    private(set) var banner: String?
+    private(set) var banner: String? {
+        get { bannerText }
+        // Any assignment replaces the banner, so what was known about the old one goes with it.
+        set { bannerText = newValue; bannerContext = nil }
+    }
+    private var bannerText: String?
+    /// What `banner` reports, set only through `showBanner` and cleared whenever the banner changes.
+    private var bannerContext: (kind: JobFailureKind?, dailyStartFailedAt: Date?)?
     /// A job stopped by a provider outage (Q25); Retry resumes this same job and its queue.
     private(set) var failedJobID: UUID?
     /// A paused job loaded from the store, for example one left paused by a previous session, so its strip
@@ -100,7 +107,8 @@ final class DigestRunModel {
          coordinator: ReviewCoordinator? = nil,
          reminders: RemindersAccessModel = RemindersAccessModel(preview: .granted), progress: JobProgress? = nil, banner: String? = nil, failedJobID: UUID? = nil,
          lastRunAt: Date? = nil, lastRunFoundNothing: Bool = false, lastRunSummary: String? = nil,
-         jobs: [Job] = [], scheduledRunWaiting: Bool = false) {
+         jobs: [Job] = [], scheduledRunWaiting: Bool = false,
+         bannerKind: JobFailureKind? = nil, dailyStartFailedAt: Date? = nil) {
         self.settings = preview
         self.review = review
         let coordinator = coordinator ?? ReviewCoordinator.empty(review: review)
@@ -109,7 +117,8 @@ final class DigestRunModel {
         self.reminders = reminders
         self.processed = ProcessedMailModel(review: review, settings: preview, actions: RecordingMailActions(locations: [:]))
         self.progress = progress
-        self.banner = banner
+        self.bannerText = banner
+        if banner != nil { self.bannerContext = (bannerKind, dailyStartFailedAt) }
         self.failedJobID = failedJobID
         self.lastRunAt = lastRunAt
         self.lastRunFoundNothing = lastRunFoundNothing
@@ -156,8 +165,14 @@ final class DigestRunModel {
 
     /// The menu's primary Daily action. A Daily run that is starting has no job yet but already counts as running.
     var dailyAction: DailyMenuAction {
-        dailyStarting ? .running : dailyLifecycle.menuAction
+        if dailyStarting { return .running }
+        let action = dailyLifecycle.menuAction
+        // A Daily start that failed before any job existed offers Retry, which starts the run again.
+        return dailyStartFailedAt != nil && action.behavior == .startNew ? .retryStart : action
     }
+
+    /// When the last Daily start failed its Ollama check (no job was created), while that banner shows.
+    var dailyStartFailedAt: Date? { bannerContext?.dailyStartFailedAt }
 
     var isDailyActionEnabled: Bool {
         switch dailyAction.behavior {
@@ -174,6 +189,8 @@ final class DigestRunModel {
         var lines: [String] = []
         // The banner already gives a failed job's error in this session.
         let bannerExplains = banner != nil && failedJobID != nil && lifecycle.jobs.first?.id == failedJobID
+            // The attention card gives the persisted failed job's error after a relaunch.
+            || (menuAttention?.job).map { $0.id == lifecycle.jobs.first?.id } ?? false
         if let note = dailyAction.note, !bannerExplains { lines.append(note) }
         if scheduledRunWaiting, lifecycle != .none {
             lines.append("Today's scheduled Daily digest will run once the unfinished Daily job is finished.")
@@ -197,7 +214,7 @@ final class DigestRunModel {
 
     /// What the menu bar icon shows. Progress is bucketed to 5% so the icon is rarely redrawn.
     var menuBarIcon: MenuBarIconState {
-        guard let p = activeProgress else { return .idle }
+        guard let p = activeProgress else { return menuAttention == nil ? .idle : .warning }
         switch p.state {
         case .paused: return .paused
         case .listing: return .listing
@@ -205,6 +222,104 @@ final class DigestRunModel {
             guard p.total > 0 else { return .listing }
             return .progress(step: Int((Double(min(p.done, p.total)) / Double(p.total) * 20).rounded(.down)))
         }
+    }
+
+    // MARK: Menu panel
+
+    /// The failure the menu panel shows in place of the job section, or nil. Covers a failed job from this
+    /// session, a persisted failed Daily job after a relaunch, and any other banner.
+    struct MenuAttention: Equatable {
+        /// The failed job, when the failure belongs to one.
+        var job: Job?
+        var card: MenuAttentionCard
+        /// Subtitle under the job title ("Started 6:30 am · stopped before reading any emails").
+        var subtitle: String?
+        var title: String?
+        var showsRetry: Bool
+    }
+
+    /// Nil while a job is active; the progress card shows instead.
+    var menuAttention: MenuAttention? {
+        guard activeProgress == nil else { return nil }
+        var failed: Job?
+        if let failedJobID, let job = pastJobs.first(where: { $0.id == failedJobID })?.job, job.state == .failed {
+            failed = job
+        } else if case .failed(let job) = dailyLifecycle {
+            failed = job
+        }
+        let startFailedAt = failed == nil ? dailyStartFailedAt : nil
+        guard failed != nil || banner != nil else { return nil }
+        let message = banner ?? failed?.lastError ?? "The job stopped before it finished."
+        // A banner explains itself; the failed job's stored kind only applies when there is no banner.
+        let kind = banner != nil ? bannerContext?.kind : failed?.failureKind
+        let locale = Locale.current
+        let calendar = library.calendar
+        let title = failed.map { MenuPanelPresentation.jobTitle($0, calendar: calendar, locale: locale) }
+            ?? startFailedAt.map { at in
+                MenuPanelPresentation.jobTitle(kind: .daily, from: at, to: at, calendar: calendar, locale: locale)
+            }
+        let card = MenuPanelPresentation.attentionCard(kind: kind, jobTitle: title, message: message,
+                                                       model: settings.settings.resolvedModel)
+        var subtitle = failed.map {
+            MenuPanelPresentation.attentionSubtitle(startedAt: $0.startedAt, done: $0.totals.done + $0.totals.failed,
+                                                    total: $0.totals.done + $0.totals.failed + $0.totals.queued,
+                                                    calendar: calendar, locale: locale)
+        }
+        if let startFailedAt {
+            subtitle = MenuPanelPresentation.attentionSubtitle(startedAt: startFailedAt, done: 0, total: 0,
+                                                               calendar: calendar, locale: locale)
+        }
+        return MenuAttention(job: failed, card: card, subtitle: subtitle, title: title,
+                             showsRetry: failed != nil || startFailedAt != nil || showsBannerRetry)
+    }
+
+    /// The Retry in the attention card: continues the failed job by id. Disabled while anything runs.
+    var isAttentionRetryEnabled: Bool {
+        guard let job = menuAttention?.job else { return dailyStartFailedAt != nil ? canStartDaily : !isRunning }
+        return job.kind == .daily ? canRunDailyWork : !isRunning
+    }
+
+    func retryAttention() async {
+        guard let job = menuAttention?.job else {
+            if dailyStartFailedAt != nil { return await runNow() }
+            return await retryFailedJob()
+        }
+        if case .failed(let daily) = dailyLifecycle, daily.id == job.id {
+            await resumeDailyJob(job.id, expecting: .failed)
+        } else {
+            await resumeJob(job.id)
+        }
+    }
+
+    /// Title of the job in the progress card; Backlog jobs carry their date range.
+    func menuJobTitle(for progress: JobProgress) -> String {
+        if let job = pastJobs.first(where: { $0.id == progress.jobID })?.job {
+            return MenuPanelPresentation.jobTitle(job, calendar: library.calendar, locale: .current)
+        }
+        return progress.kind == .daily ? "Daily Digest" : "Backlog"
+    }
+
+    /// "Local · Qwen3 4B".
+    var menuModelLabel: String {
+        "Local · " + RoutingPresentation.modelDisplayName(settings.settings.resolvedModel)
+    }
+
+    /// The latest Daily digest as a one-line row; follows approvals and dismissals through the archive.
+    func menuSuggestionsRow(now: Date) -> MenuSuggestionsRow? {
+        library.archive.latestDaily.map {
+            MenuPanelPresentation.suggestionsRow($0, now: now, calendar: library.calendar, locale: .current)
+        }
+    }
+
+    private func showBanner(_ text: String, kind: JobFailureKind?, dailyStartFailedAt: Date? = nil) {
+        banner = text
+        bannerContext = (kind, dailyStartFailedAt)
+    }
+
+    private func showError(_ error: Error) {
+        let kind: JobFailureKind?
+        if case JobRunnerError.providerUnavailable(_, let k) = error { kind = k } else { kind = nil }
+        showBanner(Self.message(for: error), kind: kind)
     }
 
     private var llm: OllamaClient {
@@ -352,13 +467,15 @@ final class DigestRunModel {
         guard let store = await openStore() else { return }
 
         // Check Ollama first so a down server doesn't cost a mail listing (Q25).
+        let checkedAt = clock.now()
         do {
             try await llm.healthCheck()
         } catch let error as LLMError {
-            banner = error.userMessage
+            showBanner(error.userMessage, kind: JobFailureKind(error), dailyStartFailedAt: checkedAt)
             return
         } catch {
-            banner = "Ollama is not reachable. Start Ollama, or run `ollama pull qwen3:4b`."
+            showBanner("Ollama is not reachable. Start Ollama, or run `ollama pull qwen3:4b`.", kind: .ollamaUnreachable,
+                       dailyStartFailedAt: checkedAt)
             return
         }
 
@@ -388,7 +505,7 @@ final class DigestRunModel {
             await refreshJobLists()
             return
         } catch {
-            banner = Self.message(for: error)
+            showError(error)
             return
         }
         await finishRun(startedAt: startedAt)
@@ -418,7 +535,9 @@ final class DigestRunModel {
         if preempting {
             // Don't pause the Backlog job for a resume that would fail on a down Ollama anyway (Q25).
             do { try await llm.healthCheck() } catch {
-                banner = (error as? LLMError)?.userMessage ?? "Ollama is not reachable. Start Ollama, or run `ollama pull qwen3:4b`."
+                showBanner((error as? LLMError)?.userMessage
+                           ?? "Ollama is not reachable. Start Ollama, or run `ollama pull qwen3:4b`.",
+                           kind: (error as? LLMError).map { JobFailureKind($0) } ?? .ollamaUnreachable)
                 return
             }
         }
@@ -429,7 +548,7 @@ final class DigestRunModel {
             restoredProgress = nil
             await runner.waitUntilIdle()
         } catch {
-            banner = Self.message(for: error)
+            showError(error)
             await refreshJobLists()
             return
         }
@@ -486,7 +605,7 @@ final class DigestRunModel {
             restoredProgress = nil
             await runner.waitUntilIdle()
         } catch {
-            banner = Self.message(for: error)
+            showError(error)
             // A blocked resume leaves the job paused with its reason; show that in the strip and Past Jobs.
             await refreshJobLists()
             return
@@ -508,7 +627,7 @@ final class DigestRunModel {
             restoredProgress = nil
             await runner.waitUntilIdle()
         } catch {
-            banner = Self.message(for: error)
+            showError(error)
             await refreshJobLists()
             return
         }
@@ -560,7 +679,7 @@ final class DigestRunModel {
         let job = jobID.flatMap { id in jobs?.first { $0.id == id } } ?? jobs?.first
         if let job, job.state == .failed {
             failedJobID = job.id
-            banner = job.lastError ?? "The run stopped. Try again."
+            showBanner(job.lastError ?? "The run stopped. Try again.", kind: job.failureKind)
             Self.log.notice("run stopped: state=failed queued=\(job.totals.queued, privacy: .public)")
             await review.reload()
             return
@@ -800,7 +919,7 @@ final class DigestRunModel {
     }
 
     private static func message(for error: Error) -> String {
-        if case JobRunnerError.providerUnavailable(let message) = error { return message }
+        if case JobRunnerError.providerUnavailable(let message, _) = error { return message }
         if case JobRunnerError.resourceBlocked(let reason) = error { return reason.blockedMessage }
         if case JobRunnerError.nothingToProcess = error { return "There are no emails to process in this selection." }
         if case JobRunnerError.previewOutdated = error {

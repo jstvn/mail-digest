@@ -14,21 +14,25 @@ enum PreviewSupport {
 
     static func run(review: ReviewViewModel = review(), coordinator: ReviewCoordinator? = nil, reminders: RemindersAuthorization = .granted, progress: JobProgress? = nil, banner: String? = nil,
                     failedJobID: UUID? = nil, foundNothing: Bool = false, jobs: [Job] = [],
-                    scheduledRunWaiting: Bool = false) -> DigestRunModel {
+                    scheduledRunWaiting: Bool = false, bannerKind: JobFailureKind? = nil,
+                    dailyStartFailedAt: Date? = nil) -> DigestRunModel {
         DigestRunModel(preview: SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
                        review: review, coordinator: coordinator, reminders: RemindersAccessModel(preview: reminders), progress: progress, banner: banner, failedJobID: failedJobID,
                        lastRunAt: PreviewFixtures.now, lastRunFoundNothing: foundNothing,
                        lastRunSummary: "Last run 6:45 AM · 4 suggestions · 23 emails",
-                       jobs: jobs, scheduledRunWaiting: scheduledRunWaiting)
+                       jobs: jobs, scheduledRunWaiting: scheduledRunWaiting,
+                       bannerKind: bannerKind, dailyStartFailedAt: dailyStartFailedAt)
     }
 
     /// A persisted job for the menu's Daily action previews (Q52); `PreviewFixtures.jobID` by default, the
     /// job the sample progress describes.
     static func job(_ state: JobState, kind: JobKind = .daily, id: UUID = PreviewFixtures.jobID,
-                    lastError: String? = nil) -> Job {
+                    lastError: String? = nil, failureKind: JobFailureKind? = nil,
+                    startedAt: Date? = PreviewFixtures.now.addingTimeInterval(-3_600)) -> Job {
         Job(id: id, kind: kind, mailboxes: [], scopeFrom: PreviewFixtures.now.addingTimeInterval(-86_400),
             scopeTo: PreviewFixtures.now, state: state, createdAt: PreviewFixtures.now,
-            totals: JobTotals(queued: 12, done: 11, failed: 0, skipped: 0), autoPaused: false, lastError: lastError)
+            totals: JobTotals(queued: 12, done: 11, failed: 0, skipped: 0), autoPaused: false, lastError: lastError,
+            startedAt: startedAt, failureKind: failureKind)
     }
 
     /// `PreviewFixtures.pausedProgress` as a Daily job.
@@ -192,40 +196,69 @@ enum PreviewSupport {
     MenuBarView(run: run, access: MailAccessModel(preview: PreviewSupport.fastLocal))
 }
 
-#Preview("Menu bar") {
-    menu(PreviewSupport.run(progress: PreviewFixtures.runningProgress,
-                            jobs: [PreviewSupport.job(.running, kind: .backlog)]))
+/// The menu panel with a Daily digest in the library, so the last-run row shows.
+@MainActor private func menuRun(progress: JobProgress? = nil, banner: String? = nil, failedJobID: UUID? = nil,
+                                jobs: [Job] = [], scheduledRunWaiting: Bool = false,
+                                bannerKind: JobFailureKind? = nil, dailyStartFailedAt: Date? = nil) -> DigestRunModel {
+    PreviewSupport.run(coordinator: PreviewSupport.coordinator(), progress: progress, banner: banner,
+                       failedJobID: failedJobID, jobs: jobs, scheduledRunWaiting: scheduledRunWaiting,
+                       bannerKind: bannerKind, dailyStartFailedAt: dailyStartFailedAt)
 }
 
-#Preview("Menu · Run Now") { menu(PreviewSupport.run()) }
-
-#Preview("Menu · Daily paused → Resume") {
-    menu(PreviewSupport.run(progress: PreviewSupport.pausedDailyProgress, jobs: [PreviewSupport.job(.paused)],
-                            scheduledRunWaiting: true))
-}
-
-#Preview("Menu · Backlog paused → Run Now") {
-    menu(PreviewSupport.run(progress: PreviewFixtures.pausedProgress, jobs: [PreviewSupport.job(.paused, kind: .backlog)]))
+#Preview("Menu · Backlog running") {
+    menu(menuRun(progress: PreviewFixtures.runningProgress, jobs: [PreviewSupport.job(.running, kind: .backlog)]))
 }
 
 #Preview("Menu · Daily running") {
-    menu(PreviewSupport.run(progress: PreviewFixtures.dailyRunningProgress, jobs: [PreviewSupport.job(.running)]))
+    menu(menuRun(progress: PreviewFixtures.dailyRunningProgress, jobs: [PreviewSupport.job(.running)]))
+}
+
+#Preview("Menu · Run Daily Digest Now") { menu(menuRun()) }
+
+#Preview("Menu · no digest yet") { menu(PreviewSupport.run()) }
+
+#Preview("Menu · Daily paused → Resume") {
+    menu(menuRun(progress: PreviewSupport.pausedDailyProgress, jobs: [PreviewSupport.job(.paused)],
+                 scheduledRunWaiting: true))
+}
+
+#Preview("Menu · Backlog paused") {
+    menu(menuRun(progress: PreviewFixtures.pausedProgress, jobs: [PreviewSupport.job(.paused, kind: .backlog)]))
 }
 
 #Preview("Menu · Daily stopping") {
     var stopping = PreviewFixtures.dailyRunningProgress
     stopping.state = .stopping
-    return menu(PreviewSupport.run(progress: stopping, jobs: [PreviewSupport.job(.running)]))
+    return menu(menuRun(progress: stopping, jobs: [PreviewSupport.job(.running)]))
 }
 
-#Preview("Menu · Daily stopped") { menu(PreviewSupport.run(jobs: [PreviewSupport.job(.stopped)])) }
+#Preview("Menu · Daily stopped") { menu(menuRun(jobs: [PreviewSupport.job(.stopped)])) }
 
-#Preview("Menu · Daily failed → Retry") {
-    menu(PreviewSupport.run(jobs: [PreviewSupport.job(.failed, lastError: "Ollama isn't running. Start Ollama, or run `ollama pull qwen3:4b`.")]))
+#Preview("Menu · Ollama isn't running") {
+    menu(menuRun(jobs: [PreviewSupport.job(.failed, lastError: "Ollama is not reachable. Start Ollama and try again.",
+                                           failureKind: .ollamaUnreachable, startedAt: PreviewFixtures.now.addingTimeInterval(-300))]))
+}
+
+#Preview("Menu · Ollama down at Daily start") {
+    menu(menuRun(banner: "Ollama is not reachable. Start Ollama and try again.", bannerKind: .ollamaUnreachable,
+                 dailyStartFailedAt: PreviewFixtures.now.addingTimeInterval(-300)))
+}
+
+#Preview("Menu · Model isn't installed") {
+    menu(menuRun(jobs: [PreviewSupport.job(.failed, lastError: "The model qwen3:4b is not installed. Run: ollama pull qwen3:4b",
+                                           failureKind: .modelMissing)]))
+}
+
+#Preview("Menu · Daily failed (generic)") {
+    menu(menuRun(jobs: [PreviewSupport.job(.failed, lastError: "Ollama returned HTTP 500.", failureKind: .other)]))
+}
+
+#Preview("Menu · other banner") {
+    menu(menuRun(banner: "No inboxes found in Mail."))
 }
 
 #Preview("Menu · two unfinished Daily jobs") {
-    menu(PreviewSupport.run(jobs: [PreviewSupport.job(.paused, id: UUID()), PreviewSupport.job(.stopped, id: UUID())]))
+    menu(menuRun(jobs: [PreviewSupport.job(.paused, id: UUID()), PreviewSupport.job(.stopped, id: UUID())]))
 }
 
 #Preview("Settings") {

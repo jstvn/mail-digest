@@ -50,7 +50,7 @@ public enum JobRunnerError: Error, Sendable, Equatable {
     case alreadyRunning
     case jobNotFound
     /// The model provider failed its health check (Q25); the message says how to fix it.
-    case providerUnavailable(String)
+    case providerUnavailable(String, kind: JobFailureKind)
     /// A resource rule blocks this kind of job right now (Q43). The job was left (or created) paused with
     /// this reason and resumes by itself once the rule clears in this session (Q44).
     case resourceBlocked(PauseReason)
@@ -468,6 +468,7 @@ public actor JobRunner {
             job.state = .running
             job.clearPause()
             job.lastError = nil
+            job.failureKind = nil
             autoPausedThisSession.remove(job.id)
             let running = markRunning(&job, trigger: trigger)
             try await store.updateJob(job, event: running)
@@ -801,6 +802,7 @@ public actor JobRunner {
             // resumed by id once the cause is fixed.
             run.job.state = .failed
             run.job.lastError = (error as? ProviderFailure)?.message ?? Self.shortReason(error)
+            run.job.failureKind = (error as? ProviderFailure)?.kind ?? JobFailureKind(error)
             run.current = nil
             run.job.endedAt = clock.now()
             try? await store.updateJob(run.job, event: event(.failed, run.job.id,
@@ -943,7 +945,7 @@ public actor JobRunner {
             if Self.mightBeProviderFailure(error), let outage = await providerOutage() {
                 try await store.setItemState(item.id, .queued, error: nil)
                 run.current = nil
-                throw ProviderFailure(message: outage)
+                throw ProviderFailure(message: outage.message, kind: outage.kind)
             }
             let reason = Self.shortReason(error)
             // `item.attempts` was read before this attempt started. A timed-out extraction already
@@ -1133,20 +1135,22 @@ public actor JobRunner {
     // MARK: Provider health (Q25)
 
     /// A job-level stop caused by the model provider, not by the email being processed.
-    private struct ProviderFailure: Error { let message: String }
+    private struct ProviderFailure: Error { let message: String; let kind: JobFailureKind }
 
     /// Throws `providerUnavailable` unless the model provider passes its health check.
     private func preflight() async throws {
-        if let outage = await providerOutage() { throw JobRunnerError.providerUnavailable(outage) }
+        if let outage = await providerOutage() {
+            throw JobRunnerError.providerUnavailable(outage.message, kind: outage.kind)
+        }
     }
 
-    /// Nil when the provider is healthy, otherwise a message safe to show.
-    private func providerOutage() async -> String? {
+    /// Nil when the provider is healthy, otherwise a message safe to show and what kind of outage it is.
+    private func providerOutage() async -> (message: String, kind: JobFailureKind)? {
         do {
             try await llm.healthCheck()
             return nil
         } catch {
-            return (error as? LLMError)?.userMessage ?? Self.shortReason(error)
+            return ((error as? LLMError)?.userMessage ?? Self.shortReason(error), JobFailureKind(error))
         }
     }
 

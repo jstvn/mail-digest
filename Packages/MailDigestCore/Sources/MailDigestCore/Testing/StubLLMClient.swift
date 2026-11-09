@@ -26,6 +26,7 @@ public actor StubLLMClient: LLMClient {
     public private(set) var failures: [String: Int]
     public private(set) var headlineText: String
     public private(set) var healthy: Bool
+    private var healthFailure: (any Error)?
     public private(set) var onExtract: (@Sendable (EmailMessage) async throws -> Void)?
     public private(set) var extractCalls: [StubExtractCall] = []
     public private(set) var headlineCalls = 0
@@ -53,11 +54,14 @@ public actor StubLLMClient: LLMClient {
     public func setDefaultResult(_ result: ExtractionResult) { defaultResult = result }
     public func setFailures(_ new: [String: Int]) { failures = new }
     public func setHeadlineText(_ text: String) { headlineText = text }
-    public func setHealthy(_ value: Bool) { healthy = value }
+    public func setHealthy(_ value: Bool) { healthy = value; healthFailure = nil }
+
+    /// Makes the health check fail with `error` (for example `LLMError.unreachable`) until `setHealthy(true)`.
+    public func setHealthFailure(_ error: any Error) { healthy = false; healthFailure = error }
     public func setOnExtract(_ hook: (@Sendable (EmailMessage) async throws -> Void)?) { onExtract = hook }
 
     public func healthCheck() async throws {
-        if !healthy { throw StubLLMError.unhealthy }
+        if !healthy { throw healthFailure ?? StubLLMError.unhealthy }
     }
 
     public func extract(_ email: EmailMessage, tier: MailTier, trustedNewsletter: Bool,

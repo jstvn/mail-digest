@@ -83,6 +83,8 @@ public struct DigestArchive: Sendable, Equatable {
     public let months: [ArchiveMonth]
     /// Backlog digests, newest first.
     public let backlogs: [ArchiveBacklog]
+    /// The newest Daily digest of any day, for the menu panel's last-run row; never a Backlog digest.
+    public let latestDaily: DigestSummary?
 
     private let digestsByDay: [DigestDay: [UUID]]
     private let today: DigestDay
@@ -96,6 +98,7 @@ public struct DigestArchive: Sendable, Equatable {
         let dailies = summaries.filter { $0.kind == .daily }.sorted { $0.createdAt < $1.createdAt }
         func actionable(_ s: DigestSummary) -> Int { s.pendingCount + s.failedCount }
 
+        latestDaily = dailies.last
         todayDigestIDs = dailies.filter { DigestDay($0.createdAt, calendar: calendar) == today }.map(\.id)
         todayCount = dailies
             .filter { $0.createdAt < start || DigestDay($0.createdAt, calendar: calendar) == today }

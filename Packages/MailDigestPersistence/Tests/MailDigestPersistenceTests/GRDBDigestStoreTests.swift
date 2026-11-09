@@ -373,7 +373,7 @@ import MailDigestCore
         #expect(try reopened.setting("k") == "v")
         #expect(try await reopened.isProcessed("m"))
         let applied = try await reopened.writer.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations") }
-        #expect(applied == ["v1", "v2", "v3", "v4", "v5"])
+        #expect(applied == ["v1", "v2", "v3", "v4", "v5", "v6"])
     }
 
     @Test func stoppedStateAndPauseReasonSurviveReopen() async throws {
@@ -412,6 +412,38 @@ import MailDigestCore
         let store = try GRDBDigestStore(path: dir.databasePath)
         let job = try #require(try await store.jobs().first)
         #expect(job.state == .paused && job.autoPaused && job.pauseReason == nil)
+    }
+
+    @Test func failureKindRoundTripsAndLegacyRowsReadNil() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanUp() }
+        try FileManager.default.createDirectory(at: URL(fileURLWithPath: dir.databasePath).deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        // A failed job written before v6 has no kind.
+        let queue = try DatabaseQueue(path: dir.databasePath)
+        try GRDBDigestStore.migrator.migrate(queue, upTo: "v5")
+        let old = makeJob(state: .failed)
+        try await queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO job (id, kind, mailboxes, scope_from, scope_to, state, created_at, queued, done, failed,
+                                 skipped, auto_paused, last_error)
+                VALUES (?, 'daily', '[]', 0, 0, 'failed', 0, 1, 0, 0, 0, 0, 'Ollama is not reachable.')
+                """, arguments: [old.id.uuidString])
+        }
+        try queue.close()
+        let store = try GRDBDigestStore(path: dir.databasePath)
+        let legacy = try #require(try await store.jobs().first)
+        #expect(legacy.state == .failed && legacy.failureKind == nil)
+
+        var updated = legacy
+        updated.failureKind = .modelMissing
+        try await store.updateJob(updated, event: nil)
+        #expect(try await store.jobs().first?.failureKind == .modelMissing)
+
+        var created = makeJob(state: .failed)
+        created.failureKind = .ollamaUnreachable
+        try await store.createJob(created)
+        #expect(try await store.jobs().first { $0.id == created.id }?.failureKind == .ollamaUnreachable)
     }
 
     // MARK: Pinned info
