@@ -98,6 +98,9 @@ public protocol DigestStore: Sendable {
     func enqueue(_ headers: [MessageHeader], job jobID: UUID) async throws
     /// True if an item with this message id is queued or processing in any job.
     func isQueued(_ messageID: String) async throws -> Bool
+    /// Like `isQueued`, but leaves out items of stopped Backlog jobs. Such a job releases its reservation for
+    /// new Backlog selections (Q71); it stays resumable by id and keeps its own queue.
+    func isReservedFromBacklog(_ messageID: String) async throws -> Bool
     /// Up to `limit` queued items, lowest position first.
     func nextQueued(job jobID: UUID, limit: Int) async throws -> [JobItem]
     /// All items of a job, by position.

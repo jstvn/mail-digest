@@ -30,6 +30,8 @@ struct JobSetupView: View {
             model.applyDefaultSelection(from: run.mailboxes)
         }
         .onChange(of: run.mailboxes) { _, boxes in model.applyDefaultSelection(from: boxes) }
+        // The window is a single scene whose state can outlive it; never reopen on an old preview.
+        .onDisappear { model.reset() }
     }
 
     // MARK: Header and footer
@@ -225,6 +227,11 @@ struct JobSetupView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Preview · \(model.scopeDescription) · \(JobFormat.number(confirmed.toProcess.count)) emails · \(JobFormat.duration(confirmed.estimatedSeconds))")
                 .font(.headline)
+            if confirmed.toProcess.isEmpty {
+                Text(nothingToProcessText(preview, confirmed: confirmed))
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             ForEach(preview.plan.mailboxes, id: \.self) { box in
                 HStack {
                     Text("\(box.account) · \(box.name)")
@@ -247,6 +254,15 @@ struct JobSetupView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Why Start is unavailable: no mail at all, everything handled already, or everything unticked.
+    private func nothingToProcessText(_ preview: JobPreview, confirmed: JobPreview) -> String {
+        if preview.totalFound == 0 { return "There is no mail in this range, so there is nothing to process." }
+        if preview.toProcess.isEmpty {
+            return "Nothing to process: every email found is already processed or queued in another job."
+        }
+        return "Nothing to process: every email is unticked."
     }
 
     private func emailList(_ preview: JobPreview) -> some View {

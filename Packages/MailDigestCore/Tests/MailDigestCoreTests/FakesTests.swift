@@ -98,6 +98,21 @@ private func header(_ id: String) -> MessageHeader {
         await #expect(throws: CancellationError.self) { _ = try await task.value }
     }
 
+    @Test func stoppedJobIsNotReservedForBacklog() async throws {
+        let store = InMemoryDigestStore()
+        let job = Job(id: UUID(), kind: .backlog, mailboxes: [], scopeFrom: Date(timeIntervalSince1970: 0),
+                      scopeTo: Date(timeIntervalSince1970: 10), state: .paused, createdAt: Date(timeIntervalSince1970: 10),
+                      totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        try await store.createJob(job)
+        try await store.enqueue([header("a")], job: job.id)
+        #expect(try await store.isReservedFromBacklog("a"))
+        var stopped = job
+        stopped.state = .stopped
+        try await store.updateJob(stopped)
+        #expect(try await store.isQueued("a"))
+        #expect(try await !store.isReservedFromBacklog("a"))
+    }
+
     @Test func storeQueueBasics() async throws {
         let store = InMemoryDigestStore()
         let job = UUID()

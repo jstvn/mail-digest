@@ -267,6 +267,13 @@ public actor InMemoryDigestStore: DigestStore {
         itemList.contains { $0.messageID == messageID && ($0.state == .queued || $0.state == .processing) }
     }
 
+    public func isReservedFromBacklog(_ messageID: String) async throws -> Bool {
+        let stopped = Set(jobList.filter { $0.state == .stopped && $0.kind == .backlog }.map(\.id))
+        return itemList.contains {
+            $0.messageID == messageID && ($0.state == .queued || $0.state == .processing) && !stopped.contains($0.jobID)
+        }
+    }
+
     public func nextQueued(job jobID: UUID, limit: Int) async throws -> [JobItem] {
         let cap = max(0, limit)
         guard cap > 0 else { return [] }

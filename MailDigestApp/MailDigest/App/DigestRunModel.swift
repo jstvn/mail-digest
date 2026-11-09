@@ -522,15 +522,15 @@ final class DigestRunModel {
     }
 
     /// Job setup: queues exactly the confirmed plan and starts it in the background. Returns once the job is
-    /// queued; progress then arrives through the progress strip. Returns an error message on failure.
-    func startBacklog(_ plan: JobPlan) async -> String? {
-        guard !isRunning else { return "Another job is already running." }
+    /// queued; progress then arrives through the progress strip. Returns the failure otherwise.
+    func startBacklog(_ plan: JobPlan) async -> BacklogStartFailure? {
+        guard !isRunning else { return BacklogStartFailure(message: "Another job is already running.") }
         busyFlag = true
         banner = nil
         progressText = "Starting…"
         guard let runner = await ensureRunner() else {
             busyFlag = false; progressText = nil
-            return banner ?? "Could not open the Mail Digest database."
+            return BacklogStartFailure(message: banner ?? "Could not open the Mail Digest database.")
         }
         do {
             // Q43: a job created while a rule applies is stored paused before any email is read.
@@ -538,7 +538,8 @@ final class DigestRunModel {
             try await runner.start(plan)
         } catch {
             busyFlag = false; progressText = nil
-            return Self.message(for: error)
+            return BacklogStartFailure(message: Self.message(for: error),
+                                       previewOutdated: (error as? JobRunnerError) == .previewOutdated)
         }
         evaluateResources(force: true)
         Task {
@@ -801,6 +802,10 @@ final class DigestRunModel {
     private static func message(for error: Error) -> String {
         if case JobRunnerError.providerUnavailable(let message) = error { return message }
         if case JobRunnerError.resourceBlocked(let reason) = error { return reason.blockedMessage }
+        if case JobRunnerError.nothingToProcess = error { return "There are no emails to process in this selection." }
+        if case JobRunnerError.previewOutdated = error {
+            return "These emails changed after the preview. Check the updated preview, then start again."
+        }
         if case JobRunnerError.dailyJobUnresolved = error {
             return "A Daily job is unfinished. Resume it, or review it in Settings > Jobs, before a new Daily digest runs."
         }
@@ -822,6 +827,12 @@ struct PastJobRow: Identifiable, Equatable, Sendable {
 }
 
 enum JobSetupError: Error { case databaseUnavailable }
+
+/// Why a Backlog start did not begin. `previewOutdated` tells the setup window to reload its preview.
+struct BacklogStartFailure: Equatable {
+    var message: String
+    var previewOutdated = false
+}
 
 /// What "Delete All History Now" reports back to Settings.
 enum DeleteHistoryResult: Equatable {

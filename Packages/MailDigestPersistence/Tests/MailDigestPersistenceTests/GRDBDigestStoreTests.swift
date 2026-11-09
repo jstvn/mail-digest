@@ -141,6 +141,40 @@ import MailDigestCore
         #expect(try await store.jobs().count == 2)
     }
 
+    @Test func stoppedJobReleasesItsReservationForBacklogOnly() async throws {
+        let store = try GRDBDigestStore.inMemory()
+        var running = makeJob(), other = makeJob()
+        running.state = .paused
+        other.state = .running
+        try await store.createJob(running)
+        try await store.createJob(other)
+        try await store.enqueue([makeHeader("a")], job: running.id)
+        try await store.enqueue([makeHeader("b")], job: other.id)
+        #expect(try await store.isReservedFromBacklog("a"))
+        #expect(try await store.isReservedFromBacklog("b"))
+
+        running.state = .stopped
+        try await store.updateJob(running)
+        // Stopped: still queued for `isQueued`, but no longer reserved.
+        #expect(try await store.isQueued("a"))
+        #expect(try await !store.isReservedFromBacklog("a"))
+        #expect(try await store.isReservedFromBacklog("b"))
+        #expect(try await !store.isReservedFromBacklog("missing"))
+
+        // A stopped Daily job keeps its queue reserved (Q23).
+        var daily = makeJob()
+        daily.kind = .daily
+        daily.state = .stopped
+        try await store.createJob(daily)
+        try await store.enqueue([makeHeader("c")], job: daily.id)
+        #expect(try await store.isReservedFromBacklog("c"))
+
+        // Done items never count.
+        let b = try #require(try await store.items(job: other.id).first)
+        try await store.setItemState(b.id, .done, error: nil)
+        #expect(try await !store.isReservedFromBacklog("b"))
+    }
+
     @Test func queueSemanticsAndAttemptRule() async throws {
         let store = try GRDBDigestStore.inMemory()
         let job = makeJob()

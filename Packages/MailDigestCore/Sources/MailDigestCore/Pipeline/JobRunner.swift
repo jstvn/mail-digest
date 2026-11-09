@@ -57,6 +57,11 @@ public enum JobRunnerError: Error, Sendable, Equatable {
     /// An unresolved Daily job exists (Q52), so no other Daily job is created or put back to work. The
     /// user resolves it (Resume, Retry) instead.
     case dailyJobUnresolved
+    /// A Backlog selection has no emails to process. No job was created.
+    case nothingToProcess
+    /// Some emails confirmed in the preview are no longer selectable (processed, queued in another job that
+    /// still holds it, or gone from Mail). No job was created; preview again.
+    case previewOutdated
 }
 
 /// Runs persisted jobs one email at a time with a checkpoint after each email.
@@ -243,9 +248,12 @@ public actor JobRunner {
     public func preview(_ plan: JobPlan) async throws -> JobPreview {
         let (headers, unavailable) = try await listHeaders(plan)
         let builder = JobPreviewBuilder(filter: settings.filter)
-        return builder.build(plan: plan, headers: headers, isProcessedOrQueued: unavailable,
-                             averageSecondsPerEmail: try await rollingAverage(),
-                             limit: dailyLimit(plan))
+        var result = builder.build(plan: plan, headers: headers, isProcessedOrQueued: unavailable,
+                                   averageSecondsPerEmail: try await rollingAverage(),
+                                   limit: dailyLimit(plan))
+        // Backlog start queues exactly what was previewed (and ticked), not a fresh listing.
+        if plan.kind == .backlog { result.plan.confirmedMessageIDs = Set(result.toProcess.map(\.id)) }
+        return result
     }
 
     /// Mean seconds of the last 20 finished emails across all jobs, or nil without history.
@@ -268,15 +276,19 @@ public actor JobRunner {
         for mailbox in plan.mailboxes where headers[mailbox] == nil {
             let listed = try await source.listHeaders(in: mailbox, from: plan.from, to: plan.to)
             headers[mailbox] = listed
-            unavailable.formUnion(try await processedOrQueued(listed.map(\.id).filter { !plan.excludedMessageIDs.contains($0) }))
+            unavailable.formUnion(try await processedOrQueued(listed.map(\.id).filter { !plan.excludedMessageIDs.contains($0) },
+                                                               kind: plan.kind))
         }
         return (headers, unavailable)
     }
 
-    private func processedOrQueued(_ ids: [String]) async throws -> Set<String> {
+    /// Backlog selection ignores items of stopped Backlog jobs (Q71: Stop releases them); Daily keeps `isQueued`.
+    private func processedOrQueued(_ ids: [String], kind: JobKind) async throws -> Set<String> {
         var result = Set<String>()
         for id in ids {
-            if try await store.isProcessed(id) { result.insert(id) } else if try await store.isQueued(id) { result.insert(id) }
+            if try await store.isProcessed(id) { result.insert(id); continue }
+            let queued = kind == .backlog ? try await store.isReservedFromBacklog(id) : try await store.isQueued(id)
+            if queued { result.insert(id) }
         }
         return result
     }
@@ -536,13 +548,24 @@ public actor JobRunner {
         var job = Job(id: UUID(), kind: plan.kind, mailboxes: plan.mailboxes, scopeFrom: plan.from,
                       scopeTo: plan.to, state: .listing, createdAt: now,
                       totals: JobTotals(queued: 0, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        // Backlog selects first, so a refusal leaves no job and no events behind.
+        var backlogHeaders: [MessageHeader]?
+        if plan.kind == .backlog {
+            do {
+                backlogHeaders = try await confirmedBacklogSelection(plan)
+            } catch {
+                busy = false
+                throw error
+            }
+        }
         do {
             try await store.createJob(job)
             run = RunState(job: job, digest: Digest(id: job.id, createdAt: now, headline: "", emailCount: 0,
                                                     suggestions: [], info: [], skipped: []), digestStored: false)
             emit(force: true)
 
-            let headers = try await select(plan).toProcess
+            let headers: [MessageHeader]
+            if let backlogHeaders { headers = backlogHeaders } else { headers = try await select(plan).toProcess }
 
             var index = 0
             while index < headers.count {
@@ -582,6 +605,20 @@ public actor JobRunner {
             run = nil
             throw error
         }
+    }
+
+    /// The headers a Backlog start queues. With a confirmed set, exactly those emails; throws `previewOutdated`
+    /// if any is no longer selectable, and `nothingToProcess` when there is nothing to queue.
+    private func confirmedBacklogSelection(_ plan: JobPlan) async throws -> [MessageHeader] {
+        var headers = try await select(plan).toProcess
+        if let confirmed = plan.confirmedMessageIDs {
+            guard !confirmed.isEmpty else { throw JobRunnerError.nothingToProcess }
+            let selectable = Set(headers.map(\.id))
+            guard confirmed.isSubset(of: selectable) else { throw JobRunnerError.previewOutdated }
+            headers = headers.filter { confirmed.contains($0.id) }
+        }
+        guard !headers.isEmpty else { throw JobRunnerError.nothingToProcess }
+        return headers
     }
 
     /// Rebuilds counters from the persisted items so a resumed job reports correct totals.
@@ -809,21 +846,25 @@ public actor JobRunner {
         }
     }
 
+    /// Outcome for an item whose message was already processed, by another job or before a crash.
+    static let alreadyProcessedOutcome = "skipped: already processed"
+
     /// Skip reason recorded when a fetched message has no readable body text.
     static let unreadableBodyReason = "no readable body"
 
     /// Processes one item. Returns true if it went back to `queued`.
     private func handle(_ item: JobItem, email: EmailMessage?, run: RunState) async throws -> Bool {
+        // A message can be queued in a stopped job and a newer one; whichever runs second must not redo it.
+        // Only `markProcessed` after a successful run sets this, so failed or requeued items still retry.
+        if try await store.isProcessed(item.messageID) {
+            try await complete(run, item, state: .skipped, outcome: Self.alreadyProcessedOutcome, seconds: nil, error: nil)
+            return false
+        }
         guard let email else {
             let reason = "not found in Mail"
             try await persist(EmailResult(emailID: item.messageID, skipped: SkippedEmail(
                 id: item.messageID, sender: item.sender, subject: item.subject, reason: reason)), in: run)
             try await complete(run, item, state: .skipped, outcome: "skipped: \(reason)", seconds: nil, error: reason)
-            return false
-        }
-        // Guards against a crash between "marked processed" and "item done".
-        if try await store.isProcessed(item.messageID) {
-            try await complete(run, item, state: .skipped, outcome: "skipped: already processed", seconds: nil, error: nil)
             return false
         }
         // An empty body (for example a message Mail never downloaded) must not reach the model. It is

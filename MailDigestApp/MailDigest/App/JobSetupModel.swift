@@ -93,9 +93,10 @@ final class JobSetupModel {
     // MARK: Preview
 
     /// Lists headers only; no bodies, no model calls.
-    func loadPreview(run: DigestRunModel) {
+    /// `message` stays visible after the reload, for example when Start found the preview outdated.
+    func loadPreview(run: DigestRunModel, message: String? = nil) {
         previewTask?.cancel()
-        error = nil
+        error = message
         excluded = []
         preview = nil
         isLoadingPreview = true
@@ -111,6 +112,25 @@ final class JobSetupModel {
                 self.error = Self.message(for: error)
             }
         }
+    }
+
+    /// Returns the window to its first step with the default selection and no preview, so a reopened
+    /// window never shows a stale one. Cancels an in-flight preview first.
+    func reset() {
+        previewTask?.cancel()
+        previewTask = nil
+        step = .mailboxes
+        selected = []
+        didDefaultSelection = false
+        showAllMailboxes = false
+        scope = .last30
+        customFrom = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+        customTo = .now
+        preview = nil
+        excluded = []
+        error = nil
+        isLoadingPreview = false
+        isStarting = false
     }
 
     func invalidatePreview() {
@@ -152,6 +172,8 @@ final class JobSetupModel {
         let perEmail = p.toProcess.isEmpty ? 20 : p.estimatedSeconds / Double(p.toProcess.count)
         p.toProcess.removeAll { excluded.contains($0.id) }
         p.plan.excludedMessageIDs = excluded
+        // Start queues exactly these emails, not a fresh listing.
+        p.plan.confirmedMessageIDs = Set(p.toProcess.map(\.id))
         p.estimatedSeconds = perEmail * Double(p.toProcess.count)
         return p
     }
@@ -168,8 +190,12 @@ final class JobSetupModel {
         guard let plan = confirmed?.plan, !isStarting else { return false }
         isStarting = true
         defer { isStarting = false }
-        if let message = await run.startBacklog(plan) {
-            error = message
+        if let failure = await run.startBacklog(plan) {
+            if failure.previewOutdated {
+                loadPreview(run: run, message: failure.message)
+            } else {
+                error = failure.message
+            }
             return false
         }
         return true

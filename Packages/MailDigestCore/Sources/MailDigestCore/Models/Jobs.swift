@@ -55,13 +55,19 @@ public struct JobPlan: Codable, Sendable, Equatable {
     public var from: Date
     public var to: Date
     public var excludedMessageIDs: Set<String>
+    /// The exact emails the user confirmed in a Backlog preview (unticked ones removed). When set, `start`
+    /// queues only these and refuses with `previewOutdated` if any is no longer selectable. Nil means
+    /// "whatever the selection finds now" (Daily, and callers that never previewed).
+    public var confirmedMessageIDs: Set<String>?
 
-    public init(kind: JobKind, mailboxes: [MailboxRef], from: Date, to: Date, excludedMessageIDs: Set<String>) {
+    public init(kind: JobKind, mailboxes: [MailboxRef], from: Date, to: Date, excludedMessageIDs: Set<String>,
+                confirmedMessageIDs: Set<String>? = nil) {
         self.kind = kind
         self.mailboxes = mailboxes
         self.from = from
         self.to = to
         self.excludedMessageIDs = excludedMessageIDs
+        self.confirmedMessageIDs = confirmedMessageIDs
     }
 }
 

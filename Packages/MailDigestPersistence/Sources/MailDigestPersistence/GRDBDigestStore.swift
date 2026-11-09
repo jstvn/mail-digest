@@ -719,6 +719,17 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         }
     }
 
+    public func isReservedFromBacklog(_ messageID: String) async throws -> Bool {
+        try await writer.read { db in
+            try Bool.fetchOne(db, sql: """
+                SELECT EXISTS (
+                    SELECT 1 FROM job_item i JOIN job j ON j.id = i.job_id
+                    WHERE i.message_id = ? AND i.state IN ('queued', 'processing')
+                      AND NOT (j.state = 'stopped' AND j.kind = 'backlog'))
+                """, arguments: [messageID]) ?? false
+        }
+    }
+
     public func nextQueued(job jobID: UUID, limit: Int) async throws -> [JobItem] {
         let cap = max(0, limit)
         guard cap > 0 else { return [] }

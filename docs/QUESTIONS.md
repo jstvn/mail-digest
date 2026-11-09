@@ -369,3 +369,11 @@ Each item says what the spec leaves open and the interim choice the build uses, 
    - **Migration:** a stored Kev 0.8B saved before default revision 2 only reflected the old default and becomes Kev 4B. One saved at revision 2 had been kept as the low-memory option and becomes Tev1. Any other stored value, including a custom tag, is left alone.
    - **There was no automatic low-memory selection or model fallback to replace.** The app sends the configured tag or keeps mail local, so the model in Activity is the one used. Old Activity rows keep the model they recorded.
    - **Model checks:** a missing model is no longer cached for the app's lifetime, so installing it takes effect on the next job.
+
+## Backlog selection after Stop (2026-11-09)
+
+71. **Does a stopped Backlog job keep its queued mail reserved, and what does Start queue?** (decided)
+   - **Decision (approved by Justin, 2026-11-09):** Stop releases the reservation. Mail queued only in a `.stopped` Backlog job is available to a new Backlog selection. `.paused` jobs, stopped Daily jobs (Q23) and every other job keep theirs, in line with Q15 (paused is a temporary suspension, Stop ends the run). Daily selection and Q53 discovery still treat all queued mail as queued.
+   - **Resuming:** a stopped job stays resumable by explicit id, and creating a new job doesn't touch its items. An item whose message has since been processed by another job is skipped, not processed twice.
+   - **Start:** a Backlog job queues exactly the IDs confirmed in its preview. Start creates no job when the selection is empty, or when any confirmed email can no longer be selected. In the second case the setup window reloads the preview and says why.
+   - **Why:** a job stopped at 1 of 7 held its 6 queued emails, and a reopened setup window still offered its old preview. Start re-derived the selection, found nothing and recorded `Completed · 0 of 0` twice.

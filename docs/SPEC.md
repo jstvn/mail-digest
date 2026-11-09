@@ -397,7 +397,7 @@ Before declaring the mail pipeline production-ready, reconcile the existing Core
 
 - The Daily job lists the window from the previous qualifying Daily scope end (at most 48 hours back) to now, in the Daily mailboxes (default: every account's inbox, matching "All Inboxes").
 - Other mailboxes and older mail are only touched by a job the user sets up, previews and confirms (see Large inboxes).
-- Already processed or queued RFC Message-IDs are dropped before queueing. The Mail store row ID is not used for cross-run deduplication.
+- Already processed or queued RFC Message-IDs are dropped before queueing. For a Backlog selection, mail queued only in a stopped Backlog job counts as available (Q71). The Mail store row ID is not used for cross-run deduplication.
 - Persist each email's result as soon as its processing finishes. The 50-email Backlog review batch is a logical presentation/pagination grouping, not a barrier that prevents users from reviewing already persisted results while the job continues.
 
 ## Filtering and LLM layer

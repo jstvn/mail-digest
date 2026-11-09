@@ -267,9 +267,11 @@ private func oldMessages(_ count: Int, prefix: String = "old") -> [EmailMessage]
 
     @Test func emptyJobLeavesNoDigestAndRetryFailedDropsFailedResults() async throws {
         let h = Harness(source: FixtureMailSource(messages: []), llm: StubLLMClient())
-        try await h.runner.start(h.plan(boxes: [icloud]))
+        // A zero-email Daily job is legitimate; an empty Backlog selection is refused instead.
+        try await h.runner.startDaily()
         await h.runner.waitUntilIdle()
         #expect(await h.store.allDigests().isEmpty)
+        #expect(try await h.store.jobs().map(\.state) == [.finished])
 
         let h2 = Harness(source: FixtureMailSource(messages: oldMessages(2)),
                          llm: StubLLMClient(failures: ["old-0@fixture": Int.max]))
@@ -347,13 +349,12 @@ private func oldMessages(_ count: Int, prefix: String = "old") -> [EmailMessage]
 
         try await h.runner.startDaily()
         await h.runner.waitUntilIdle()
-        // A Backlog job over the same window also finds everything processed.
-        try await h.runner.start(h.plan())
-        await h.runner.waitUntilIdle()
+        // A Backlog job over the same window finds everything processed and is refused without a job.
+        await #expect(throws: JobRunnerError.nothingToProcess) { try await h.runner.start(h.plan()) }
 
         #expect(await h.llm.extractCalls.count == extractsAfterFirst)
         let jobs = try await h.store.jobs()
-        #expect(jobs.count == 3 && jobs.allSatisfy { $0.state == .finished })
+        #expect(jobs.count == 2 && jobs.allSatisfy { $0.state == .finished })
         #expect(await h.notifier.messages.count == 1)
         #expect(await h.store.allDigests().count == 1) // empty jobs write no digest
     }
@@ -1626,5 +1627,192 @@ private func recentMessages(_ count: Int) -> [EmailMessage] {
         try await h.runner.start(h.plan(boxes: [icloud]))
         await h.runner.waitUntilIdle()
         #expect(await h.store.allItems().allSatisfy { $0.startedAt == today })
+    }
+}
+
+// MARK: Stop releases the Backlog reservation; confirmed selection
+
+@Suite struct BacklogSelectionTests {
+    private func harness(_ count: Int = 4, messages: [EmailMessage]? = nil) -> Harness {
+        Harness(source: FixtureMailSource(messages: messages ?? oldMessages(count)), llm: StubLLMClient())
+    }
+
+    private func ids(_ range: ClosedRange<Int>) -> Set<String> { Set(range.map { "old-\($0)@fixture" }) }
+
+    /// Starts a Backlog job and stops it while old-1 runs: old-0 is done, the rest are queued.
+    private func stoppedJob(_ h: Harness) async throws -> Job {
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "old-1@fixture" { await runner.stop() }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract { _ in }
+        let job = try await h.job()
+        #expect(job.state == .stopped)
+        return job
+    }
+
+    @Test func newBacklogOverStoppedJobQueuesItsLeftoversAndRefusesTheNext() async throws {
+        let h = harness(4)
+        let stopped = try await stoppedJob(h)
+        let before = try await h.store.items(job: stopped.id)
+        #expect(before.map(\.state) == [.done, .queued, .queued, .queued])
+
+        let preview = try await h.runner.preview(h.plan(boxes: [icloud]))
+        #expect(Set(preview.toProcess.map(\.id)) == ids(1...3))
+        #expect(preview.plan.confirmedMessageIDs == ids(1...3))
+        try await h.runner.start(preview.plan)
+        await h.runner.waitUntilIdle()
+
+        let jobs = try await h.store.jobs()
+        #expect(jobs.count == 2)
+        let newJob = try #require(jobs.first { $0.id != stopped.id })
+        #expect(newJob.state == .finished && newJob.totals.done == 3)
+        #expect(Set(try await h.store.items(job: newJob.id).map(\.messageID)) == ids(1...3))
+        // The stopped job is untouched by the new job.
+        #expect(try await h.store.items(job: stopped.id) == before)
+
+        // The same range again has nothing selectable: refused, no job.
+        let again = try await h.runner.preview(h.plan(boxes: [icloud]))
+        #expect(again.toProcess.isEmpty)
+        await #expect(throws: JobRunnerError.nothingToProcess) { try await h.runner.start(again.plan) }
+        await #expect(throws: JobRunnerError.nothingToProcess) { try await h.runner.start(h.plan(boxes: [icloud])) }
+        #expect(try await h.store.jobs().count == 2)
+    }
+
+    @Test func stalePlanIsRefusedWithoutCreatingAJob() async throws {
+        let h = harness(4)
+        let preview = try await h.runner.preview(h.plan(boxes: [icloud]))
+        // A paused job reserves one of the previewed emails afterwards.
+        let paused = Job(id: UUID(), kind: .backlog, mailboxes: [icloud], scopeFrom: today, scopeTo: today,
+                         state: .paused, createdAt: today,
+                         totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        try await h.store.createJob(paused)
+        let header = try #require(preview.toProcess.first)
+        try await h.store.enqueue([header], job: paused.id)
+
+        await #expect(throws: JobRunnerError.previewOutdated) { try await h.runner.start(preview.plan) }
+        #expect(try await h.store.jobs().map(\.id) == [paused.id])
+        #expect(await h.store.allItems().count == 1)
+        #expect(await h.llm.extractCalls.isEmpty)
+
+        // The runner is not left busy: a fresh preview starts fine and leaves the paused job's mail alone.
+        let fresh = try await h.runner.preview(h.plan(boxes: [icloud]))
+        #expect(!fresh.toProcess.contains { $0.id == header.id } && fresh.toProcess.count == 3)
+        try await h.runner.start(fresh.plan)
+        await h.runner.waitUntilIdle()
+        #expect(try await h.store.jobs().count == 2)
+    }
+
+    @Test func processedMailAfterPreviewMakesThePlanStale() async throws {
+        let h = harness(3)
+        let preview = try await h.runner.preview(h.plan(boxes: [icloud]))
+        try await h.store.markProcessed(ProcessedEmail(id: "old-0@fixture", receivedAt: today, tier: .full,
+                                                       processedAt: today))
+        await #expect(throws: JobRunnerError.previewOutdated) { try await h.runner.start(preview.plan) }
+        #expect(try await h.store.jobs().isEmpty)
+    }
+
+    @Test func emptyBacklogIsRefusedWithoutAJobOrEvents() async throws {
+        let h = harness(0)
+        await #expect(throws: JobRunnerError.nothingToProcess) { try await h.runner.start(h.plan(boxes: [icloud])) }
+        #expect(try await h.store.jobs().isEmpty)
+
+        let full = harness(3)
+        var plan = full.plan(boxes: [icloud])
+        plan.confirmedMessageIDs = []
+        await #expect(throws: JobRunnerError.nothingToProcess) { try await full.runner.start(plan) }
+        #expect(try await full.store.jobs().isEmpty)
+        // Not busy afterwards.
+        try await full.runner.start(full.plan(boxes: [icloud]))
+        await full.runner.waitUntilIdle()
+        #expect(try await full.job().state == .finished)
+    }
+
+    @Test func onlyConfirmedMailIsQueued() async throws {
+        let h = harness(4)
+        var preview = try await h.runner.preview(h.plan(boxes: [icloud]))
+        // The user unticks old-3; new mail arrives after the preview.
+        preview.plan.excludedMessageIDs = ["old-3@fixture"]
+        preview.plan.confirmedMessageIDs = ids(0...2)
+        await h.source.addMessage(oldMessages(1, prefix: "late")[0])
+
+        try await h.runner.start(preview.plan)
+        await h.runner.waitUntilIdle()
+        #expect(Set(await h.store.allItems().map(\.messageID)) == ids(0...2))
+    }
+
+    @Test func pausedJobKeepsItsReservation() async throws {
+        let h = harness(3)
+        let paused = Job(id: UUID(), kind: .backlog, mailboxes: [icloud], scopeFrom: today, scopeTo: today,
+                         state: .paused, createdAt: today,
+                         totals: JobTotals(queued: 1, done: 0, failed: 0, skipped: 0), autoPaused: false)
+        try await h.store.createJob(paused)
+        let first = try #require(try await h.runner.preview(h.plan(boxes: [icloud])).toProcess.first)
+        try await h.store.enqueue([first], job: paused.id)
+        let preview = try await h.runner.preview(h.plan(boxes: [icloud]))
+        #expect(!preview.toProcess.contains { $0.id == first.id } && preview.alreadyProcessed == 1)
+    }
+
+    @Test func resumedStoppedJobSkipsMailProcessedElsewhere() async throws {
+        let h = harness(4)
+        let stopped = try await stoppedJob(h)
+        // A newer job takes old-1 and old-2; old-3 is unticked so only the stopped job holds it.
+        var preview = try await h.runner.preview(h.plan(boxes: [icloud]))
+        preview.plan.excludedMessageIDs = ["old-3@fixture"]
+        preview.plan.confirmedMessageIDs = ids(1...2)
+        try await h.runner.start(preview.plan)
+        await h.runner.waitUntilIdle()
+        let callsBefore = await h.llm.extractCalls.map(\.id)
+
+        try await h.runner.resume(jobID: stopped.id)
+        await h.runner.waitUntilIdle()
+        let items = try await h.store.items(job: stopped.id)
+        #expect(items.map(\.state) == [.done, .skipped, .skipped, .done])
+        #expect(items[1].outcome == "skipped: already processed" && items[2].outcome == items[1].outcome)
+        // Only old-3 reached the pipeline.
+        #expect(await h.llm.extractCalls.map(\.id) == callsBefore + ["old-3@fixture"])
+        let job = try await h.job(stopped.id)
+        #expect(job.state == .finished && job.totals.skipped == 2 && job.totals.done == 2 && job.totals.queued == 0)
+    }
+
+    @Test func resumedStoppedJobWhoseMailWasAllProcessedElsewhereFinishes() async throws {
+        let h = harness(3)
+        let stopped = try await stoppedJob(h)
+        let preview = try await h.runner.preview(h.plan(boxes: [icloud]))
+        try await h.runner.start(preview.plan)
+        await h.runner.waitUntilIdle()
+        let calls = await h.llm.extractCalls.count
+
+        try await h.runner.resume(jobID: stopped.id)
+        await h.runner.waitUntilIdle()
+        #expect(await h.llm.extractCalls.count == calls)
+        #expect(try await h.job(stopped.id).state == .finished)
+    }
+
+    @Test func dailyStillTreatsAStoppedJobsQueueAsQueued() async throws {
+        let recent = (0..<3).map { n in
+            EmailMessage(id: "recent-\(n)@fixture", account: "iCloud", mailbox: "Inbox",
+                         sender: "Sam <sam@example.com>", subject: "Recent \(n)",
+                         receivedAt: today.addingTimeInterval(-3600 * Double(n + 1)),
+                         body: "Hello. Please reply by Friday.", headers: [:])
+        }
+        let h = Harness(source: FixtureMailSource(messages: recent), llm: StubLLMClient(),
+                        settings: settings(mailboxes: [icloud]))
+        let runner = h.runner
+        await h.llm.setOnExtract { email in
+            if email.id == "recent-1@fixture" { await runner.stop() }
+        }
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        await h.llm.setOnExtract { _ in }
+        let calls = await h.llm.extractCalls.count
+
+        try await h.runner.startDaily()
+        await h.runner.waitUntilIdle()
+        let daily = try #require(try await h.store.jobs().first { $0.kind == .daily })
+        #expect(daily.state == .finished && daily.totals.queued == 0 && daily.totals.done == 0)
+        #expect(await h.llm.extractCalls.count == calls)
     }
 }

@@ -514,3 +514,13 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 - Opening the review window adds Mail Digest to the Dock; clicking the Dock icon from another app brings it forward; minimising keeps the Dock icon; closing the window removes it; the menu bar icon keeps working throughout, including reopening the window.
 - Repeat open → close → reopen at least four times in one session, opening from both the menu bar and a notification, and closing with the red button and Cmd-W: the Dock icon appears on every open and disappears on every close. Minimise and restore from the Dock, and move between sidebar views: neither removes the icon. (The cycle logic was checked in a test harness with the same code, not in the app.)
 - After a build that had `kev:0.8b-q8_0` saved, Settings shows the migrated model, and Activity rows recorded before the change still show their original model.
+
+## Backlog selection after Stop, Q71 (2026-11-09)
+
+- Start a Backlog job on a single day, Stop it after one email, then reopen New Backlog Job: the window starts at Mailboxes with no earlier preview.
+- Preview the same day: the stopped job's unprocessed emails are offered, Start queues exactly those, and the stopped job still shows its own progress in Activity.
+- Preview that day again after the new job finishes: Start is disabled and the window explains that nothing is left to process.
+- Resume the stopped job: emails the newer job processed show as skipped, and the job finishes without running the model on them.
+- Cancel the setup window on the Preview step and reopen it: no earlier preview appears.
+- Stale start: with Start enabled, make the previewed mail unavailable (for example, pause another job holding it), then click Start. The window stays open, reloads the preview and shows "These emails changed after the preview…".
+- The empty-preview explanation wraps cleanly and VoiceOver reads it.
