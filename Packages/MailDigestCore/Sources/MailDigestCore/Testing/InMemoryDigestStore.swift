@@ -203,8 +203,16 @@ public actor InMemoryDigestStore: DigestStore {
 
     public func updateJob(_ job: Job, event: JobEvent?) async throws {
         guard let i = jobList.firstIndex(where: { $0.id == job.id }) else { return }
-        jobList[i] = job
+        // The name is owned by `renameJob`, as in the SQLite store.
+        var replacement = job
+        replacement.name = jobList[i].name
+        jobList[i] = replacement
         if let event { append(event) }
+    }
+
+    public func renameJob(id: UUID, name: String?) async throws {
+        guard let i = jobList.firstIndex(where: { $0.id == id }) else { return }
+        jobList[i].name = name
     }
 
     private func append(_ event: JobEvent) {

@@ -84,6 +84,9 @@ public protocol DigestStore: Sendable {
     /// Replaces a job by id and, when given, appends `event` in the same transaction. A missing job is
     /// ignored (and no event is written). `updateJob(_:)` is the same without an event.
     func updateJob(_ job: Job, event: JobEvent?) async throws
+    /// Sets or clears (nil) only the job's name. `updateJob` never writes the name, so a runner holding an
+    /// older copy of the job cannot undo a rename. A missing job is ignored.
+    func renameJob(id: UUID, name: String?) async throws
     /// All jobs, newest first.
     func jobs() async throws -> [Job]
     /// A job's lifecycle events ordered by `(at, id)`.

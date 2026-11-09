@@ -373,7 +373,7 @@ import MailDigestCore
         #expect(try reopened.setting("k") == "v")
         #expect(try await reopened.isProcessed("m"))
         let applied = try await reopened.writer.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations") }
-        #expect(applied == ["v1", "v2", "v3", "v4", "v5", "v6"])
+        #expect(applied == ["v1", "v2", "v3", "v4", "v5", "v6", "v7"])
     }
 
     @Test func stoppedStateAndPauseReasonSurviveReopen() async throws {

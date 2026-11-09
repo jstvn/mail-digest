@@ -2,7 +2,7 @@ import AppKit
 import MailDigestCore
 import SwiftUI
 
-/// The review window's sidebar: workflows, Recent Digests grouped by month, Backlog jobs and the job status pill.
+/// The review window's sidebar: workflows, a month calendar of digests, Backlog jobs and the footer.
 /// It reads only the library's summaries, so it never loads a digest.
 struct SidebarView: View {
     let run: DigestRunModel
@@ -10,6 +10,9 @@ struct SidebarView: View {
     @Environment(\.openWindow) private var openWindow
 
     @State private var showsJob = false
+    @State private var renaming: UUID?
+    @State private var deleting: UUID?
+    @State private var nameDraft = ""
 
     private var coordinator: ReviewCoordinator { run.coordinator }
     private var library: ReviewLibrary { run.library }
@@ -23,33 +26,33 @@ struct SidebarView: View {
         List(selection: selection) {
             Section {
                 row(.today, badge: archive.todayCount) {
-                    Label { Text("Today") } icon: { SidebarIconBadge(symbol: "sun.max.fill", color: .orange) }
+                    Label { Text("Today") } icon: { SidebarTile(.today) }
                 }
                 row(.reviewQueue, badge: archive.reviewQueueCount) {
-                    Label { Text("Review Queue") } icon: { SidebarIconBadge(symbol: "tray.fill", color: .blue) }
+                    Label { Text("Review Queue") } icon: { SidebarTile(.reviewQueue) }
                 }
                 row(.logbook) {
-                    Label { Text("Logbook") } icon: { SidebarIconBadge(symbol: "checkmark", color: .green) }
+                    Label { Text("Logbook") } icon: { SidebarTile(.logbook) }
                 }
-                row(.mailCleanup) {
-                    Label { Text("Mail Cleanup") } icon: { SidebarIconBadge(symbol: "archivebox.fill", color: .indigo) }
+                row(.mailCleanup, badge: run.processed.allEntries.count) {
+                    Label { Text("Mail Cleanup") } icon: { SidebarTile(.mailCleanup) }
                 }
                 row(.activity) {
-                    Label { Text("Activity") } icon: { SidebarIconBadge(symbol: "waveform.path.ecg", color: .gray) }
+                    Label { Text("Activity") } icon: { SidebarTile(.activity) }
                 }
             }
 
-            // The newest month sits under "Recent Digests"; each older month gets its own header.
-            ForEach(Array(archive.months.enumerated()), id: \.element.id) { index, month in
-                let title = index == 0 ? "Recent Digests" : ReviewDateText.month(month.month, calendar: library.calendar)
-                Section(title) {
-                    ForEach(month.days) { day in dayRow(day) }
+            Section {
+                MiniMonthCalendar(archive: archive, calendar: library.calendar, selection: coordinator.selection) {
+                    coordinator.select($0)
                 }
+                .listRowSeparator(.hidden)
+                .selectionDisabled()
             }
 
             Section("Backlog Jobs") {
                 ForEach(archive.backlogs) { backlog in
-                    row(.backlog(backlog.id), badge: backlog.actionableCount) { backlogLabel(backlog.id) }
+                    backlogRow(backlog)
                 }
                 Button {
                     openWindow(id: "job-setup")
@@ -59,14 +62,34 @@ struct SidebarView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
+                .selectionDisabled()
                 .disabled(run.isRunning || access.status?.mode == .unavailable)
                 .help("Process older mail in the mailboxes you choose")
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom, spacing: 0) { jobPill }
+        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .onChange(of: run.activeProgress == nil) { _, none in
             if none { showsJob = false }
+        }
+        .alert("Rename Backlog Job", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Name", text: $nameDraft)
+            Button("Rename") {
+                if let id = renaming { Task { await run.renameBacklogJob(id, to: nameDraft) } }
+                renaming = nil
+            }
+            Button("Cancel", role: .cancel) { renaming = nil }
+        } message: {
+            Text("Leave it empty to use the mailbox name.")
+        }
+        .alert("Delete This Backlog Job?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
+            Button("Delete", role: .destructive) {
+                if let id = deleting { Task { await run.deleteBacklogJob(id) } }
+                deleting = nil
+            }
+            Button("Cancel", role: .cancel) { deleting = nil }
+        } message: {
+            Text("Its digest and suggestions are removed from Mail Digest. Your mail and any reminders you already added are not affected.")
         }
     }
 
@@ -76,38 +99,102 @@ struct SidebarView: View {
         content().selectableRow(item, badge: badge)
     }
 
-    /// The mailbox name (up to two lines) over the job's date scope.
-    private func backlogLabel(_ id: UUID) -> some View {
-        let title = library.sidebarTitle(forBacklog: id)
-        let scope = library.scope(forBacklog: id)
-        return Label {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).lineLimit(2)
-                if let scope {
-                    Text(scope).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
+    // MARK: Backlog jobs
+
+    /// The state the row shows: the runner's live state for the job it holds, otherwise the stored one.
+    private func effectiveState(_ job: Job?, id: UUID) -> JobState {
+        if let live = run.activeProgress, live.jobID == id { return live.state }
+        return job?.state ?? .finished
+    }
+
+    private func backlogRow(_ backlog: ArchiveBacklog) -> some View {
+        let job = library.backlogJobs[backlog.id]
+        let state = effectiveState(job, id: backlog.id)
+        let isRunning = [.listing, .running, .pausing].contains(state)
+        let actions = BacklogJobActions(
+            state: state, isLoaded: run.activeProgress?.jobID == backlog.id,
+            anotherJobRuns: run.isRunning)
+        return row(.backlog(backlog.id), badge: isRunning ? nil : backlog.actionableCount) {
+            backlogLabel(backlog.id, job: job, state: state, isRunning: isRunning)
+        }
+        .contextMenu {
+            Button("Pause") { run.pause() }.disabled(!actions.canPause)
+            Button("Resume") { Task { await run.resumeJob(backlog.id) } }.disabled(!actions.canResume)
+            Button("Stop") { run.stop() }.disabled(!actions.canStop)
+            Divider()
+            Button("Rename…") {
+                nameDraft = job?.name ?? ""
+                renaming = backlog.id
             }
-            .help(scope.map { "\(title)\n\($0)" } ?? title)
-        } icon: {
-            Image(systemName: "tray.and.arrow.down")
+            Button("Delete…", role: .destructive) { deleting = backlog.id }
+                .disabled(!actions.canDelete)
         }
     }
 
-    // MARK: Recent digests
-
-    private func dayRow(_ day: ArchiveDay) -> some View {
-        let title = ReviewDateText.day(day.day, calendar: library.calendar)
-        return HStack {
-            Text(title)
-            Spacer(minLength: 4)
-            Text("\(day.emailCount)")
-                .font(.callout)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+    /// The job's name (or, until it has one, the mailbox name) over its subtitle, with a progress ring while it runs.
+    private func backlogLabel(_ id: UUID, job: Job?, state: JobState, isRunning: Bool) -> some View {
+        let name = job?.name
+        let title = name ?? library.sidebarTitle(forBacklog: id)
+        let scope = library.scope(forBacklog: id)
+        let subtitle = rowSubtitle(job: job, state: state, id: id, named: name != nil, scope: scope)
+        return Label {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).lineLimit(2)
+                if let subtitle {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            .help(subtitle.map { "\(title)\n\($0)" } ?? title)
+        } icon: {
+            if isRunning, let live = run.activeProgress, live.jobID == id {
+                pillIndicator(live)
+            } else {
+                Image(systemName: "tray.and.arrow.down")
+            }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title), \(day.emailCount) \(day.emailCount == 1 ? "email" : "emails")")
-        .selectableRow(.day(day.day), badge: day.actionableCount)
+    }
+
+    /// Named running job: "iCloud, Outlook · 52%". Paused and Stopped say so, so the two stay distinct (Q48, Q78).
+    private func rowSubtitle(job: Job?, state: JobState, id: UUID, named: Bool, scope: String?) -> String? {
+        let percent: Int?
+        if let live = run.activeProgress, live.jobID == id, live.total > 0 {
+            percent = Int(Double(min(live.done, live.total)) / Double(live.total) * 100)
+        } else {
+            percent = job.flatMap { BacklogRowText.percent($0.totals) }
+        }
+        switch state {
+        case .listing, .running, .pausing:
+            guard named, let job else { return scope }
+            return BacklogRowText.runningSubtitle(accounts: BacklogRowText.accounts(of: job), percent: percent)
+        case .paused, .stopped, .stopping:
+            let word = state == .paused ? "Paused" : "Stopped"
+            let detail = named ? percent.map { "\($0)%" } : scope
+            return detail.map { "\(word) · \($0)" } ?? word
+        default:
+            return scope
+        }
+    }
+
+    // MARK: Footer
+
+    /// Idle: when the next scheduled digest runs. Running or paused: the task capsule.
+    @ViewBuilder private var footer: some View {
+        if run.activeProgress != nil {
+            jobPill
+        } else {
+            // Re-evaluated each minute so "today at" turns into "tomorrow at" once the time passes.
+            TimelineView(.everyMinute) { context in
+                let schedule = run.settings.settings
+                Label(NextDigestText.text(now: context.date, hour: schedule.runHour, minute: schedule.runMinute,
+                                          timeZone: library.calendar.timeZone), systemImage: "clock")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
+        }
     }
 
     // MARK: Job status
@@ -184,23 +271,5 @@ private extension View {
     func selectableRow(_ item: SidebarItem, badge: Int?) -> some View {
         self.badge(badge ?? 0)
             .tag(item)
-    }
-}
-
-/// A small colour-filled rounded square with a white glyph, the sidebar icon style of system apps.
-/// Fixed colours keep the icons distinct under any system accent colour.
-private struct SidebarIconBadge: View {
-    let symbol: String
-    let color: Color
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 5, style: .continuous).fill(color.gradient)
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
-        }
-        .frame(width: 20, height: 20)
-        .accessibilityHidden(true)
     }
 }

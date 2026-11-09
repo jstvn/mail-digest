@@ -129,6 +129,27 @@ public struct DigestArchive: Sendable, Equatable {
         day < today ? digestsByDay[day] ?? [] : []
     }
 
+    /// What the sidebar calendar shows for `day`: today (when Today has digests) or an earlier day with a
+    /// digest; nil for any other day.
+    public func calendarEntry(for day: DigestDay) -> CalendarDigestEntry? {
+        if day == today {
+            return todayDigestIDs.isEmpty ? nil : CalendarDigestEntry(unreviewed: todayCount)
+        }
+        guard day < today, let ids = digestsByDay[day], !ids.isEmpty else { return nil }
+        let unreviewed = months.first { $0.month == DigestMonth(day) }?.days.first { $0.day == day }?.actionableCount ?? 0
+        return CalendarDigestEntry(unreviewed: unreviewed)
+    }
+
+    /// Months the calendar can show: from the oldest month with a digest (or this month) to this month.
+    public var calendarMonthRange: ClosedRange<DigestMonth> {
+        let latest = DigestMonth(today)
+        let earliest = months.map(\.month).min().map { min($0, latest) } ?? latest
+        return earliest...latest
+    }
+
+    /// The calendar day that is today.
+    public var todayDay: DigestDay { today }
+
     /// Whether this digest belongs to Today's Daily digests.
     public func isToday(digestID: UUID) -> Bool { todayDigestIDs.contains(digestID) }
 
@@ -139,4 +160,11 @@ public struct DigestArchive: Sendable, Equatable {
 
     /// Whether `item` still points at something the sidebar lists, so a stale selection can fall back to Today.
     public func hasBacklog(_ id: UUID) -> Bool { backlogs.contains { $0.id == id } }
+}
+
+/// A digest on a calendar day, with how many of its suggestions still need a decision.
+public struct CalendarDigestEntry: Sendable, Equatable {
+    public var unreviewed: Int
+
+    public init(unreviewed: Int) { self.unreviewed = unreviewed }
 }

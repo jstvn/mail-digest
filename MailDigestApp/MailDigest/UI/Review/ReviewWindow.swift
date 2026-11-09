@@ -13,7 +13,7 @@ struct ReviewWindow: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(run: run, access: access)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
+                .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
             canvas
                 .id(coordinator.selection)

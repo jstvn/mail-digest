@@ -104,3 +104,30 @@ import MailDigestCore
         #expect(stored.schemaVersion == 1)
     }
 }
+
+/// v7: the nullable job name.
+@Suite struct JobNameMigrationTests {
+    @Test func v6DatabaseMigratesWithNilNameAndRenameSticksAcrossUpdates() async throws {
+        let queue = try DatabaseQueue()
+        try GRDBDigestStore.migrator.migrate(queue, upTo: "v6")
+        let jobID = UUID()
+        try await queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO job (id, kind, mailboxes, scope_from, scope_to, state, created_at, queued, done, failed,
+                                 skipped, auto_paused, last_error)
+                VALUES (?, 'backlog', '[]', 0, 0, 'finished', ?, 0, 1, 0, 0, 0, NULL)
+                """, arguments: [jobID.uuidString, t0.timeIntervalSince1970])
+        }
+        let store = try GRDBDigestStore(writer: queue)
+        var job = try #require(try await store.jobs().first)
+        #expect(job.name == nil)
+        try await store.renameJob(id: jobID, name: "October")
+        // A runner holding the old copy updates the job; the name must survive.
+        job.state = .stopped
+        try await store.updateJob(job)
+        let after = try #require(try await store.jobs().first)
+        #expect(after.name == "October" && after.state == .stopped)
+        try await store.renameJob(id: jobID, name: nil)
+        #expect(try await store.jobs().first?.name == nil)
+    }
+}

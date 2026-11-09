@@ -813,6 +813,42 @@ final class DigestRunModel {
         }
     }
 
+    // MARK: Backlog job rename and delete (sidebar)
+
+    /// Names a Backlog job; blank text clears the name, so the sidebar shows its mailbox title again.
+    func renameBacklogJob(_ jobID: UUID, to name: String) async {
+        guard let store = await openStore() else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            try await store.renameJob(id: jobID, name: trimmed.isEmpty ? nil : trimmed)
+        } catch {
+            Self.log.error("rename job failed: \(String(describing: error), privacy: .public)")
+            banner = "The job could not be renamed."
+            return
+        }
+        await library.refresh()
+        await refreshPastJobs()
+    }
+
+    /// Deletes a Backlog job with its digest, results and items. Processed ids and sender decisions stay, and
+    /// nothing in Mail or Reminders is touched. Refuses a job the runner holds.
+    func deleteBacklogJob(_ jobID: UUID) async {
+        guard activeProgress?.jobID != jobID, let store = await openStore() else { return }
+        do {
+            try await store.apply(RetentionPlan(digestIDs: [jobID], jobIDs: [jobID]))
+        } catch {
+            Self.log.error("delete job failed: \(String(describing: error), privacy: .public)")
+            banner = "The job could not be deleted. Nothing was changed."
+            return
+        }
+        // A selection on the deleted job falls back to Today in `loadSelected`.
+        await review.reload()
+        await processed.refresh()
+        await refreshJobLists()
+        await library.refresh()
+        await coordinator.loadSelected()
+    }
+
     // MARK: Helpers
 
     /// Creates the runner once and only recreates it when the inbox set changes. The first runner puts jobs

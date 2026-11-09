@@ -176,6 +176,10 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         migrator.registerMigration("v6") { db in
             try db.execute(sql: "ALTER TABLE job ADD COLUMN failure_kind TEXT")
         }
+        // v7: the user's name for a job (sidebar rename). Older rows stay NULL.
+        migrator.registerMigration("v7") { db in
+            try db.execute(sql: "ALTER TABLE job ADD COLUMN name TEXT")
+        }
         return migrator
     }
 
@@ -645,6 +649,12 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         }
     }
 
+    public func renameJob(id: UUID, name: String?) async throws {
+        try await writer.write { db in
+            try db.execute(sql: "UPDATE job SET name = ? WHERE id = ?", arguments: [name, id.uuidString])
+        }
+    }
+
     public func jobs() async throws -> [Job] {
         try await writer.read { db in
             // Newest first; equal timestamps keep insertion order, like the in-memory store's stable sort.
@@ -665,7 +675,8 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             pauseReason: (row["pause_reason"] as String?).flatMap(PauseReason.init(rawValue:)),
             startedAt: (row["started_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
             endedAt: (row["ended_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
-            failureKind: (row["failure_kind"] as String?).flatMap(JobFailureKind.init(rawValue:)))
+            failureKind: (row["failure_kind"] as String?).flatMap(JobFailureKind.init(rawValue:)),
+            name: row["name"])
     }
 
     // MARK: Queue

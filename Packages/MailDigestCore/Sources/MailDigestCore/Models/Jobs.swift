@@ -127,11 +127,14 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
     public var startedAt: Date?
     /// When the job last reached a terminal state (stopped, finished, failed); cleared when it runs again.
     public var endedAt: Date?
+    /// The user's name for the job ("October"); nil until one is set, and for jobs stored before names existed.
+    public var name: String?
 
     public init(id: UUID, kind: JobKind, mailboxes: [MailboxRef], scopeFrom: Date, scopeTo: Date,
                 state: JobState, createdAt: Date, totals: JobTotals, autoPaused: Bool, lastError: String? = nil,
                 pauseReason: PauseReason? = nil, startedAt: Date? = nil, endedAt: Date? = nil,
-                failureKind: JobFailureKind? = nil) {
+                failureKind: JobFailureKind? = nil, name: String? = nil) {
+        self.name = name
         self.failureKind = failureKind
         self.startedAt = startedAt
         self.endedAt = endedAt
