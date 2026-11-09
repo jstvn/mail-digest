@@ -280,6 +280,7 @@ enum PreviewSupport {
 }
 
 #Preview("Settings") {
-    SettingsView(run: PreviewSupport.run())
+    SettingsView(run: PreviewSupport.run(),
+                 access: MailAccessModel(preview: MailAccessStatus(fullDiskAccess: .granted, automation: .granted)))
 }
 #endif

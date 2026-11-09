@@ -40,9 +40,9 @@ final class IgnoreSuggestionModel {
     /// "Ignore Sender": the only path that adds to the Ignored list.
     func accept() {
         guard let suggestion, let store = settingsStore else { return }
-        if !store.settings.ignoredSenders.contains(where: { MailFilter.address(from: $0) == suggestion.sender }) {
-            store.settings.ignoredSenders.append(suggestion.sender)
-        }
+        // The same call as Settings > Senders and the card context menus.
+        var settings = store.settings
+        if settings.add(sender: suggestion.sender, to: .ignored) { store.settings = settings }
         self.suggestion = nil
     }
 

@@ -1,31 +1,51 @@
+import AppKit
 import MailDigestCore
 import SwiftUI
 
 /// The tabs of the Settings window.
 enum SettingsTab: Hashable {
-    case general, model, senders, jobs
+    case general, mail, models, senders
 }
 
-/// Settings window. `docs/MAC_TODO.md` lists which settings take effect when.
+/// Settings window: General, Mail, Models and Senders. `docs/MAC_TODO.md` lists which settings take effect when.
+/// Job history is not a setting; it lives in Activity (Q78).
 struct SettingsView: View {
     @Bindable var run: DigestRunModel
+    let access: MailAccessModel
 
     var body: some View {
         TabView(selection: $run.settingsTab) {
             GeneralSettingsTab(run: run)
                 .tabItem { Label("General", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
-            ModelSettingsTab(run: run)
-                .tabItem { Label("Model & Reminders", systemImage: "sparkles") }
-                .tag(SettingsTab.model)
-            SendersSettingsTab(store: run.settings)
+            MailSettingsTab(run: run, access: access)
+                .tabItem { Label("Mail", systemImage: "envelope") }
+                .tag(SettingsTab.mail)
+            ModelsSettingsTab(run: run)
+                .tabItem { Label("Models", systemImage: "sparkles") }
+                .tag(SettingsTab.models)
+            SendersSettingsTab(run: run)
                 .tabItem { Label("Senders", systemImage: "person.2") }
                 .tag(SettingsTab.senders)
-            PastJobsView(run: run)
-                .tabItem { Label("Jobs", systemImage: "list.bullet.rectangle") }
-                .tag(SettingsTab.jobs)
         }
-        .frame(width: 520, height: 520)
+        .frame(width: 520)
+    }
+}
+
+/// A toggle with a one-line explanation under its title, as the grouped rows in the design.
+struct SubtitledToggle: View {
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(subtitle).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
 
@@ -39,33 +59,35 @@ private struct GeneralSettingsTab: View {
     var body: some View {
         @Bindable var store = store
         Form {
-            Section("Daily digest") {
-                DatePicker("Run at", selection: $store.runTime, displayedComponents: .hourAndMinute)
-                Stepper(value: $store.settings.lookbackHours, in: 12...336, step: 12) {
-                    LabeledContent("Look back", value: "\(store.settings.lookbackHours) hours")
+            Section {
+                DatePicker("Run At", selection: $store.runTime, displayedComponents: .hourAndMinute)
+                Picker("Look Back", selection: $store.settings.lookbackHours) {
+                    ForEach(SettingsPresentation.lookbackOptions(current: store.settings.lookbackHours), id: \.self) {
+                        Text(SettingsPresentation.lookbackTitle($0)).tag($0)
+                    }
                 }
-                Toggle("Limit emails per run", isOn: limitEnabled)
+                SubtitledToggle(title: "Limit Emails per Run",
+                                subtitle: "Handy on slow days. Extra emails wait for the next run.", isOn: limitEnabled)
                 if let limit = store.settings.maxEmailsPerRun {
                     Stepper(value: Binding(get: { limit }, set: { store.settings.maxEmailsPerRun = $0 }),
                             in: 10...1_000, step: 10) {
-                        LabeledContent("Newest emails per run", value: "\(limit)")
+                        LabeledContent("Newest Emails per Run", value: "\(limit)")
                     }
                 }
+            } header: {
+                Text("Daily Digest")
+            } footer: {
+                Text(SettingsPresentation.runAtFootnote(hour: store.settings.runHour, minute: store.settings.runMinute))
             }
+            RemindersListSection(run: run)
+            BackgroundWorkSection(store: store)
             Section("Startup") {
                 LaunchAtLoginToggle()
             }
-            Section {
-                Toggle("File processed emails automatically", isOn: $store.settings.autoFileProcessed)
-            } header: {
-                Text("Mail cleanup")
-            } footer: {
-                Text("Moves each email into a \"Mail Digest\" mailbox in the same account as soon as you have fully handled it, so you can review and delete them in Mail. Only mail processed after you turn this on is moved. Nothing is moved to Trash or deleted permanently. You can still undo from the Processed tab until you quit.")
-            }
-            BacklogPowerSection(store: store)
             HistorySection(run: run)
         }
         .formStyle(.grouped)
+        .frame(height: 660)
     }
 
     private var limitEnabled: Binding<Bool> {
@@ -74,74 +96,87 @@ private struct GeneralSettingsTab: View {
     }
 }
 
-/// History retention and "Delete All History Now", which goes through the same retention path as the
-/// daily cleanup: pinned items and unfinished jobs stay, Mail and Reminders are never touched.
-private struct HistorySection: View {
+/// Where approved reminders go. Choosing a list only points new reminders at it: the list itself is never
+/// renamed or changed. Without Reminders access the lists can't be read, so the name is shown instead.
+private struct RemindersListSection: View {
     let run: DigestRunModel
-    @State private var confirming = false
-    @State private var isDeleting = false
-    @State private var result: DeleteHistoryResult?
+
+    private var reminders: RemindersAccessModel { run.reminders }
+    private var name: String { run.settings.settings.resolvedListName }
+
+    /// The id of the real list in use, or nil when none has been chosen or created yet (or it was deleted).
+    private var selectedID: String? {
+        guard let id = reminders.storedListID, reminders.lists.contains(where: { $0.id == id }) else { return nil }
+        return id
+    }
 
     var body: some View {
-        @Bindable var store = run.settings
         Section {
-            Picker("Keep history for", selection: $store.settings.retention) {
-                Text("30 days").tag(HistoryRetention.thirtyDays)
-                Text("90 days").tag(HistoryRetention.ninetyDays)
-                Text("1 year").tag(HistoryRetention.oneYear)
-                Text("Forever").tag(HistoryRetention.forever)
-            }
-            LabeledContent {
-                Button("Delete All History Now…", role: .destructive) { confirming = true }
-                    .disabled(isDeleting)
-            } label: {
-                if let result {
-                    switch result {
-                    case .success(let text):
-                        Label(text, systemImage: "checkmark.circle").foregroundStyle(.secondary)
-                    case .failure(let text):
-                        Label(text, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
-                    }
+            if reminders.status == .granted {
+                Picker("Add Reminders To", selection: Binding(get: { selectedID }, set: { choose($0) })) {
+                    // Until a list exists, the named list is made the first time something is added.
+                    if selectedID == nil { Text("\(name) (New List)").tag(String?.none) }
+                    ForEach(reminders.lists) { Text($0.title).tag(Optional($0.id)) }
                 }
+            } else {
+                LabeledContent("Add Reminders To", value: name)
+                accessRow
             }
         } header: {
-            Text("History")
+            Text("Reminders")
         } footer: {
-            Text("Pinned items and unfinished or resumable jobs are kept. Processed-email records and learned sender rules are never deleted, and nothing in Mail or Reminders is changed.")
+            Text("Nothing is added until you press Add to Reminders.")
         }
-        .confirmationDialog("Delete all history?", isPresented: $confirming) {
-            Button("Delete All History", role: .destructive) {
-                isDeleting = true
-                result = nil
-                Task {
-                    result = await run.deleteAllHistory()
-                    isDeleting = false
-                }
+        .onAppear { reminders.refresh() }
+    }
+
+    private func choose(_ id: String?) {
+        guard let id, let option = reminders.lists.first(where: { $0.id == id }) else { return }
+        reminders.chooseList(option, settings: run.settings)
+    }
+
+    @ViewBuilder private var accessRow: some View {
+        if reminders.status == .notDetermined {
+            LabeledContent {
+                Button("Allow Access…") { Task { await run.reminders.request() } }
+            } label: {
+                Text("Mail Digest needs Reminders access to show your lists. Until then, new reminders go to a list named \"\(name)\".")
+                    .font(.callout).foregroundStyle(.secondary)
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Past digests, suggestions and finished jobs will be removed. Pinned items, unfinished jobs, emails in Mail and reminders are kept. This can't be undone.")
+        } else {
+            LabeledContent {
+                Button("Open Reminders Settings…") {
+                    if let url = URL(string: PanelAlert.remindersSettingsURL) { NSWorkspace.shared.open(url) }
+                }
+            } label: {
+                Text("Reminders access is off, so your lists can't be shown. New reminders go to a list named \"\(name)\".")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
         }
     }
 }
 
-/// Power and run-window rules for Backlog jobs (the window is where they may run, Q45). Low Power Mode and serious heat always pause them, so
-/// they have no switch here.
-private struct BacklogPowerSection: View {
+/// Power and run-window rules for Backlog jobs (the window is where they may run, Q45). Low Power Mode and
+/// serious heat always pause them, so they have no switch here. The time pickers show only when the toggle is on.
+private struct BackgroundWorkSection: View {
     @Bindable var store: SettingsStore
 
     var body: some View {
         Section {
-            Toggle("Pause on battery power", isOn: $store.settings.pauseBacklogOnBattery)
-            Toggle("Only run during this time window", isOn: $store.settings.quietHoursEnabled)
+            Toggle("Pause on Battery", isOn: $store.settings.pauseBacklogOnBattery)
+            SubtitledToggle(
+                title: "Only Run Overnight",
+                subtitle: SettingsPresentation.overnightSubtitle(startMinute: store.settings.quietHoursStartMinute,
+                                                                 endMinute: store.settings.quietHoursEndMinute),
+                isOn: $store.settings.quietHoursEnabled)
             if store.settings.quietHoursEnabled {
                 DatePicker("From", selection: minuteBinding(\.quietHoursStartMinute), displayedComponents: .hourAndMinute)
                 DatePicker("Until", selection: minuteBinding(\.quietHoursEndMinute), displayedComponents: .hourAndMinute)
             }
         } header: {
-            Text("Backlog jobs")
+            Text("Background Work")
         } footer: {
-            Text("Backlog jobs also pause in Low Power Mode and when the Mac gets hot, and resume by themselves when it is safe. The Daily digest only pauses in Low Power Mode. The time window uses Brisbane time.")
+            Text("Backlog jobs also pause in Low Power Mode or when your Mac gets hot, then pick up again by themselves. The Daily digest only pauses in Low Power Mode. The time window uses Brisbane time.")
         }
     }
 
@@ -159,117 +194,140 @@ private struct BacklogPowerSection: View {
     }
 }
 
-// MARK: Model and Reminders
-
-private struct ModelSettingsTab: View {
+/// History retention and "Delete All History…", which goes through the same retention path as the daily
+/// cleanup: pinned items and unfinished jobs stay, Mail and Reminders are never touched.
+private struct HistorySection: View {
     let run: DigestRunModel
-    @FocusState private var listNameFocused: Bool
+    @State private var confirming = false
+    @State private var isDeleting = false
+    @State private var result: DeleteHistoryResult?
+
+    var body: some View {
+        @Bindable var store = run.settings
+        Section {
+            Picker("Keep Digests and Activity For", selection: $store.settings.retention) {
+                ForEach(SettingsPresentation.retentionChoices, id: \.self) {
+                    Text(SettingsPresentation.retentionTitle($0)).tag($0)
+                }
+            }
+            LabeledContent {
+                Button("Delete All History…") { confirming = true }
+                    .disabled(isDeleting)
+            } label: {
+                if let result {
+                    switch result {
+                    case .success(let text):
+                        Label(text, systemImage: "checkmark.circle").foregroundStyle(.secondary)
+                    case .failure(let text):
+                        Label(text, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+                    }
+                }
+            }
+        } header: {
+            Text("Digest History")
+        } footer: {
+            Text("Covers past digests, the Logbook and Activity, stored only on this Mac. Pinned items, unfinished jobs, processed-email records and sender rules are kept, and nothing in Mail or Reminders changes.")
+        }
+        .confirmationDialog("Delete all history?", isPresented: $confirming) {
+            Button("Delete All History", role: .destructive) {
+                isDeleting = true
+                result = nil
+                Task {
+                    result = await run.deleteAllHistory()
+                    isDeleting = false
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Past digests, suggestions and finished jobs will be removed. Pinned items, unfinished jobs, emails in Mail and reminders are kept. This can't be undone.")
+        }
+    }
+}
+
+// MARK: Mail
+
+private struct MailSettingsTab: View {
+    let run: DigestRunModel
+    let access: MailAccessModel
+    @Environment(\.openWindow) private var openWindow
 
     private var store: SettingsStore { run.settings }
 
-    /// Renames the Reminders list once the user finishes editing, not on every keystroke.
-    private func commitListName() {
-        let name = store.settings.resolvedListName
-        Task { await run.reminders.renameList(to: name) }
-    }
-
     var body: some View {
         @Bindable var store = store
         Form {
             Section {
-                TextField("Ollama URL", text: $store.settings.ollamaURL, prompt: Text(DigestSettings.defaultOllamaURL))
-                    .textContentType(.URL)
-                if URL(string: store.settings.ollamaURL.trimmingCharacters(in: .whitespaces))?.host == nil {
-                    Text("This isn't a valid URL, so the default is used.")
-                        .font(.caption).foregroundStyle(.red)
-                }
-                TextField("Model", text: $store.settings.ollamaModel, prompt: Text(DigestSettings.defaultModel))
+                statusRow
+                LabeledContent("Daily Digest Reads", value: DailyMailboxSelection.summary(
+                    stored: store.settings.dailyMailboxes, available: run.mailboxes))
             } header: {
-                Text("Ollama")
+                Text("Mail Access")
             } footer: {
-                Text("Changes apply to the next run.").foregroundStyle(.secondary)
+                Text("Choose which mailboxes the daily digest reads in Mail Access.")
             }
             Section {
-                TextField("List name", text: $store.settings.remindersListName,
-                          prompt: Text(DigestSettings.defaultListName))
-                    .focused($listNameFocused)
-                    .onSubmit(commitListName)
-                    .onChange(of: listNameFocused) { _, focused in if !focused { commitListName() } }
+                SubtitledToggle(
+                    title: "File Handled Emails",
+                    subtitle: "Once every suggestion from an email is added or dismissed, it moves to a Mail Digest mailbox in the same account.",
+                    isOn: $store.settings.autoFileProcessed)
             } header: {
-                Text("Reminders")
+                Text("Mail Cleanup")
             } footer: {
-                Text("Approved reminders go into this list.").foregroundStyle(.secondary)
+                Text("Only mail handled after you turn this on is moved. Nothing goes to Trash or gets deleted. You can undo from Mail Cleanup until you quit.")
             }
-            CloudSettingsSection(run: run)
         }
         .formStyle(.grouped)
-    }
-}
-
-// MARK: Senders
-
-private struct SendersSettingsTab: View {
-    let store: SettingsStore
-
-    var body: some View {
-        @Bindable var store = store
-        Form {
-            SenderListSection(title: "VIP senders", footer: "Always get a full summary.",
-                              list: $store.settings.vipSenders)
-            SenderListSection(title: "Blocked senders", footer: "Never read.",
-                              list: $store.settings.blockedSenders)
-            SenderListSection(title: "Ignored senders", footer: "Skipped without a summary.",
-                              list: $store.settings.ignoredSenders)
-            SenderListSection(title: "Trusted newsletter senders",
-                              footer: "Newsletters from these senders can suggest up to 8 reminders each. Blocked, VIP and ignored rules still come first.",
-                              list: $store.settings.trustedNewsletterSenders)
+        .frame(height: 400)
+        .task {
+            await access.refresh()
+            if canLoadMailboxes, run.mailboxes.isEmpty { await run.loadMailboxes() }
         }
-        .formStyle(.grouped)
     }
-}
 
-/// A list of email addresses with an add field and a remove button per row.
-private struct SenderListSection: View {
-    let title: String
-    let footer: String
-    @Binding var list: [String]
-    @State private var draft = ""
+    /// Listing mailboxes in automation mode needs the Automation grant, so never load before it.
+    private var canLoadMailboxes: Bool {
+        guard let status = access.status else { return false }
+        return status.mode == .fastLocal || status.automation == .granted
+    }
 
-    var body: some View {
-        Section {
-            ForEach(list, id: \.self) { address in
-                HStack {
-                    Text(address)
-                    Spacer()
-                    Button {
-                        list.removeAll { $0 == address }
-                    } label: {
-                        Image(systemName: "minus.circle")
+    @ViewBuilder private var statusRow: some View {
+        LabeledContent {
+            Button("Mail Access…") {
+                openWindow(id: "mail-access")
+                NSApp.activate()
+            }
+        } label: {
+            if let status = access.status {
+                let summary = MailAccessPresentation(status).settingsSummary
+                HStack(alignment: .top, spacing: 8) {
+                    Circle().fill(summary.isReady ? Color.green : Color.orange)
+                        .frame(width: 8, height: 8).padding(.top, 5).accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(summary.title)
+                        Text(summary.detail).font(.callout).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .buttonStyle(.borderless)
-                    .help("Remove \(address)")
-                    .accessibilityLabel("Remove \(address)")
                 }
+                .accessibilityElement(children: .combine)
+            } else {
+                Text("Checking…").foregroundStyle(.secondary)
             }
-            HStack {
-                TextField("Add address", text: $draft, prompt: Text("name@example.com"))
-                    .onSubmit(add)
-                Button("Add", action: add)
-                    .disabled(normalised.isEmpty)
-            }
-        } header: {
-            Text(title)
-        } footer: {
-            Text(footer).foregroundStyle(.secondary)
         }
     }
-
-    private var normalised: String { MailFilter.address(from: draft) }
-
-    private func add() {
-        let address = normalised
-        guard address.contains("@"), !list.contains(address) else { return }
-        list.append(address)
-        draft = ""
-    }
 }
+
+#if DEBUG
+#Preview("General") {
+    GeneralSettingsTab(run: PreviewSupport.run())
+}
+
+#Preview("Mail") {
+    let status = MailAccessStatus(fullDiskAccess: .granted, automation: .granted)
+    MailSettingsTab(run: PreviewSupport.run(), access: MailAccessModel(preview: status, checkedAt: .now))
+}
+
+#Preview("Mail, slower mode") {
+    let status = MailAccessStatus(fullDiskAccess: .denied, automation: .granted)
+    MailSettingsTab(run: PreviewSupport.run(), access: MailAccessModel(preview: status, checkedAt: .now))
+}
+#endif

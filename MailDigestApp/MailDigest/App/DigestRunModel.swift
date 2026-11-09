@@ -48,9 +48,9 @@ final class DigestRunModel {
     private(set) var restoredProgress: JobProgress?
     /// Items of the job shown in the progress view (recent results and the activity log); sender and subject only.
     private(set) var activityItems: [JobItem] = []
-    /// Every job, newest first, for Settings > Jobs.
+    /// Every job, newest first. Drives the Daily lifecycle and the menu panel.
     private(set) var pastJobs: [PastJobRow] = []
-    /// The Settings tab to show; the menu's "Review Daily Job…" selects Jobs.
+    /// The Settings tab shown, so a caller can open Settings on a given tab.
     var settingsTab: SettingsTab = .general
     /// Set synchronously when a Daily run or Daily resume starts, before any job or progress exists, so a
     /// second click or a scheduler check in between cannot start another one (Q52).
@@ -125,12 +125,12 @@ final class DigestRunModel {
         self.lastRunAt = lastRunAt
         self.lastRunFoundNothing = lastRunFoundNothing
         self.lastRunSummary = lastRunSummary
-        self.pastJobs = jobs.map { PastJobRow(job: $0, processingSeconds: 0) }
+        self.pastJobs = jobs.map { PastJobRow(job: $0) }
         self.scheduledRunWaiting = scheduledRunWaiting
     }
 
     /// The runner's progress while a job is active (listing, running, pausing, paused or stopping), or a
-    /// paused job restored from the store. A stopped job has no strip; it is resumed from Past Jobs.
+    /// paused job restored from the store. A stopped job has no strip; it is resumed from Activity.
     var activeProgress: JobProgress? {
         if let progress, Self.isActive(progress.state, includePaused: true) { return progress }
         return restoredProgress
@@ -608,7 +608,7 @@ final class DigestRunModel {
             await runner.waitUntilIdle()
         } catch {
             showError(error)
-            // A blocked resume leaves the job paused with its reason; show that in the strip and Past Jobs.
+            // A blocked resume leaves the job paused with its reason; show that in the strip and Activity.
             await refreshJobLists()
             return
         }
@@ -739,7 +739,7 @@ final class DigestRunModel {
         return await runner(for: mailboxes.filter { $0.kind == .inbox }.map(\.ref), store: store)
     }
 
-    /// Reloads Past Jobs and the paused-job strip from the store.
+    /// Reloads the job list and the paused-job strip from the store.
     func refreshJobLists() async {
         await refreshPastJobs()
         await restoreResumableJob()
@@ -747,12 +747,7 @@ final class DigestRunModel {
 
     func refreshPastJobs() async {
         guard let store, let jobs = try? await store.jobs() else { return }
-        var rows: [PastJobRow] = []
-        for job in jobs {
-            let items = (try? await store.items(job: job.id)) ?? []
-            rows.append(PastJobRow(job: job, processingSeconds: items.compactMap(\.seconds).reduce(0, +)))
-        }
-        pastJobs = rows
+        pastJobs = jobs.map { PastJobRow(job: $0) }
         // A scheduled run that waited for this Daily job is checked again as soon as the job is resolved,
         // rather than at the next 15-minute tick; the schedule rule still decides whether it is due.
         if scheduledRunWaiting, dailyLifecycle == .none, !dailyStarting {
@@ -823,9 +818,23 @@ final class DigestRunModel {
         settings.settings.resourcePolicy().blocked(conditions: monitor.conditions, now: clock.now())
     }
 
+    // MARK: Senders
+
+    /// Senders of recent mail for Settings > Senders' "Add from Recent Senders…", read only from `job_item` rows
+    /// already on this Mac (the newest jobs). Addresses already on `list` are left out.
+    func recentSenders(excluding list: SenderList) async -> [RecentSender] {
+        guard let store = await openStore(), let jobs = try? await store.jobs() else { return [] }
+        var items: [JobItem] = []
+        for job in jobs.sorted(by: { $0.createdAt > $1.createdAt }).prefix(10) {
+            items += (try? await store.items(job: job.id)) ?? []
+        }
+        let listed = Set(settings.settings.senders(in: list).map(MailFilter.address(from:)))
+        return RecentSender.rank(items, excluding: listed)
+    }
+
     // MARK: Delete all history
 
-    /// Settings > History > Delete All History Now. Uses the retention path: pinned digests and unfinished or
+    /// Settings > General > Delete All History…. Uses the retention path: pinned digests and unfinished or
     /// resumable jobs (with their digests and context) are kept, processed ids and sender decisions are never
     /// deleted, and nothing in Mail or Reminders is touched. Returns the message to show.
     func deleteAllHistory() async -> DeleteHistoryResult {
@@ -1003,7 +1012,7 @@ final class DigestRunModel {
             return "These emails changed after the preview. Check the updated preview, then start again."
         }
         if case JobRunnerError.dailyJobUnresolved = error {
-            return "A Daily job is unfinished. Resume it, or review it in Settings > Jobs, before a new Daily digest runs."
+            return "A Daily job is unfinished. Resume it, or review it in Activity, before a new Daily digest runs."
         }
         if case OsascriptError.automationDenied = error {
             return "Mail automation is off. Open Mail Access to allow it."
@@ -1013,11 +1022,9 @@ final class DigestRunModel {
 }
 
 
-/// A job as Settings > Jobs lists it.
+/// A stored job, for the Daily lifecycle and the menu panel.
 struct PastJobRow: Identifiable, Equatable, Sendable {
     var job: Job
-    /// Sum of the seconds the model spent on its emails.
-    var processingSeconds: Double
 
     var id: UUID { job.id }
 }

@@ -156,6 +156,8 @@ struct InfoClusterCard: View {
     @ViewBuilder private var menuItems: some View {
         if cluster.isGroup {
             Button(isExpanded ? "Hide Details" : "Show Details") { isExpanded.toggle() }
+            // A group is one sender on one day, so the lead's sender is every item's sender.
+            SenderRuleMenuItems(sender: email?.sender)
         } else {
             InfoMenuItems(item: lead, context: context)
         }
@@ -236,6 +238,7 @@ private struct InfoMenuItems: View {
         Button("Save to Notes") { context.onSaveToNotes(item) }
             .disabled(context.notesState(item) == .saving)
         Button("Open in Mail") { context.onOpen(item) }
+        SenderRuleMenuItems(sender: context.email(item.emailID)?.sender)
     }
 }
 

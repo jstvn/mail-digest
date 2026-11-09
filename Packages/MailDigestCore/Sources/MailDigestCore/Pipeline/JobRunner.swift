@@ -405,7 +405,7 @@ public actor JobRunner {
     }
 
     /// Cancels the in-flight email (it returns to `queued`) and ends the run. The job is persisted as
-    /// `.stopped` (Q15): resumable by hand from Past Jobs with `resume(jobID:)`, never automatically.
+    /// `.stopped` (Q15): resumable by hand from Activity with `resume(jobID:)`, never automatically.
     public func stop() {
         guard let run, loopTask != nil else { return }
         stopRequested = true

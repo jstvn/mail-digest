@@ -4,12 +4,15 @@ import Observation
 import OSLog
 
 /// Tracks Reminders permission, hands the EventKit writer to the review window only when full access is
-/// granted, and renames the app's list when the user changes its name in Settings.
+/// granted, and remembers which Reminders list new reminders go to.
 @MainActor @Observable
 final class RemindersAccessModel {
     private(set) var status: RemindersAuthorization
     /// The user's Reminders lists, for the Review Queue inspector's List picker. Empty until access is granted.
     private(set) var lists: [ReminderListOption] = []
+    /// The id of the list new reminders go to, or nil until one has been chosen or created. Kept in step with
+    /// the `remindersListID` default, which the cross-digest coordinator also writes after creating a list.
+    private(set) var storedListID: String?
 
     @ObservationIgnored private let writer: EventKitReminderWriter?
     @ObservationIgnored private weak var coordinator: ReviewCoordinator?
@@ -18,6 +21,7 @@ final class RemindersAccessModel {
     init(writer: EventKitReminderWriter = EventKitReminderWriter()) {
         self.writer = writer
         self.status = EventKitReminderWriter.authorization()
+        self.storedListID = UserDefaults.standard.string(forKey: ReviewViewModel.listIDKey)
     }
 
     /// Previews: a fixed status and no EventKit.
@@ -36,6 +40,7 @@ final class RemindersAccessModel {
     /// Re-reads the system status, so granting access in System Settings works without a relaunch.
     func refresh() {
         guard writer != nil else { return }
+        storedListID = UserDefaults.standard.string(forKey: ReviewViewModel.listIDKey)
         status = EventKitReminderWriter.authorization()
         apply()
     }
@@ -47,18 +52,12 @@ final class RemindersAccessModel {
         refresh()
     }
 
-    /// Renames the stored list after the user commits a new name. A deleted list clears the stored id so
-    /// the next approval recreates it.
-    func renameList(to name: String) async {
-        guard let writer, status == .granted,
-              let id = UserDefaults.standard.string(forKey: ReviewViewModel.listIDKey) else { return }
-        do {
-            try await writer.renameList(id: id, to: name)
-        } catch RemindersError.listMissing {
-            UserDefaults.standard.removeObject(forKey: ReviewViewModel.listIDKey)
-        } catch {
-            Self.log.error("could not rename list: \(String(describing: error), privacy: .public)")
-        }
+    /// Makes new reminders go to an existing list. Only the stored id and the fallback name change; the list in
+    /// Reminders is never renamed or modified. The name is only used if the list is deleted and has to be recreated.
+    func chooseList(_ option: ReminderListOption, settings: SettingsStore) {
+        UserDefaults.standard.set(option.id, forKey: ReviewViewModel.listIDKey)
+        storedListID = option.id
+        settings.settings.remindersListName = option.title
     }
 
     private func apply() {

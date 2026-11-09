@@ -188,10 +188,14 @@ public struct DigestSettings: Codable, Sendable, Equatable {
 
     /// The Ollama endpoint, or the default when the text isn't a usable http(s) URL.
     public var resolvedOllamaURL: URL {
-        let fallback = URL(string: Self.defaultOllamaURL)!
-        guard let url = URL(string: ollamaURL.trimmingCharacters(in: .whitespaces)),
+        Self.usableOllamaURL(ollamaURL) ?? URL(string: Self.defaultOllamaURL)!
+    }
+
+    /// The URL in `text` when it is an http(s) address with a host, otherwise nil.
+    public static func usableOllamaURL(_ text: String) -> URL? {
+        guard let url = URL(string: text.trimmingCharacters(in: .whitespaces)),
               let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https", url.host != nil
-        else { return fallback }
+        else { return nil }
         return url
     }
 

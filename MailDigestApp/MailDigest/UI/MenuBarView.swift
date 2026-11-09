@@ -233,12 +233,10 @@ struct MenuBarView: View {
         if let shortcut { button.keyboardShortcut(shortcut) } else { button }
     }
 
-    /// Settings > Jobs, where unresolved jobs are resumed explicitly.
+    /// Activity, where an unresolved job's row offers Resume (Q78).
     private func showJobs() {
-        run.settingsTab = .jobs
-        dismiss()
-        openSettings()
-        NSApp.activate()
+        run.coordinator.select(.activity)
+        show("review")
     }
 
     private func show(_ id: String) {

@@ -133,3 +133,96 @@ import Testing
         for kind in JobEventKind.allCases { #expect(!text(kind).isEmpty) }
     }
 }
+
+// MARK: - Empty runs and repeat runs (Phase 6)
+
+extension ActivityTimelineTests {
+    static func backlog(_ id: String, at date: Date, state: JobState = .finished, done: Int = 3, queued: Int = 0,
+                        failed: Int = 0, scope: Date? = nil, name: String? = nil,
+                        boxes: [MailboxRef] = [MailboxRef(account: "iCloud", name: "Inbox")]) -> Job {
+        Job(id: UUID(uuidString: id)!, kind: .backlog, mailboxes: boxes, scopeFrom: scope ?? date, scopeTo: scope ?? date,
+            state: state, createdAt: date,
+            totals: JobTotals(queued: queued, done: done, failed: failed, skipped: 0), autoPaused: false, name: name)
+    }
+
+    @Test func emptyRunsAreOnlyFinishedJobsWithNothingInThem() {
+        let d = Self.at(2026, 11, 8)
+        #expect(ActivityTimeline.isEmptyRun(Self.job(state: .finished, at: d, done: 0)))
+        #expect(!ActivityTimeline.isEmptyRun(Self.job(state: .finished, at: d, done: 1)))
+        #expect(!ActivityTimeline.isEmptyRun(Self.job(state: .finished, at: d, failed: 1, done: 0)))
+        for state in [JobState.running, .listing, .paused, .stopped, .failed, .pausing, .stopping, .idle] {
+            #expect(!ActivityTimeline.isEmptyRun(Self.job(state: state, at: d, done: 0)))
+        }
+        // Stopped with mail still queued is never hidden either.
+        #expect(!ActivityTimeline.isEmptyRun(Self.job(state: .finished, at: d, done: 0, queued: 2)))
+    }
+
+    @Test func emptyRunsAreHiddenUnlessShown() {
+        let d = Self.at(2026, 11, 8, 9)
+        let jobs = [Self.job("00000000-0000-0000-0000-000000000001", state: .finished, at: d, done: 0),
+                    Self.job("00000000-0000-0000-0000-000000000002", state: .failed, at: d.addingTimeInterval(-60), done: 0),
+                    Self.job("00000000-0000-0000-0000-000000000003", state: .paused, at: d.addingTimeInterval(-120), done: 0, queued: 4),
+                    Self.job("00000000-0000-0000-0000-000000000004", state: .finished, at: d.addingTimeInterval(-180), done: 2)]
+        let timeline = ActivityTimeline(jobs: jobs)
+        let hidden = timeline.displaySections(calendar: Self.brisbane, now: Self.now, showEmptyRuns: false)
+        #expect(hidden.flatMap(\.entries).map { String($0.id.uuidString.suffix(1)) } == ["2", "3", "4"])
+        let shown = timeline.displaySections(calendar: Self.brisbane, now: Self.now, showEmptyRuns: true)
+        #expect(shown.flatMap(\.entries).count == 4)
+    }
+
+    @Test func aDayWithOnlyEmptyRunsDisappears() {
+        let d = Self.at(2026, 11, 7, 9)
+        let timeline = ActivityTimeline(jobs: [Self.job(state: .finished, at: d, done: 0),
+                                               Self.job(state: .finished, at: Self.at(2026, 11, 8), done: 2)])
+        let sections = timeline.displaySections(calendar: Self.brisbane, now: Self.now, showEmptyRuns: false)
+        #expect(sections.map(\.title) == ["Today"])
+    }
+
+    @Test func consecutiveRepeatRunsGroupNewestFirst() {
+        let d = Self.at(2026, 11, 8, 9)
+        let scope = Self.at(2026, 10, 1)
+        let a = Self.backlog("00000000-0000-0000-0000-00000000000A", at: d, scope: scope)
+        let b = Self.backlog("00000000-0000-0000-0000-00000000000B", at: d.addingTimeInterval(-60), done: 5, scope: scope)
+        let c = Self.backlog("00000000-0000-0000-0000-00000000000C", at: d.addingTimeInterval(-120), done: 0, scope: scope)
+        let other = Self.backlog("00000000-0000-0000-0000-00000000000D", at: d.addingTimeInterval(-180), scope: Self.at(2026, 9, 1))
+        let timeline = ActivityTimeline(jobs: [a, b, c, other])
+        let entries = timeline.displaySections(calendar: Self.brisbane, now: Self.now, showEmptyRuns: true)[0].entries
+        #expect(entries.count == 2)
+        guard case .group(let group) = entries[0] else { Issue.record("expected a group"); return }
+        #expect(group.jobs.map(\.id) == [a.id, b.id, c.id] && group.title == "Run 3 times")
+        #expect(group.totals.done == 8)
+        #expect(entries[1] == .job(other))
+        // With empty runs hidden the empty third run leaves the group, which becomes "Run 2 times".
+        let trimmed = timeline.displaySections(calendar: Self.brisbane, now: Self.now, showEmptyRuns: false)[0].entries
+        guard case .group(let two) = trimmed[0] else { Issue.record("expected a group"); return }
+        #expect(two.count == 2)
+    }
+
+    @Test func nonConsecutiveOrUnfinishedOrDifferentJobsDoNotGroup() {
+        let d = Self.at(2026, 11, 8, 9)
+        let scope = Self.at(2026, 10, 1)
+        let first = Self.backlog("00000000-0000-0000-0000-000000000001", at: d, scope: scope)
+        let between = Self.backlog("00000000-0000-0000-0000-000000000002", at: d.addingTimeInterval(-60), scope: Self.at(2026, 8, 1))
+        let again = Self.backlog("00000000-0000-0000-0000-000000000003", at: d.addingTimeInterval(-120), scope: scope)
+        let renamed = Self.backlog("00000000-0000-0000-0000-000000000004", at: d.addingTimeInterval(-180), scope: Self.at(2026, 7, 1), name: "A")
+        let renamedB = Self.backlog("00000000-0000-0000-0000-000000000005", at: d.addingTimeInterval(-240), scope: Self.at(2026, 7, 1), name: "B")
+        let stoppedA = Self.backlog("00000000-0000-0000-0000-000000000006", at: d.addingTimeInterval(-300), state: .stopped, queued: 3, scope: Self.at(2026, 6, 1))
+        let stoppedB = Self.backlog("00000000-0000-0000-0000-000000000007", at: d.addingTimeInterval(-360), state: .stopped, queued: 3, scope: Self.at(2026, 6, 1))
+        let daily1 = Self.job("00000000-0000-0000-0000-000000000008", at: d.addingTimeInterval(-420))
+        let daily2 = Self.job("00000000-0000-0000-0000-000000000009", at: d.addingTimeInterval(-480))
+        let timeline = ActivityTimeline(jobs: [first, between, again, renamed, renamedB, stoppedA, stoppedB, daily1, daily2])
+        let entries = timeline.displaySections(calendar: Self.brisbane, now: Self.now, showEmptyRuns: true)[0].entries
+        #expect(entries.count == 9)
+        #expect(entries.allSatisfy { if case .job = $0 { true } else { false } })
+    }
+
+    @Test func differentMailboxesDoNotGroup() {
+        let d = Self.at(2026, 11, 8, 9)
+        let x = Self.backlog("00000000-0000-0000-0000-000000000001", at: d, boxes: [MailboxRef(account: "A", name: "Inbox")])
+        let y = Self.backlog("00000000-0000-0000-0000-000000000002", at: d.addingTimeInterval(-1),
+                             boxes: [MailboxRef(account: "B", name: "Inbox")])
+        let entries = ActivityTimeline(jobs: [x, y]).displaySections(calendar: Self.brisbane, now: Self.now,
+                                                                     showEmptyRuns: true)[0].entries
+        #expect(entries.count == 2)
+    }
+}

@@ -42,6 +42,9 @@ final class ActivityModel {
     /// Sections the user opened or closed; others follow the default (newest open).
     private(set) var sectionExpansion: [Date: Bool] = [:]
 
+    /// Shows jobs that finished having found no emails. Off by default; a running, paused, stopped or failed
+    /// job is always shown (`ActivityTimeline.isEmptyRun`).
+    var showEmptyRuns = false
     var kindFilter: KindFilter = .all { didSet { if kindFilter != oldValue { filtersChanged() } } }
     var pathFilter: PathFilter = .all { didSet { if pathFilter != oldValue { filtersChanged() } } }
 

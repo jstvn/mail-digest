@@ -50,7 +50,7 @@ struct MailDigestApp: App {
         .windowResizability(.contentSize)
 
         Settings {
-            SettingsView(run: run)
+            SettingsView(run: run, access: access)
         }
     }
 

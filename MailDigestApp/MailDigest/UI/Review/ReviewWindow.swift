@@ -22,6 +22,7 @@ struct ReviewWindow: View {
                 .toolbar(removing: .title)
         }
         .frame(minWidth: 900, minHeight: 560)
+        .environment(\.senderRules, SenderRuleActions(store: run.settings))
         .toolbar {
             // A flexible item first: `.primaryAction` alone parks the button at the leading edge here.
             ToolbarItem(placement: .automatic) { Spacer() }

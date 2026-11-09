@@ -1,6 +1,6 @@
 import Foundation
 
-/// Text for the Past Jobs list. Pure; time zone and locale are injected.
+/// Text for job rows in Activity. Pure; time zone and locale are injected.
 public enum JobSummaryText {
     /// "Backlog · iCloud Inbox and Outlook Inbox".
     public static func title(_ job: Job) -> String {

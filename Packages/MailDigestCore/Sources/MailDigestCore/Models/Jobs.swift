@@ -3,7 +3,7 @@ import Foundation
 public enum JobKind: String, Codable, Sendable, Equatable { case daily, backlog }
 
 public enum JobState: String, Codable, Sendable, Equatable {
-    /// `stopped` is an explicit user Stop (Q15): resumable by hand from Past Jobs, never automatically.
+    /// `stopped` is an explicit user Stop (Q15): resumable by hand from Activity, never automatically.
     case idle, listing, running, pausing, paused, stopping, stopped, finished, failed
 }
 

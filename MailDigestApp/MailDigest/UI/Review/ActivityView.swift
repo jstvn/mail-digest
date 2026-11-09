@@ -28,6 +28,16 @@ struct ActivityView: View {
                     .pickerStyle(.segmented)
                     .help("Show jobs with emails processed locally, by Gemini, or both")
                 }
+                ToolbarItem(placement: .automatic) {
+                    Menu {
+                        Toggle("Show Empty Runs", isOn: $model.showEmptyRuns)
+                    } label: {
+                        Label("Filter", systemImage: model.showEmptyRuns
+                              ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease")
+                    }
+                    .help("Filter Activity")
+                    .accessibilityLabel("Filter Activity")
+                }
             }
             // Progress arrives about twice a second; the model throttles to once a second.
             .onChange(of: run.progress) { _, _ in model.liveRefresh() }
@@ -40,9 +50,20 @@ struct ActivityView: View {
             ContentUnavailableView(model.loadFailed ? "Couldn't Load Activity" : "No Activity",
                                    systemImage: "clock.arrow.circlepath",
                                    description: Text(emptyDescription))
+        } else if displaySections.isEmpty {
+            ContentUnavailableView("No Activity to Show", systemImage: "clock.arrow.circlepath",
+                                   description: Text("Runs that found no emails are hidden. Choose Show Empty Runs in the filter menu to see them."))
+            // Older pages may hold the first job worth showing.
+            .task(id: model.timeline.jobs.count) { await model.loadMore() }
         } else {
             list
         }
+    }
+
+    /// Empty runs hidden (unless shown) and repeat runs grouped; computed once per body. `now` only decides
+    /// Today and Yesterday, so a stale value is harmless.
+    private var displaySections: [ActivityDisplaySection] {
+        model.timeline.displaySections(calendar: calendar, now: SystemClock().now(), showEmptyRuns: model.showEmptyRuns)
     }
 
     private var emptyDescription: String {
@@ -52,8 +73,7 @@ struct ActivityView: View {
     }
 
     private var list: some View {
-        // Computed once per body; `now` only decides Today and Yesterday, so a stale value is harmless.
-        let sections = model.timeline.sections(calendar: calendar, now: SystemClock().now())
+        let sections = displaySections
         let newest = sections.first?.id
         let lastJobID = model.timeline.jobs.last?.id
         return List {
@@ -61,11 +81,19 @@ struct ActivityView: View {
                 DisclosureGroup(isExpanded: Binding(
                     get: { model.isSectionExpanded(section.id, newest: newest) },
                     set: { model.setSection(section.id, expanded: $0) })) {
-                    ForEach(section.jobs) { job in
-                        ActivityJobRow(job: job, model: model, calendar: calendar)
-                            .onAppear {
-                                if job.id == lastJobID { Task { await model.loadMore() } }
-                            }
+                    ForEach(section.entries) { entry in
+                        switch entry {
+                        case .job(let job):
+                            ActivityJobRow(job: job, run: run, model: model, calendar: calendar)
+                                .onAppear {
+                                    if job.id == lastJobID { Task { await model.loadMore() } }
+                                }
+                        case .group(let group):
+                            ActivityRunGroupRow(group: group, run: run, model: model, calendar: calendar)
+                                .onAppear {
+                                    if group.jobs.last?.id == lastJobID { Task { await model.loadMore() } }
+                                }
+                        }
                     }
                 } label: {
                     Text(section.title).font(.headline)
@@ -96,8 +124,46 @@ struct ActivityView: View {
 
 // MARK: - Job row
 
+/// Several finished runs of one backlog job, as one row ("Run 3 times") that expands to each run.
+private struct ActivityRunGroupRow: View {
+    let group: ActivityRunGroup
+    let run: DigestRunModel
+    let model: ActivityModel
+    let calendar: Calendar
+    @State private var isExpanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            ForEach(group.jobs) { job in
+                ActivityJobRow(job: job, run: run, model: model, calendar: calendar)
+            }
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "tray.full")
+                    .frame(width: 20)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ActivityText.title(group.lead)).font(.body.weight(.medium)).lineLimit(1)
+                    Text(group.title).font(.caption).foregroundStyle(.secondary)
+                    Label("Completed", systemImage: ActivityJobRow.symbol(.completed))
+                        .foregroundStyle(ActivityJobRow.tint(.completed))
+                        .font(.caption)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(ActivityText.title(group.lead)), \(group.title)")
+            .accessibilityValue("\(group.totals.done) done across \(group.count) runs")
+            .accessibilityHint("Expand to see each run")
+        }
+    }
+}
+
 private struct ActivityJobRow: View {
     let job: Job
+    let run: DigestRunModel
     let model: ActivityModel
     let calendar: Calendar
 
@@ -109,7 +175,42 @@ private struct ActivityJobRow: View {
             set: { model.setJob(job, expanded: $0) })) {
             ActivityJobDetailView(job: job, detail: model.details[job.id], calendar: calendar)
         } label: {
-            header
+            HStack(alignment: .top, spacing: 10) {
+                header
+                actions
+            }
+        }
+    }
+
+    // MARK: Resume and Retry Failed (Q78): the only job history is here, so the actions are too
+
+    private var canResume: Bool { JobSummaryText.canResume(job) }
+    private var canRetryFailed: Bool { JobSummaryText.canRetryFailed(job) }
+
+    /// Retrying a Daily job's failures would make it a second unresolved Daily job (Q52).
+    private var blockedByOtherDailyJob: Bool {
+        job.kind == .daily && run.dailyLifecycle.jobs.contains { $0.id != job.id }
+    }
+
+    private var retryHelp: String { blockedByOtherDailyJob ? "Finish the unfinished Daily job first." : "Retry the emails that failed" }
+
+    @ViewBuilder private var actions: some View {
+        if canResume || canRetryFailed {
+            HStack(spacing: 6) {
+                if canResume {
+                    Button("Resume") { Task { await run.resumeJob(job.id) } }
+                        .disabled(run.isRunning)
+                        .help("Continue this job from the next email")
+                }
+                if canRetryFailed {
+                    Button("Retry Failed") { Task { await run.retryFailedItems(of: job.id) } }
+                        .disabled(run.isRunning || blockedByOtherDailyJob)
+                        .help(retryHelp)
+                }
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .controlSize(.small)
         }
     }
 
@@ -123,6 +224,9 @@ private struct ActivityJobRow: View {
                 Text(ActivityText.title(job)).font(.body.weight(.medium)).lineLimit(1)
                 Text(timesText).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 summaryLine
+                if job.state == .failed, let error = job.lastError {
+                    Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)
+                }
                 if status == .running, total > 0 {
                     ProgressView(value: Double(min(finished, total)), total: Double(total))
                         .controlSize(.small)
@@ -136,6 +240,14 @@ private struct ActivityJobRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(ActivityText.title(job)), \(status.title)")
         .accessibilityValue(accessibilitySummary)
+        .accessibilityActions {
+            if canResume && !run.isRunning {
+                Button("Resume") { Task { await run.resumeJob(job.id) } }
+            }
+            if canRetryFailed && !run.isRunning && !blockedByOtherDailyJob {
+                Button("Retry Failed") { Task { await run.retryFailedItems(of: job.id) } }
+            }
+        }
     }
 
     private var finished: Int { job.totals.done + job.totals.failed + job.totals.skipped }
@@ -214,6 +326,7 @@ private struct ActivityJobDetailView: View {
 
     var body: some View {
         if let detail, detail.isLoaded {
+            overview(detail.items)
             events(detail.events)
             // Only finished items ran a model; skipped ones have no routing to summarise.
             if let summary = RoutingPresentation.localReasonSummaryText(
@@ -236,6 +349,23 @@ private struct ActivityJobDetailView: View {
         } else {
             ProgressView().controlSize(.small)
         }
+    }
+
+    /// The job's date scope, totals and the time the model spent, which Settings > Jobs used to show.
+    @ViewBuilder private func overview(_ items: [JobItem]) -> some View {
+        let processing = items.compactMap(\.seconds).reduce(0, +)
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Summary").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+            if job.kind == .backlog {
+                Text("Emails from \(JobSummaryText.scope(job, timeZone: calendar.timeZone))")
+            }
+            Text(JobSummaryText.totals(job))
+            if processing >= 60 { Text("\(JobFormat.duration(processing)) of processing") }
+        }
+        .font(.callout)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder private func events(_ events: [JobEvent]) -> some View {

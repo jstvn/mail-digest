@@ -59,6 +59,7 @@ struct ReviewQueueRow: View {
             Button(isChecked ? "Deselect" : "Select", action: onToggle)
             Button("Open in Mail", action: onOpen)
             if suggestion.status == .pending { Button("Dismiss", role: .destructive, action: onDismiss) }
+            SenderRuleMenuItems(sender: record.email?.sender)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(SuggestionAccessibility.label(for: record, isSelected: isChecked, now: now, calendar: calendar))

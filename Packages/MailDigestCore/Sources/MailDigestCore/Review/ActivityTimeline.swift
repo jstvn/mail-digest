@@ -46,6 +46,46 @@ public struct ActivityDaySection: Sendable, Equatable, Identifiable {
     public var jobs: [Job]
 }
 
+/// Finished backlog runs that repeat one definition (same mailboxes, date scope and name), newest first.
+/// Shown as one row ("Run 3 times") that expands to each run.
+public struct ActivityRunGroup: Sendable, Equatable, Identifiable {
+    public var jobs: [Job]
+    public var id: UUID { jobs[0].id }
+    public var lead: Job { jobs[0] }
+    public var count: Int { jobs.count }
+
+    /// "Run 3 times".
+    public var title: String { "Run \(count) times" }
+
+    /// Done, failed and skipped emails summed over every run.
+    public var totals: JobTotals {
+        jobs.reduce(JobTotals(queued: 0, done: 0, failed: 0, skipped: 0)) { sum, job in
+            JobTotals(queued: sum.queued + job.totals.queued, done: sum.done + job.totals.done,
+                      failed: sum.failed + job.totals.failed, skipped: sum.skipped + job.totals.skipped)
+        }
+    }
+}
+
+/// One row of the Activity list: a job, or a group of repeat runs.
+public enum ActivityEntry: Sendable, Equatable, Identifiable {
+    case job(Job)
+    case group(ActivityRunGroup)
+
+    public var id: UUID {
+        switch self {
+        case .job(let job): job.id
+        case .group(let group): group.id
+        }
+    }
+}
+
+/// One day of Activity rows after empty runs are hidden and repeat runs grouped.
+public struct ActivityDisplaySection: Sendable, Equatable, Identifiable {
+    public var id: Date
+    public var title: String
+    public var entries: [ActivityEntry]
+}
+
 /// The Activity list's jobs: merged pages in `(createdAt DESC, id DESC)` order, grouped by day.
 /// Each job stays its own record, even when several share a day.
 public struct ActivityTimeline: Sendable, Equatable {
@@ -85,6 +125,45 @@ public struct ActivityTimeline: Sendable, Equatable {
             }
         }
         return out
+    }
+
+    /// True for a job that finished having found no emails. Only finished jobs qualify, so a running, paused,
+    /// stopped or failed job (or any job holding results) is always shown.
+    public static func isEmptyRun(_ job: Job) -> Bool {
+        let t = job.totals
+        return job.state == .finished && t.done == 0 && t.failed == 0 && t.skipped == 0 && t.queued == 0
+    }
+
+    /// Whether two jobs are repeat runs of one definition and may share a group. Only finished backlog jobs
+    /// group, so a job that can still be resumed or retried keeps its own row and buttons.
+    static func isRepeat(_ a: Job, _ b: Job) -> Bool {
+        a.kind == .backlog && b.kind == .backlog && a.state == .finished && b.state == .finished
+            && Set(a.mailboxes) == Set(b.mailboxes) && a.scopeFrom == b.scopeFrom && a.scopeTo == b.scopeTo
+            && a.name == b.name
+    }
+
+    /// The day sections as the list shows them: empty runs dropped unless `showEmptyRuns`, then consecutive repeat
+    /// runs of one backlog job merged into a group. Days left with nothing are dropped.
+    public func displaySections(calendar: Calendar, now: Date, showEmptyRuns: Bool) -> [ActivityDisplaySection] {
+        sections(calendar: calendar, now: now).compactMap { section in
+            var entries: [ActivityEntry] = []
+            var run: [Job] = []
+            func flush() {
+                if run.count > 1 { entries.append(.group(ActivityRunGroup(jobs: run))) }
+                else if let only = run.first { entries.append(.job(only)) }
+                run = []
+            }
+            for job in section.jobs where showEmptyRuns || !Self.isEmptyRun(job) {
+                if let last = run.last, Self.isRepeat(last, job) {
+                    run.append(job)
+                } else {
+                    flush()
+                    run = [job]
+                }
+            }
+            flush()
+            return entries.isEmpty ? nil : ActivityDisplaySection(id: section.id, title: section.title, entries: entries)
+        }
     }
 
     /// "Today", "Yesterday", "Fri, 6 Nov", or "Fri, 6 Nov 2025" outside the current year.

@@ -18,7 +18,7 @@ public enum DailyLifecycle: Equatable, Sendable {
     /// Stopped by a provider, Mail or store failure with its queue intact (Q25).
     case failed(Job)
     /// More than one unresolved Daily job, newest first (data from an earlier version). Nothing is picked
-    /// for the user; each is resolved explicitly from Settings > Jobs.
+    /// for the user; each is resolved explicitly from Activity.
     case conflict([Job])
 
     /// Derives the state from `jobs`. `live` overlays the runner's in-memory state (for example `.pausing`)
@@ -77,14 +77,14 @@ public enum DailyLifecycle: Equatable, Sendable {
         case .stopped:
             return DailyMenuAction(title: "Review Daily Job…", systemImage: "list.bullet.rectangle",
                                    behavior: .review,
-                                   note: "The Daily job was stopped. Resume it from Settings > Jobs before a new Daily digest can run.")
+                                   note: "The Daily job was stopped. Resume it from Activity before a new Daily digest can run.")
         case .failed(let job):
             return DailyMenuAction(title: "Retry Daily Digest", systemImage: "arrow.clockwise", behavior: .retry(job.id),
                                    note: job.lastError ?? "The Daily job stopped before it finished.")
         case .conflict(let jobs):
             return DailyMenuAction(title: "Review Daily Jobs…", systemImage: "list.bullet.rectangle",
                                    behavior: .review,
-                                   note: "\(jobs.count) Daily jobs are unfinished. Resume them from Settings > Jobs before a new Daily digest can run.")
+                                   note: "\(jobs.count) Daily jobs are unfinished. Resume them from Activity before a new Daily digest can run.")
         }
     }
 }
@@ -98,7 +98,7 @@ public struct DailyMenuAction: Equatable, Sendable {
         case resume(UUID)
         /// Resume this failed Daily job by id, the Q25 recovery path.
         case retry(UUID)
-        /// Open Settings > Jobs so the user resolves the job(s) explicitly.
+        /// Open Activity so the user resolves the job(s) explicitly.
         case review
         /// A Daily job is busy; the row is disabled.
         case none

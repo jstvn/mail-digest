@@ -119,7 +119,10 @@ struct SuggestionCard: View {
             editRequest.wrappedValue = nil
             if isEditable { titleFocused = true }
         }
-        .contextMenu { if isEditable { contextMenuItems } else { Button("Open in Mail", action: onOpen) } }
+        .contextMenu {
+            if isEditable { contextMenuItems } else { Button("Open in Mail", action: onOpen) }
+            SenderRuleMenuItems(sender: record.email?.sender)
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(SuggestionAccessibility.label(for: record, isSelected: isSelected, now: now, calendar: calendar))
         .accessibilityActions { accessibilityActions }

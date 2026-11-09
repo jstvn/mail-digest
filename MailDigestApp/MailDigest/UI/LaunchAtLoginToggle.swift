@@ -9,7 +9,7 @@ struct LaunchAtLoginToggle: View {
     @State private var errorText: String?
 
     var body: some View {
-        Toggle("Launch at login", isOn: Binding(
+        Toggle("Launch at Login", isOn: Binding(
             get: { status == .enabled || status == .requiresApproval },
             set: { set($0) }))
         .onAppear(perform: refresh)
