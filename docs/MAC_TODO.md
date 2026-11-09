@@ -716,3 +716,16 @@ Core tests and the xcodebuild build pass. A scratch program confirmed that `NSIm
 - BIMI header: process an email that has a `BIMI-Indicator` header (a bulk sender that publishes BIMI, e.g. a large bank or retailer), then check its avatar shows the logo with the switch off and no network traffic. This only happens for mail processed after this build (headers aren't stored).
 - Fallbacks: a domain with no logo, a timeout, a redirect to http, an oversized or invalid image all end as initials. Check VoiceOver still reads sender names from the row text (the avatar stays hidden from accessibility).
 - Settings window height: confirm the General tab (now taller by one section) still fits and scrolls on a small display.
+
+## Download Model (2026-11-10)
+
+Core tests and the xcodebuild build pass. Nothing below has been run against a real Ollama; no model was pulled while building this.
+
+- Settings > Models with Ollama running: choose a digest model that isn't installed (edit `ollamaModel`, or pick a tag in the privacy popup that isn't pulled). The row shows "(Not Installed)" and a "Download Model" button; with Ollama quit, the button is absent and the row says Not Running.
+- Click Download Model: the bar and "1.2 GB of 2.5 GB · 48%" appear ("Preparing…" first), the percentage never goes backwards when a new layer starts, and the numbers don't jitter in width. Switch to another Settings tab and back, and close and reopen the Settings window: progress continues.
+- Cancel: the request stops (Ollama log shows the pull aborted), the row returns to the button. Click Download Model again: it resumes from the partial layers (the percentage starts above 0).
+- Finish: the "(Not Installed)" label and button disappear without reopening Settings; the model is selectable and `ollama list` shows it.
+- Failure: quit Ollama mid-download (or edit the URL to an unreachable one and start): a plain-English message with Try Again appears. Try a nonexistent tag (for example `qwen3:nonexistent`): Ollama's error is shown, not a generic one.
+- Banner: stop a run whose configured digest model isn't installed; the run-problem banner shows "Download Model" beside Retry. It starts the download and opens Settings on the Models tab. Check the banner clears on Retry after the download finishes.
+- VoiceOver reads the progress with its label and value, and the Download Model, Cancel and Try Again buttons by name.
+- Network monitor: during a download the only traffic is to the configured Ollama URL.

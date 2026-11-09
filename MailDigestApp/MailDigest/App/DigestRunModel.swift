@@ -34,6 +34,8 @@ final class DigestRunModel {
     let senderLogos: SenderLogoProvider?
     @ObservationIgnored private let logoService: SenderLogoService?
     let reminders: RemindersAccessModel
+    /// Model downloads started from Settings or the missing-model banner; they outlive the window.
+    let modelDownloads = ModelDownloadModel()
     /// The Processed tab: cleanup, Undo history and auto-file.
     let processed: ProcessedMailModel
     private(set) var banner: String? {
@@ -44,6 +46,8 @@ final class DigestRunModel {
     private var bannerText: String?
     /// What `banner` reports, set only through `showBanner` and cleared whenever the banner changes.
     private var bannerContext: (kind: JobFailureKind?, dailyStartFailedAt: Date?)?
+    /// Whether the current banner is "model not installed", which offers Download Model.
+    var bannerOffersDownloadModel: Bool { banner != nil && bannerContext?.kind == .modelMissing }
     /// Whether the current banner is "Ollama isn't running", which the canvas answers with Start Ollama.
     var bannerOffersStartOllama: Bool { banner != nil && bannerContext?.kind == .ollamaUnreachable }
     /// A job stopped by a provider outage (Q25); Retry resumes this same job and its queue.

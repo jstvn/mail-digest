@@ -302,6 +302,8 @@ struct ModelsSettingsTab: View {
         .frame(height: cloudOn ? 720 : 470)
         .task { await refreshKey() }
         .task(id: store.settings.resolvedOllamaURL.absoluteString) { await loadInstalledTags() }
+        // A finished download changes what is installed.
+        .task(id: run.modelDownloads.completedCount) { await loadInstalledTags() }
         .sheet(item: $sheet, onDismiss: presentNext) { sheet in
             switch sheet {
             case .editURL:
@@ -371,12 +373,17 @@ struct ModelsSettingsTab: View {
     }
 
     private var digestModelPicker: some View {
-        Picker("Digest Model", selection: Binding(get: { store.settings.resolvedModel },
-                                                  set: { store.settings.ollamaModel = $0 })) {
-            ForEach(digestModelOptions, id: \.self) { tag in
-                let missing = installedTags.map { !$0.contains(tag) } ?? false
-                Text(RoutingPresentation.modelDisplayName(tag) + (missing ? " (Not Installed)" : "")).tag(tag)
+        let tag = store.settings.resolvedModel
+        return VStack(alignment: .leading, spacing: 6) {
+            Picker("Digest Model", selection: Binding(get: { store.settings.resolvedModel },
+                                                      set: { store.settings.ollamaModel = $0 })) {
+                ForEach(digestModelOptions, id: \.self) { tag in
+                    let missing = installedTags.map { !$0.contains(tag) } ?? false
+                    Text(RoutingPresentation.modelDisplayName(tag) + (missing ? " (Not Installed)" : "")).tag(tag)
+                }
             }
+            ModelDownloadRow(tag: tag, installedTags: installedTags, downloads: run.modelDownloads,
+                             baseURL: store.settings.resolvedOllamaURL)
         }
     }
 
@@ -459,6 +466,8 @@ struct ModelsSettingsTab: View {
                     Text(note).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 triageStatus(tag)
+                ModelDownloadRow(tag: tag, installedTags: installedTags, downloads: run.modelDownloads,
+                                 baseURL: store.settings.resolvedOllamaURL)
             }
         }
     }
@@ -469,8 +478,7 @@ struct ModelsSettingsTab: View {
                 if installed.contains(tag) {
                     Label("\(tag) is installed", systemImage: "checkmark.circle")
                 } else {
-                    Label("Not installed. Run `ollama pull \(tag)` in Terminal.", systemImage: "exclamationmark.triangle")
-                        .textSelection(.enabled)
+                    Label("Not installed", systemImage: "exclamationmark.triangle")
                 }
             } else if ollamaChecked {
                 Label("Couldn't check installed models. Is Ollama running?", systemImage: "questionmark.circle")
@@ -601,6 +609,52 @@ struct ModelsSettingsTab: View {
     }
 }
 
+/// "Download Model" for a chosen model that Ollama doesn't have, with progress, Cancel and Try Again. Shows
+/// nothing when Ollama isn't reachable (`installedTags` is nil) or the model is installed.
+private struct ModelDownloadRow: View {
+    let tag: String
+    let installedTags: Set<String>?
+    let downloads: ModelDownloadModel
+    let baseURL: URL
+
+    var body: some View {
+        switch downloads.state(for: tag) {
+        case .downloading(let progress):
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    if let fraction = progress.fraction {
+                        ProgressView(value: fraction) { Text("Downloading \(tag)") }.labelsHidden()
+                    } else {
+                        ProgressView { Text("Downloading \(tag)") }.progressViewStyle(.linear).labelsHidden()
+                    }
+                    Button("Cancel") { downloads.cancel(tag: tag) }
+                        .accessibilityLabel("Cancel download of \(tag)")
+                }
+                Text(progress.text).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    .accessibilityLabel("Download progress")
+                    .accessibilityValue(progress.text)
+            }
+        case .failed(let message):
+            HStack(spacing: 8) {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button("Try Again") { downloads.start(tag: tag, baseURL: baseURL) }
+                    .accessibilityLabel("Try downloading \(tag) again")
+            }
+        case nil:
+            if let installedTags, !installedTags.contains(tag) {
+                HStack {
+                    Spacer()
+                    Button("Download Model") { downloads.start(tag: tag, baseURL: baseURL) }
+                        .accessibilityLabel("Download model \(tag)")
+                }
+            }
+        }
+    }
+}
+
 /// A title followed by its icon, for external links ("Gemini API Terms ↗").
 private struct TrailingIconLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -612,6 +666,25 @@ private struct TrailingIconLabelStyle: LabelStyle {
 }
 
 #if DEBUG
+@MainActor private func previewRow(_ state: ModelDownloadModel.State?) -> some View {
+    var progress = ModelPullProgress()
+    progress.apply(ModelPullEvent(status: "pulling", digest: "a", total: 2_500_000_000, completed: 1_200_000_000))
+    let resolved: ModelDownloadModel.State? = {
+        if case .downloading? = state { return .downloading(progress) }
+        return state
+    }()
+    return Form {
+        ModelDownloadRow(tag: "qwen3:4b", installedTags: [],
+                         downloads: ModelDownloadModel(previewStates: resolved.map { ["qwen3:4b": $0] } ?? [:]),
+                         baseURL: URL(string: "http://localhost:11434")!)
+    }
+    .formStyle(.grouped).frame(width: 460, height: 140)
+}
+
+#Preview("Download, idle") { previewRow(nil) }
+#Preview("Download, in progress") { previewRow(.downloading(ModelPullProgress())) }
+#Preview("Download, failed") { previewRow(.failed("Couldn't reach Ollama. Check that it is running, then try again.")) }
+
 #Preview("Models, cloud off") {
     ModelsSettingsTab(run: PreviewSupport.run())
 }

@@ -8,13 +8,17 @@ struct CanvasNotices: View {
     let run: DigestRunModel
     let access: MailAccessModel
 
+    @Environment(\.openSettings) private var openSettings
+
     private var coordinator: ReviewCoordinator { run.coordinator }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(PanelAlert.current(run: run, access: access, reminders: run.reminders.status)) { alert in
                 AlertBanner(alert: alert, canRetry: !run.isRunning, offersStartOllama: run.bannerOffersStartOllama,
-                            onStartOllama: { OllamaLauncher.start() }, onRetry: retry,
+                            onStartOllama: { OllamaLauncher.start() },
+                            offersDownloadModel: run.bannerOffersDownloadModel, onDownloadModel: downloadModel,
+                            onRetry: retry,
                             onRequestReminders: { Task { await run.reminders.request() } })
             }
             if let message = coordinator.message {
@@ -29,6 +33,13 @@ struct CanvasNotices: View {
                                        onDecline: coordinator.declineIgnoreSuggestion)
             }
         }
+    }
+
+    /// Starts the download of the configured model and opens Settings on Models, where the progress shows.
+    private func downloadModel() {
+        run.modelDownloads.start(tag: run.settings.settings.resolvedModel, baseURL: run.settings.settings.resolvedOllamaURL)
+        run.settingsTab = .models
+        openSettings()
     }
 
     private func retry() {
@@ -77,6 +88,9 @@ struct AlertBanner: View {
     /// The run problem is "Ollama isn't running": offer Start Ollama beside Retry.
     var offersStartOllama = false
     var onStartOllama: () -> Void = {}
+    /// The run problem is "model not installed": offer Download Model beside Retry.
+    var offersDownloadModel = false
+    var onDownloadModel: () -> Void = {}
     let onRetry: () -> Void
     let onRequestReminders: () -> Void
 
@@ -88,6 +102,7 @@ struct AlertBanner: View {
             switch alert {
             case .runProblem:
                 if offersStartOllama { Button("Start Ollama", action: onStartOllama) }
+                if offersDownloadModel { Button("Download Model", action: onDownloadModel) }
                 Button("Retry", action: onRetry).disabled(!canRetry)
             case .mailAutomationDenied:
                 Button("Open Privacy Settings") { open(MailAccessStatus.automationSettingsURL) }
