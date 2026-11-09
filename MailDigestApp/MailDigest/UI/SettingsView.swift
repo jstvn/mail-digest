@@ -84,10 +84,15 @@ private struct GeneralSettingsTab: View {
             Section("Startup") {
                 LaunchAtLoginToggle()
             }
+            Section("Sender Logos") {
+                SubtitledToggle(title: "Show Sender Logos",
+                                subtitle: "Fetches logos from senders' websites. They can see your IP address.",
+                                isOn: $store.settings.showSenderLogos)
+            }
             HistorySection(run: run)
         }
         .formStyle(.grouped)
-        .frame(height: 660)
+        .frame(height: 720)
     }
 
     private var limitEnabled: Binding<Bool> {

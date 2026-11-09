@@ -17,6 +17,18 @@ import Testing
             && s.trustedNewsletterSenders.isEmpty)
     }
 
+    @Test func senderLogosAreOffByDefaultAndOldBlobsStillDecode() throws {
+        #expect(DigestSettings().showSenderLogos == false)
+        let old = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"runHour":8,"vipSenders":["a@b.com"]}"#.utf8))
+        #expect(old.showSenderLogos == false && old.runHour == 8 && old.vipSenders == ["a@b.com"])
+        let on = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"showSenderLogos":true}"#.utf8))
+        #expect(on.showSenderLogos)
+        let bad = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"showSenderLogos":true,"future":1}"#.utf8))
+        #expect(bad.showSenderLogos)
+        var s = DigestSettings(); s.showSenderLogos = true
+        #expect(try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s)).showSenderLogos)
+    }
+
     @Test func codableRoundTripAndTolerantDecode() throws {
         var s = DigestSettings()
         s.runHour = 7; s.maxEmailsPerRun = 80; s.retention = .oneYear

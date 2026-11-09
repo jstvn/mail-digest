@@ -230,7 +230,8 @@ struct AppleMailSource: MailSource, MailVolumeSource {
                         sourceReference: MailMessageReference(messageID: ref.messageID, storeRowID: row.rowID),
                         // A partial .emlx may be missing parts, so it is never fully inspected (Q66).
                         contentInspection: file.source == .partialEmlx ? .uninspectedParts : parsed.inspection,
-                        inspectionGap: file.source == .partialEmlx ? .partialMessage : parsed.inspectionGap))
+                        inspectionGap: file.source == .partialEmlx ? .partialMessage : parsed.inspectionGap,
+                        bimiIndicator: BIMIIndicator.headerValue(inRawHeaders: parsed.rawHeaderBlock)))
                     if file.source == .partialEmlx { out.partialCount += 1 } else { out.emlxCount += 1 }
                 }
             } catch let error as EmlxReadFailure {

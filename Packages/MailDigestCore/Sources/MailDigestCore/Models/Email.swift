@@ -47,12 +47,16 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     public var contentInspection: ContentInspection
     /// Why the message is not `.complete`; nil when complete or when the reason is unknown.
     public var inspectionGap: InspectionGap?
+    /// The `BIMI-Indicator` header value, when present. Transient: only carried from the mail source to the
+    /// logo recorder, never encoded or stored.
+    public var bimiIndicator: String?
 
     public init(id: String, account: String, mailbox: String, sender: String, subject: String,
                 receivedAt: Date, body: String, headers: [String: String],
                 sourceReference: MailMessageReference? = nil,
                 contentInspection: ContentInspection = .unknown,
-                inspectionGap: InspectionGap? = nil) {
+                inspectionGap: InspectionGap? = nil, bimiIndicator: String? = nil) {
+        self.bimiIndicator = bimiIndicator
         self.inspectionGap = inspectionGap
         self.contentInspection = contentInspection
         self.sourceReference = sourceReference ?? MailMessageReference(messageID: id, storeRowID: nil)

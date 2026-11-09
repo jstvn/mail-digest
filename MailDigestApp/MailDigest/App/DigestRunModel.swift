@@ -30,6 +30,9 @@ final class DigestRunModel {
     let library: ReviewLibrary
     let coordinator: ReviewCoordinator
     let settings: SettingsStore
+    /// Sender logos for the avatars; website logos are fetched only while Show Sender Logos is on.
+    let senderLogos: SenderLogoProvider?
+    @ObservationIgnored private let logoService: SenderLogoService?
     let reminders: RemindersAccessModel
     /// The Processed tab: cleanup, Undo history and auto-file.
     let processed: ProcessedMailModel
@@ -99,6 +102,10 @@ final class DigestRunModel {
 
     init(settings: SettingsStore = SettingsStore()) {
         self.settings = settings
+        let logoService = SenderLogoService(store: DiskSenderLogoStore(), fetcher: SenderLogoFetcher(), clock: SystemClock())
+        self.logoService = logoService
+        self.senderLogos = SenderLogoProvider(service: logoService,
+                                              networkSetting: { [settings] in settings.settings.showSenderLogos })
         self.review = ReviewViewModel()
         self.library = ReviewLibrary()
         self.coordinator = ReviewCoordinator(library: library, review: review)
@@ -123,6 +130,9 @@ final class DigestRunModel {
          bannerKind: JobFailureKind? = nil, dailyStartFailedAt: Date? = nil, mailboxes: [MailboxInfo] = []) {
         self.mailboxes = mailboxes
         self.settings = preview
+        // Previews never touch the disk or the network.
+        self.logoService = nil
+        self.senderLogos = nil
         self.review = review
         let coordinator = coordinator ?? ReviewCoordinator.empty(review: review)
         self.coordinator = coordinator
@@ -1001,6 +1011,7 @@ final class DigestRunModel {
         // Settings that don't affect the runner are cleared so editing them doesn't rebuild it.
         var relevant = settings.settings
         relevant.retention = .default
+        relevant.showSenderLogos = false // Read live by the logo provider; no runner needed.
         relevant.remindersListName = DigestSettings.defaultListName
         relevant.runHour = 6; relevant.runMinute = 30
         relevant.declinedIgnoreSuggestions = []
@@ -1024,7 +1035,8 @@ final class DigestRunModel {
         let new = JobRunner(source: source, llm: llm, store: store, notifier: notifier, clock: clock,
                             settings: settings.settings.runnerSettings(inboxes: inboxes),
                             localModel: settings.settings.resolvedModel,
-                            routingConfig: { await provider.config() })
+                            routingConfig: { await provider.config() },
+                            logoRecorder: logoService)
         runner = new
         runnerKey = key
         if !didRecoverJobs {

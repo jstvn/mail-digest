@@ -80,6 +80,7 @@ public actor JobRunner {
     private let pipeline: DigestPipeline
     private let llm: any LLMClient
     private let routingConfig: @Sendable () async -> CloudRoutingConfig
+    private let logoRecorder: (any SenderLogoRecording)?
     private let sleep: @Sendable (Duration) async throws -> Void
     private let continuation: AsyncStream<JobProgress>.Continuation
 
@@ -144,8 +145,10 @@ public actor JobRunner {
                 clock: any Clock, settings: RunnerSettings,
                 localModel: String = DigestSettings.defaultModel,
                 routingConfig: @escaping @Sendable () async -> CloudRoutingConfig = { .localOnly(reason: .cloudDisabled) },
+                logoRecorder: (any SenderLogoRecording)? = nil,
                 sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.routingConfig = routingConfig
+        self.logoRecorder = logoRecorder
         self.source = source
         self.store = store
         self.notifier = notifier
@@ -858,6 +861,8 @@ public actor JobRunner {
             for mailbox in order {
                 for email in try await source.fetchMessages(references: refsByMailbox[mailbox] ?? [], in: mailbox) {
                     fetched[email.id] = email
+                    // Local-only: a BIMI header becomes the sender's logo; nothing else is kept from the headers.
+                    if let bimi = email.bimiIndicator { await logoRecorder?.recordBIMIHeader(bimi, sender: email.sender) }
                 }
             }
 

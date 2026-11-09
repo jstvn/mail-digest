@@ -702,3 +702,17 @@ Core tests and the xcodebuild build pass; nothing below has been checked on the 
 - In Settings > Senders, add `@example.com` to a list through the + popover: the row should read "Anyone @example.com" with "Whole domain" on the right, and `name@example.com` should show "Address". Typing `@` or `@com` should show the explanation and disable Add.
 - Confirm a domain rule affects a real preview: put a domain on Ignored, open New Backlog Job, and check the "skip ignored senders" count includes mail from that domain and its subdomains.
 - Right-click a card whose sender is covered by a listed domain: that list's menu item should be dimmed. Check VoiceOver reads the domain rows sensibly.
+
+## Sender logos (2026-11-10)
+
+Core tests and the xcodebuild build pass. A scratch program confirmed that `NSImage(data:)` renders a BIMI-style SVG correctly on macOS 15 and that the DNS TXT resolver returns `default._bimi.cnn.com` in about 0.2 s (DNS only). Nothing else below has been checked on the running app.
+
+- Off by default: Settings > General has a "Sender Logos" section with "Show Sender Logos" (subtitle "Fetches logos from senders' websites. They can see your IP address."), switched off on a fresh install and after upgrading from older settings.
+- Nothing fetched while off (network monitor): with the switch off, open the review window, Settings > Senders and a few cards, and run a Daily job; watch with Little Snitch / `sudo tcpdump -i any port 53 or port 443` / Network Instruments. There must be no DNS query for `_bimi` names, no request to any sender site and no icon-service request, other than Ollama / Mail traffic. Avatars show initials.
+- On: switch it on; avatars for non-personal domains should change from initials to logos within a few seconds, with no size change or jump. Each domain is requested at most once (check the monitor, then scroll the lists again). Senders at gmail.com, googlemail.com, outlook.com, hotmail.com, live.com, icloud.com, me.com, mac.com, yahoo.com and proton.me, and their subdomains, never produce a request.
+- Subdomain folding: mail from `email.uber.com` should query `default._bimi.uber.com` and `https://uber.com/apple-touch-icon.png`, never the subdomain.
+- Off again: switch it off; website logos disappear at once (initials), no new requests start, and logos taken from a mail's BIMI header (below) still show.
+- Cache: `~/Library/Application Support/MailDigest/SenderLogos/` holds `index.json` and hash-named `.svg`/`.png` files (header logos and website logos are separate files). Failures are in the index with a date, and a failed domain isn't requested again for 30 days (change the date in `index.json` to older than 30 days and relaunch to see one retry).
+- BIMI header: process an email that has a `BIMI-Indicator` header (a bulk sender that publishes BIMI, e.g. a large bank or retailer), then check its avatar shows the logo with the switch off and no network traffic. This only happens for mail processed after this build (headers aren't stored).
+- Fallbacks: a domain with no logo, a timeout, a redirect to http, an oversized or invalid image all end as initials. Check VoiceOver still reads sender names from the row text (the avatar stays hidden from accessibility).
+- Settings window height: confirm the General tab (now taller by one section) still fits and scrolls on a small display.

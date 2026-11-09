@@ -21,12 +21,12 @@ private struct Harness {
     let collector = ProgressCollector()
 
     init(source: FixtureMailSource, llm: StubLLMClient, store: InMemoryDigestStore = InMemoryDigestStore(),
-         settings: RunnerSettings = settings()) {
+         settings: RunnerSettings = settings(), logoRecorder: (any SenderLogoRecording)? = nil) {
         self.source = source
         self.llm = llm
         self.store = store
         runner = JobRunner(source: source, llm: llm, store: store, notifier: notifier, clock: clock,
-                           settings: settings, sleep: { _ in })
+                           settings: settings, logoRecorder: logoRecorder, sleep: { _ in })
     }
 
     /// Fixture mail with canned model answers.
@@ -62,7 +62,24 @@ private func oldMessages(_ count: Int, prefix: String = "old") -> [EmailMessage]
     }
 }
 
+private actor RecordingLogoRecorder: SenderLogoRecording {
+    private(set) var calls: [(value: String, sender: String)] = []
+    func recordBIMIHeader(_ value: String, sender: String) async { calls.append((value, sender)) }
+}
+
 @Suite struct JobRunnerTests {
+    @Test func bimiHeaderIsHandedToTheLogoRecorderOnce() async throws {
+        var messages = oldMessages(2)
+        messages[0].bimiIndicator = "PHN2Zz48L3N2Zz4="
+        let recorder = RecordingLogoRecorder()
+        let h = Harness(source: FixtureMailSource(messages: messages), llm: StubLLMClient(), logoRecorder: recorder)
+        try await h.runner.start(h.plan(boxes: [icloud]))
+        await h.runner.waitUntilIdle()
+        let calls = await recorder.calls
+        #expect(calls.count == 1)
+        #expect(calls.first?.value == "PHN2Zz48L3N2Zz4=" && calls.first?.sender == "Sam <sam@example.com>")
+    }
+
     // MARK: Q25 provider failures
 
     @Test func unhealthyProviderStopsStartBeforeAnyJobIsCreated() async throws {

@@ -15,6 +15,7 @@ struct MailDigestApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(run: run, access: access)
+                .environment(\.senderLogos, run.senderLogos)
         } label: {
             menuBarLabel
                 .task { await launch() }
@@ -29,6 +30,7 @@ struct MailDigestApp: App {
 
         Window("Mail Digest", id: "review") {
             ReviewWindow(run: run, access: access)
+                .environment(\.senderLogos, run.senderLogos)
         }
         .defaultSize(width: 1200, height: 760)
         .commands { ReviewCommands(run: run) }
@@ -51,6 +53,7 @@ struct MailDigestApp: App {
 
         Settings {
             SettingsView(run: run, access: access)
+                .environment(\.senderLogos, run.senderLogos)
         }
     }
 

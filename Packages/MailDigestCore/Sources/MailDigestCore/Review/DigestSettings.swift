@@ -43,6 +43,9 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public var privacyThreshold: Double
     /// The `CloudPrivacyPolicy` revision the user accepted; nil until they accept.
     public var cloudPrivacyAcknowledgedRevision: Int?
+    /// Fetch sender logos from the sender's own website (BIMI DNS, then apple-touch-icon). Off by default:
+    /// the sender can see the user's IP address. Logos from a mail's BIMI header never need this.
+    public var showSenderLogos: Bool
 
     /// Which triage-model strategy generation the stored value was written under.
     /// Revision 2 made Kev 4B the default (Kev 0.8B stayed as the low-memory option); revision 3 retired
@@ -72,7 +75,9 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 triageModel: String = DigestSettings.defaultTriageModel,
                 privacyThreshold: Double = DigestSettings.defaultPrivacyThreshold,
                 cloudPrivacyAcknowledgedRevision: Int? = nil,
-                triageModelDefaultRevision: Int? = DigestSettings.currentTriageModelDefaultRevision) {
+                triageModelDefaultRevision: Int? = DigestSettings.currentTriageModelDefaultRevision,
+                showSenderLogos: Bool = false) {
+        self.showSenderLogos = showSenderLogos
         self.triageModelDefaultRevision = triageModelDefaultRevision
         self.cloudDigestEnabled = cloudDigestEnabled
         self.geminiModel = geminiModel
@@ -107,7 +112,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         case dailyMailboxes, autoFileProcessed, autoFileEnabledAt
         case pauseBacklogOnBattery, quietHoursEnabled, quietHoursStartMinute, quietHoursEndMinute
         case cloudDigestEnabled, geminiModel, triageModel, privacyThreshold, cloudPrivacyAcknowledgedRevision
-        case triageModelDefaultRevision
+        case triageModelDefaultRevision, showSenderLogos
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
@@ -156,7 +161,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   privacyThreshold: try c.decodeIfPresent(Double.self, forKey: .privacyThreshold)
                       ?? d.privacyThreshold,
                   cloudPrivacyAcknowledgedRevision: try c.decodeIfPresent(Int.self,
-                                                                          forKey: .cloudPrivacyAcknowledgedRevision))
+                                                                          forKey: .cloudPrivacyAcknowledgedRevision),
+                  showSenderLogos: try c.decodeIfPresent(Bool.self, forKey: .showSenderLogos) ?? d.showSenderLogos)
     }
 
     /// The Gemini model, or the default when blank.

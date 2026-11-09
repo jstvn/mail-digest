@@ -124,12 +124,27 @@ public struct MailJSONDecoder: Sendable {
     /// Parses a raw RFC 5322 header block and keeps only `List-Unsubscribe`, `Precedence` and
     /// `Auto-Submitted`, under those canonical spellings. The first occurrence wins.
     public static func filterHeaders(_ raw: String) -> [String: String] {
+        let unfolded = unfoldHeaderLines(raw)
+
+        let keep = ["List-Unsubscribe", "Precedence", "Auto-Submitted"]
+        var out: [String: String] = [:]
+        for line in unfolded {
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let name = line[..<colon].trimmingCharacters(in: .whitespaces)
+            guard let canonical = keep.first(where: { $0.caseInsensitiveCompare(name) == .orderedSame }),
+                  out[canonical] == nil else { continue }
+            out[canonical] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+        }
+        return out
+    }
+
+    /// Splits a raw header block into logical header lines. Long headers are folded onto continuation lines
+    /// starting with space or tab; those are joined back with one space (RFC 5322). The first blank line after
+    /// a header ends the block.
+    static func unfoldHeaderLines(_ raw: String) -> [String] {
         let lines = raw.replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
             .split(separator: "\n", omittingEmptySubsequences: false)
-
-        // Long headers are folded onto continuation lines starting with space or tab; join them
-        // back with one space (RFC 5322). The first empty line ends the header block.
         var unfolded: [String] = []
         for line in lines {
             // Leading blank lines are tolerated; the first blank line after a header ends the block.
@@ -142,17 +157,7 @@ public struct MailJSONDecoder: Sendable {
                 unfolded.append(String(line))
             }
         }
-
-        let keep = ["List-Unsubscribe", "Precedence", "Auto-Submitted"]
-        var out: [String: String] = [:]
-        for line in unfolded {
-            guard let colon = line.firstIndex(of: ":") else { continue }
-            let name = line[..<colon].trimmingCharacters(in: .whitespaces)
-            guard let canonical = keep.first(where: { $0.caseInsensitiveCompare(name) == .orderedSame }),
-                  out[canonical] == nil else { continue }
-            out[canonical] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-        }
-        return out
+        return unfolded
     }
 
     // MARK: Helpers
@@ -177,7 +182,8 @@ public struct MailJSONDecoder: Sendable {
                         storeRowID: raw.storeRowID),
                      contentInspection: .unknown,
                      // JXA exposes only rendered text, so the structure is reliably unavailable.
-                     inspectionGap: .structureUnavailable)
+                     inspectionGap: .structureUnavailable,
+                     bimiIndicator: BIMIIndicator.headerValue(inRawHeaders: raw.rawHeaders ?? ""))
     }
 
     /// JS `toISOString()` emits milliseconds but other sources do not, so accept both forms.

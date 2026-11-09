@@ -46,7 +46,7 @@ import Testing
     }
 
     @Test func everyEncodedKeyIsStillAKey() throws {
-        // The redesign adds no key and renames none: a fully populated blob has exactly today's JSON keys.
+        // A fully populated blob has exactly these JSON keys; adding one (showSenderLogos) is a deliberate change.
         var full = DigestSettings()
         full.maxEmailsPerRun = 50
         full.autoFileProcessed = true
@@ -58,7 +58,7 @@ import Testing
             "vipSenders", "blockedSenders", "ignoredSenders", "trustedNewsletterSenders", "declinedIgnoreSuggestions",
             "dailyMailboxes", "autoFileProcessed", "pauseBacklogOnBattery", "quietHoursEnabled",
             "quietHoursStartMinute", "quietHoursEndMinute", "cloudDigestEnabled", "geminiModel", "triageModel",
-            "privacyThreshold", "cloudPrivacyAcknowledgedRevision", "triageModelDefaultRevision",
+            "privacyThreshold", "cloudPrivacyAcknowledgedRevision", "triageModelDefaultRevision", "showSenderLogos",
         ])
     }
 
