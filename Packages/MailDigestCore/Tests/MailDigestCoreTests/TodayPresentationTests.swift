@@ -15,13 +15,13 @@ import Testing
 
     // MARK: Greeting
 
-    @Test func greetingBoundaries() {
-        let cal = Self.calendar
-        #expect(TodayGreeting.greeting(at: Self.date(0), calendar: cal) == "Good morning")
-        #expect(TodayGreeting.greeting(at: Self.date(11, 59), calendar: cal) == "Good morning")
-        #expect(TodayGreeting.greeting(at: Self.date(12), calendar: cal) == "Good afternoon")
-        #expect(TodayGreeting.greeting(at: Self.date(17, 59), calendar: cal) == "Good afternoon")
-        #expect(TodayGreeting.greeting(at: Self.date(18), calendar: cal) == "Good evening")
+    @Test(arguments: [
+        (4, 59, "Hi"), (5, 0, "Good morning"), (11, 59, "Good morning"), (12, 0, "Good afternoon"),
+        (17, 59, "Good afternoon"), (18, 0, "Good evening"), (21, 59, "Good evening"), (22, 0, "Hi"),
+        (0, 0, "Hi"), (23, 59, "Hi"),
+    ])
+    func greetingBoundaries(hour: Int, minute: Int, expected: String) {
+        #expect(TodayGreeting.greeting(at: Self.date(hour, minute), calendar: Self.calendar) == expected)
     }
 
     @Test func firstNameFromFullName() {
@@ -35,6 +35,8 @@ import Testing
         let now = Self.date(7)
         #expect(TodayGreeting.title(now: now, calendar: Self.calendar, fullName: "Justin Wang") == "Good morning, Justin")
         #expect(TodayGreeting.title(now: now, calendar: Self.calendar, fullName: "") == "Good morning")
+        #expect(TodayGreeting.title(now: Self.date(23), calendar: Self.calendar, fullName: "Justin Wang") == "Hi, Justin")
+        #expect(TodayGreeting.title(now: Self.date(23), calendar: Self.calendar, fullName: "") == "Hi")
     }
 
     @Test func greetingFollowsTheCalendarTimeZone() {

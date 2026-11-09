@@ -2,12 +2,14 @@ import Foundation
 
 /// The Today header: greeting, first name and date overline. Time, calendar and locale are injected.
 public enum TodayGreeting {
-    /// "Good morning" before 12 pm, "Good afternoon" from 12 pm, "Good evening" from 6 pm, by `calendar`'s time zone.
+    /// "Good morning" from 5:00, "Good afternoon" from 12:00, "Good evening" from 18:00 and a plain "Hi" from
+    /// 22:00 until 4:59, by `calendar`'s time zone (the Mac's, so callers pass the current calendar).
     public static func greeting(at now: Date, calendar: Calendar) -> String {
         switch calendar.component(.hour, from: now) {
-        case ..<12: return "Good morning"
+        case 5..<12: return "Good morning"
         case 12..<18: return "Good afternoon"
-        default: return "Good evening"
+        case 18..<22: return "Good evening"
+        default: return "Hi"
         }
     }
 
@@ -16,7 +18,7 @@ public enum TodayGreeting {
         fullName.split(whereSeparator: \.isWhitespace).first.map(String.init)
     }
 
-    /// "Good morning, Justin", or just "Good morning" when there is no name (no dangling comma).
+    /// "Good morning, Justin", or just "Good morning" (or "Hi") when there is no name (no dangling comma).
     public static func title(now: Date, calendar: Calendar, fullName: String) -> String {
         let greeting = greeting(at: now, calendar: calendar)
         guard let name = firstName(fromFullName: fullName) else { return greeting }

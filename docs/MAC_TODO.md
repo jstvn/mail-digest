@@ -729,3 +729,12 @@ Core tests and the xcodebuild build pass. Nothing below has been run against a r
 - Banner: stop a run whose configured digest model isn't installed; the run-problem banner shows "Download Model" beside Retry. It starts the download and opens Settings on the Models tab. Check the banner clears on Retry after the download finishes.
 - VoiceOver reads the progress with its label and value, and the Download Model, Cancel and Try Again buttons by name.
 - Network monitor: during a download the only traffic is to the configured Ollama URL.
+
+## Today follow-ups (2026-11-10)
+
+Core tests and the xcodebuild build pass. Screenshots (light and dark) were checked with an injected clock. The time-based behaviour on a live clock has not been watched.
+
+- Greeting on the hour: leave the review window open on Today across 4:59 to 5:00 am, 11:59 am to 12:00 pm, 5:59 to 6:00 pm and 9:59 to 10:00 pm (or change the Mac's clock). The greeting should change to Good morning, Good afternoon, Good evening and Hi without reopening the window. The greeting follows the Mac's time zone; the date overline above it still uses the fixed review calendar.
+- Empty-state copy at the scheduled time: with no digest today and the run set a couple of minutes ahead (Settings > General), leave Today open. It should read "Not Ready Yet" with the time, then flip to "Today's Digest Didn't Run" at the scheduled minute. On a brand-new install it should say "No Digest Yet / Your first digest runs at <time>" instead, before and after.
+- Reasons: after the time, a failed Daily job should show its stored error, a paused or stopped one says so, a failed start (Ollama quit) shows the banner text, and with none of those it says the Mac may have been asleep or Mail Digest wasn't open. Check that "Run Now" is dimmed exactly when the toolbar's Run Now is, and that Return triggers it.
+- Toolbar button: Run Now, Pause, Resume and Retry icons should look level with the title at normal and large text sizes, and Run Now should stay left of the search field.

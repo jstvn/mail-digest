@@ -92,7 +92,8 @@ final class DigestRunModel {
     @ObservationIgnored private var store: GRDBDigestStore?
     @ObservationIgnored private var didRecoverJobs = false
     @ObservationIgnored private let notifier = UserNotifier()
-    @ObservationIgnored private let clock = SystemClock()
+    /// The time source, injectable so previews can show a chosen moment.
+    @ObservationIgnored let clock: any Clock
     @ObservationIgnored private var runner: JobRunner?
     @ObservationIgnored private var runnerKey: RunnerKey?
     @ObservationIgnored private var progressTask: Task<Void, Never>?
@@ -106,6 +107,7 @@ final class DigestRunModel {
 
     init(settings: SettingsStore = SettingsStore()) {
         self.settings = settings
+        self.clock = SystemClock()
         let logoService = SenderLogoService(store: DiskSenderLogoStore(), fetcher: SenderLogoFetcher(), clock: SystemClock())
         self.logoService = logoService
         self.senderLogos = SenderLogoProvider(service: logoService,
@@ -131,7 +133,9 @@ final class DigestRunModel {
          reminders: RemindersAccessModel = RemindersAccessModel(preview: .granted), progress: JobProgress? = nil, banner: String? = nil, failedJobID: UUID? = nil,
          lastRunAt: Date? = nil, lastRunFoundNothing: Bool = false, lastRunSummary: String? = nil,
          jobs: [Job] = [], scheduledRunWaiting: Bool = false,
-         bannerKind: JobFailureKind? = nil, dailyStartFailedAt: Date? = nil, mailboxes: [MailboxInfo] = []) {
+         bannerKind: JobFailureKind? = nil, dailyStartFailedAt: Date? = nil, mailboxes: [MailboxInfo] = [],
+         clock: any Clock = SystemClock()) {
+        self.clock = clock
         self.mailboxes = mailboxes
         self.settings = preview
         // Previews never touch the disk or the network.
@@ -174,6 +178,11 @@ final class DigestRunModel {
     /// stopped Backlog job never blocks it.
     var canStartDaily: Bool {
         dailyLifecycle == .none && canRunDailyWork
+    }
+
+    /// Whether a Run Now button (the toolbar's, or Today's empty state) can act: a Daily run may start and Mail is reachable.
+    func canRunNow(mailUnavailable: Bool) -> Bool {
+        canStartDaily && !mailUnavailable
     }
 
     /// Nothing is running, or only a Backlog job a Daily job may pre-empt (Q23).

@@ -22,6 +22,8 @@ struct DigestCanvasView: View {
     @State private var pinnedExpanded = true
     /// The local search filter; never persisted.
     @State private var searchText = ""
+    /// Today's clock, refreshed on appear and when the greeting or the empty-state copy can change.
+    @State private var shownNow: Date?
 
     private var coordinator: ReviewCoordinator { run.coordinator }
     private var library: ReviewLibrary { run.library }
@@ -203,7 +205,7 @@ struct DigestCanvasView: View {
                            "Mail Digest couldn't read this digest from its database.",
                            actions: [EmptyAction(title: "Try Again") { Task { await coordinator.loadSelected() } }])
             case .noDigestToday:
-                waitingLink
+                // The empty state has its own button for earlier suggestions, so no separate link here.
                 noDigestState
             case .backlogPending:
                 backlogPendingState
@@ -223,6 +225,7 @@ struct DigestCanvasView: View {
             }
         }
         .searchable(text: $searchText, placement: .toolbar, prompt: "Search This Page")
+        .task(id: kind == .today ? clockKey : -1) { await keepTimeFresh() }
     }
 
     /// What a Backlog job with no results yet says, by why it is idle.
@@ -246,8 +249,30 @@ struct DigestCanvasView: View {
 
     // MARK: Today header
 
+    /// The time Today shows; `run.clock` is the system clock except in previews.
+    private var now: Date { shownNow ?? run.clock.now() }
+
+    /// The configured run time as minutes, so the refresh loop restarts when the user changes it.
+    private var clockKey: Int { run.settings.settings.runHour * 60 + run.settings.settings.runMinute }
+
+    /// Refreshes `shownNow` now and at every moment the greeting (the top of each hour) or the empty-state
+    /// copy (the scheduled time, which is not on the hour) can change, so an open window never goes stale.
+    private func keepTimeFresh() async {
+        let s = run.settings.settings
+        while !Task.isCancelled {
+            let current = run.clock.now()
+            shownNow = current
+            let next = TodayEmptyState.nextChange(after: current, runHour: s.runHour, runMinute: s.runMinute,
+                                                  calendar: .autoupdatingCurrent, runTimeZone: library.calendar.timeZone)
+            try? await Task.sleep(for: .seconds(max(1, next.timeIntervalSince(current))))
+        }
+    }
+
     private var todayHeader: some View {
-        TodayHeader(now: .now, calendar: library.calendar, fullName: NSFullUserName(), headline: content?.headline ?? "")
+        // The brief belongs to a digest; with none, the header is only the date and the greeting.
+        let headline: String = { if case .digest = phase { return content?.headline ?? "" } else { return "" } }()
+        return TodayHeader(now: now, greetingCalendar: .autoupdatingCurrent, dateCalendar: library.calendar,
+                           fullName: NSFullUserName(), headline: headline)
     }
 
     /// The stat strip and the run line under it.
@@ -270,13 +295,6 @@ struct DigestCanvasView: View {
         let perform: () -> Void
     }
 
-    /// "Your next digest runs today at 6:30 am." with the configured time.
-    private var nextDigestLine: String {
-        let s = run.settings.settings
-        let when = NextDigestText.when(now: .now, hour: s.runHour, minute: s.runMinute, timeZone: library.calendar.timeZone)
-        return "Your \(library.archive.months.isEmpty && library.archive.backlogs.isEmpty ? "first" : "next") digest runs \(when)."
-    }
-
     /// The "N more waiting from earlier days" link, for a day that has no stat strip to carry it.
     @ViewBuilder private var waitingLink: some View {
         if waitingFromEarlier > 0 {
@@ -291,13 +309,48 @@ struct DigestCanvasView: View {
         }
     }
 
-    /// Today before its digest exists: when the next one runs, Run Now, and a way into earlier suggestions.
-    private var noDigestState: some View {
-        var actions = [EmptyAction(title: "Run Now", isDisabled: run.isRunning) { Task { await run.runNow() } }]
-        if waitingFromEarlier > 0 {
-            actions.append(EmptyAction(title: "Review \(waitingFromEarlier) from Earlier Days") { coordinator.select(.reviewQueue) })
+    /// What the app knows about why today's Daily digest is missing, from the job state and a failed start.
+    private var todayProblem: TodayEmptyState.Problem? {
+        if run.dailyAction == .running { return .running }
+        switch run.dailyLifecycle {
+        case .running, .stopping: return .running
+        case .failed(let job): return .failed(reason: job.lastError ?? run.banner)
+        case .paused(let job): return .paused(job.pauseReason)
+        case .stopped: return .stopped
+        case .conflict: return .unfinished
+        case .none: return run.dailyStartFailedAt != nil ? .startFailed(reason: run.banner) : nil
         }
-        return emptyState("No Digest Yet", systemImage: "sun.max", nextDigestLine, actions: actions)
+    }
+
+    /// Today before its digest exists: why, Run Now, and a way into earlier suggestions.
+    private var noDigestState: some View {
+        let s = run.settings.settings
+        let copy = TodayEmptyState(now: now, runHour: s.runHour, runMinute: s.runMinute,
+                                   timeZone: library.calendar.timeZone,
+                                   hasEverRun: !(library.archive.months.isEmpty && library.archive.backlogs.isEmpty),
+                                   problem: todayProblem)
+        let canRun = run.canRunNow(mailUnavailable: access.status?.mode == .unavailable)
+        return ContentUnavailableView {
+            Label(copy.title, systemImage: "sun.max")
+        } description: {
+            Text(copy.description)
+        } actions: {
+            // Natural widths, side by side.
+            HStack {
+                Button("Run Now") { Task { await run.runNow() } }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canRun)
+                if waitingFromEarlier > 0 {
+                    Button("Review \(waitingFromEarlier) from Earlier Days") { coordinator.select(.reviewQueue) }
+                        .buttonStyle(.bordered)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        // Measured: the scaffold's two 26 pt gaps (the notices slot is empty but still spaced) plus the
+        // view's own top inset leave 76 pt under the greeting; this brings it to the 60 pt the design asks for.
+        .padding(.top, -16)
     }
 
     private func emptyState(_ title: String, systemImage: String, _ detail: String, actions: [EmptyAction] = []) -> some View {

@@ -4,7 +4,10 @@ import SwiftUI
 /// The top of Today: the date overline, a greeting by time of day and the model's brief.
 struct TodayHeader: View {
     let now: Date
-    let calendar: Calendar
+    /// The Mac's current calendar: the greeting follows the local time of day.
+    let greetingCalendar: Calendar
+    /// The fixed review calendar for the date overline.
+    let dateCalendar: Calendar
     /// The macOS account's full name; the greeting uses its first word.
     let fullName: String
     /// The digest's one-sentence summary. A bare count ("12 emails, 3 suggestions.") is not shown as a brief.
@@ -16,11 +19,11 @@ struct TodayHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(TodayGreeting.dateOverline(now: now, calendar: calendar))
+            Text(TodayGreeting.dateOverline(now: now, calendar: dateCalendar))
                 .font(.system(size: 12, weight: .semibold))
                 .tracking(0.72)
                 .foregroundStyle(.orange)
-            Text(TodayGreeting.title(now: now, calendar: calendar, fullName: fullName))
+            Text(TodayGreeting.title(now: now, calendar: greetingCalendar, fullName: fullName))
                 .font(.system(size: 34, weight: .bold))
                 .tracking(-0.7)
                 .accessibilityAddTraits(.isHeader)
@@ -115,7 +118,7 @@ private struct RunLineLabelStyle: LabelStyle {
     let info = RunInfo(localEmails: 8, cloudEmails: 0, localModel: "qwen3:4b", cloudModel: nil,
                        finishedAt: PreviewFixtures.now, duration: 46 * 60)
     VStack(alignment: .leading, spacing: 20) {
-        TodayHeader(now: PreviewFixtures.now, calendar: calendar, fullName: "Justin Wang",
+        TodayHeader(now: PreviewFixtures.now, greetingCalendar: calendar, dateCalendar: calendar, fullName: "Justin Wang",
                     headline: "Two things need a decision: the Tanda AI Hackathon on Friday 20 Nov and Jacob's runsheet.")
         TodayRunLine(info: info, calendar: calendar, waitingCount: 7, openReviewQueue: {})
         TodayRunLine(info: RunInfo(localEmails: 5, cloudEmails: 3, localModel: "qwen3:4b", cloudModel: "gemini-3.5-flash-lite",

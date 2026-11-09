@@ -52,7 +52,7 @@ struct ReviewWindow: View {
         return Button { perform(action) } label: {
             Label(action.title, systemImage: action.systemImage)
         }
-        .labelStyle(.titleAndIcon)
+        .labelStyle(ToolbarRunLabelStyle())
         .keyboardShortcut("r", modifiers: .command)
         .accessibilityLabel(action.title)
         .disabled(!isEnabled(action))
@@ -62,7 +62,7 @@ struct ReviewWindow: View {
     private func isEnabled(_ action: ToolbarRunAction) -> Bool {
         let mailUnavailable = access.status?.mode == .unavailable
         switch action.behavior {
-        case .runNow: return run.canStartDaily && !mailUnavailable
+        case .runNow: return run.canRunNow(mailUnavailable: mailUnavailable)
         case .pause: return true
         case .resumeJob: return !run.isRunning && !mailUnavailable
         case .resumeDaily, .retryDaily: return run.isDailyActionEnabled && !mailUnavailable
@@ -103,6 +103,17 @@ struct ReviewWindow: View {
         case .logbook: return "Logbook"
         case .mailCleanup: return "Mail Cleanup"
         case .activity: return "Activity"
+        }
+    }
+}
+
+/// Icon and title of the toolbar run button. The system sizes the icon; small keeps it level with the text like
+/// Mail's toolbar buttons, and the tighter spacing than the system's title-and-icon style keeps them one unit.
+private struct ToolbarRunLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 3) {
+            configuration.icon.imageScale(.small)
+            configuration.title
         }
     }
 }
