@@ -71,13 +71,9 @@ public enum DailyLifecycle: Equatable, Sendable {
             return .running
         case .stopping:
             return DailyMenuAction(title: "Stopping…", systemImage: "stop", behavior: .none)
-        case .paused(let job):
-            return DailyMenuAction(title: "Resume", systemImage: "play", behavior: .resume(job.id),
-                                   accessibilityLabel: "Resume Daily Digest")
-        case .stopped:
-            return DailyMenuAction(title: "Review Daily Job…", systemImage: "list.bullet.rectangle",
-                                   behavior: .review,
-                                   note: "The Daily job was stopped. Resume it from Activity before a new Daily digest can run.")
+        case .paused(let job), .stopped(let job):
+            // A stopped job resumes only through this explicit click (Q48), the same way a paused one does.
+            return DailyMenuAction(title: "Resume Daily Digest", systemImage: "play", behavior: .resume(job.id))
         case .failed(let job):
             return DailyMenuAction(title: "Retry Daily Digest", systemImage: "arrow.clockwise", behavior: .retry(job.id),
                                    note: job.lastError ?? "The Daily job stopped before it finished.")
@@ -94,7 +90,7 @@ public struct DailyMenuAction: Equatable, Sendable {
     public enum Behavior: Equatable, Sendable {
         /// Create a new Daily job (`JobRunner.startDaily()`).
         case startNew
-        /// Resume this paused Daily job and its existing queue.
+        /// Resume this paused or stopped Daily job and its existing queue.
         case resume(UUID)
         /// Resume this failed Daily job by id, the Q25 recovery path.
         case retry(UUID)

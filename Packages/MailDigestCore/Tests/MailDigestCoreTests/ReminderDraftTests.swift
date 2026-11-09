@@ -52,7 +52,7 @@ private func make(due: Date?, hasTime: Bool, priority: Priority = .medium) -> Su
         let email = EmailContext(sender: "a@b.c", subject: "Hi", mailbox: box)
         let d = ReminderDraft(make(due: nil, hasTime: false), category: .finance, email: email)
         #expect(d.title == "Pay fees")
-        #expect(d.notes == "From: a@b.c\nSubject: Hi\n\"pay by Friday\"\n#finance")
+        #expect(d.notes == "From a@b.c · Hi\n\"pay by Friday\"\n#finance")
         #expect(d.url.absoluteString == "message://%3Cid@x.com%3E")
     }
 }

@@ -16,6 +16,7 @@ struct ReviewQueueView: View {
     @State private var filter = ReviewQueueFilter()
     /// Bumped by Return in the list so the inspector puts the cursor in the title.
     @State private var titleFocusRequest = 0
+    @State private var confirmingDismiss = false
 
     private var coordinator: ReviewCoordinator { run.coordinator }
     private var queue: PagedRecordsModel { coordinator.reviewQueue }
@@ -268,19 +269,30 @@ struct ReviewQueueView: View {
         }
     }
 
-    /// The bulk bar: "6 of 10 selected" and Add 6 to Reminders, over the rows the filter and search leave shown.
+    /// The bulk bar: "6 of 10 selected", Dismiss Unselected and Add 6 to Reminders, over the rows the filter and
+    /// search leave shown. Rows still behind Load More are never part of either action.
     private func footer(shown: [SuggestionRecord]) -> some View {
-        let selected = coordinator.selectedCount(in: shown)
+        let footer = ReviewQueueFooter(shown: shown, session: coordinator.session)
         let isPartial = queue.hasMore || isFiltering
-        let text = isPartial
-            ? ReviewCanvasLogic.selectionText(selected: selected, shown: shown.count, isPartial: true)
-            : "\(selected) of \(shown.count) selected"
         return VStack(spacing: 0) {
             Divider()
             HStack {
-                Text(text).monospacedDigit().foregroundStyle(.secondary)
+                Text(footer.selectionText).monospacedDigit().foregroundStyle(.secondary)
                 Spacer()
-                Button(selected > 0 ? "Add \(selected) to Reminders" : "Add to Reminders") {
+                Button(footer.dismissTitle) {
+                    if footer.needsConfirmation { confirmingDismiss = true } else { dismissUnselected(shown) }
+                }
+                .buttonStyle(.bordered)
+                .disabled(footer.unselected == 0 || coordinator.isWorking)
+                .help(isPartial ? "Dismiss the unticked suggestions shown. Hidden suggestions aren't affected."
+                      : "Dismiss the unticked suggestions")
+                .confirmationDialog(footer.confirmationTitle, isPresented: $confirmingDismiss, titleVisibility: .visible) {
+                    Button("Dismiss", role: .destructive) { dismissUnselected(shown) }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text(footer.confirmationMessage)
+                }
+                Button(footer.addTitle) {
                     Task { await coordinator.addSelected(in: shown) }
                 }
                 .buttonStyle(.bordered)
@@ -293,6 +305,10 @@ struct ReviewQueueView: View {
             .padding(.vertical, 10)
         }
         .background(.bar)
+    }
+
+    private func dismissUnselected(_ shown: [SuggestionRecord]) {
+        Task { await coordinator.dismissUnselected(in: shown) }
     }
 
     // MARK: Keyboard

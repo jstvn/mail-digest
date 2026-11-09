@@ -11,7 +11,7 @@ public struct ToolbarRunAction: Equatable, Sendable {
         case pause
         /// Resume the paused job held by the progress strip, whatever its kind.
         case resumeJob(UUID)
-        /// Resume this paused Daily job (Q52).
+        /// Resume this paused or stopped Daily job (Q52).
         case resumeDaily(UUID)
         /// Retry this failed Daily job (Q25).
         case retryDaily(UUID)
@@ -59,13 +59,13 @@ public struct ToolbarRunAction: Equatable, Sendable {
             self.init(title: "Retry", systemImage: "arrow.clockwise", behavior: .retryDaily(id),
                       help: "Retry the Daily digest")
         case .resume(let id):
-            self.init(title: "Resume", systemImage: "play.fill", behavior: .resumeDaily(id), help: "Continue the paused Daily job")
+            self.init(title: "Resume", systemImage: "play.fill", behavior: .resumeDaily(id), help: "Continue the unfinished Daily job")
         case .startNew where daily == .retryStart:
             self.init(title: "Retry", systemImage: "arrow.clockwise", behavior: .runNow, help: "Try the Daily digest again")
         case .startNew:
             self.init(title: "Run Now", systemImage: "play.fill", behavior: .runNow, help: "Read your new mail now")
         case .review, .none:
-            // A stopped or conflicting Daily job is resolved in Activity first; Run Now stays disabled.
+            // Several unfinished Daily jobs are resolved in Activity first; Run Now stays disabled.
             self.init(title: "Run Now", systemImage: "play.fill", behavior: .unavailable,
                       help: "Resume or review the unfinished Daily job first.")
         }

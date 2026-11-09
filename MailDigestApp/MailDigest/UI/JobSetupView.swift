@@ -319,15 +319,10 @@ private struct DateRangeStep: View {
                     }
                 }
                 Section {
-                    Toggle(isOn: .constant(true)) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Skip Emails Already Processed")
-                            Text(processedSubtitle).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    // Mail Digest never reads an email twice, so this one is a statement, not a choice.
-                    .disabled(true)
-                    .help("Emails that were already read, or are queued in another job, are never processed twice.")
+                    // Mail Digest never reads an email twice, so this is a statement, not a choice.
+                    Text(processedLine)
+                        .foregroundStyle(.secondary)
+                        .help("Emails that were already read, or are queued in another job, are never processed twice.")
                     Toggle(isOn: $model.skipIgnoredSenders) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Skip Ignored Senders")
@@ -366,9 +361,9 @@ private struct DateRangeStep: View {
         return "\(JobFormat.number(total)) \(total == 1 ? "email" : "emails")"
     }
 
-    private var processedSubtitle: String {
-        guard let preview = model.preview else { return "Emails Mail Digest has already read are left out." }
-        return "\(JobFormat.number(preview.alreadyProcessed)) already read or queued in another job"
+    private var processedLine: String {
+        guard let preview = model.preview else { return "Counting…" }
+        return "\(JobFormat.number(preview.alreadyProcessed)) already processed will be skipped"
     }
 
     private var ignoredSubtitle: String {

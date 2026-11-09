@@ -90,3 +90,46 @@ private func record(priority: Priority = .medium, category: Category = .other, d
         #expect(EvidenceHighlight.range(of: text, in: text) == text.startIndex..<text.endIndex)
     }
 }
+
+@Suite struct ReviewQueueFooterTests {
+    private func rec(_ status: SuggestionStatus = .pending, preselected: Bool = false) -> SuggestionRecord {
+        var r = record()
+        r.suggestion.status = status
+        r.suggestion.preselected = preselected
+        return r
+    }
+
+    @Test func textsUseTheShownRows() {
+        let shown = [rec(preselected: true), rec(preselected: true), rec()]
+        let footer = ReviewQueueFooter(shown: shown, session: ReviewSession())
+        #expect(footer.selectionText == "2 of 3 selected")
+        #expect(footer.dismissTitle == "Dismiss 1 Unselected")
+        #expect(footer.addTitle == "Add 2 to Reminders")
+    }
+
+    @Test func scopeIsOnlyTheRowsGiven() {
+        // The footer sees only the rows the caller passes (loaded, filtered); nothing else can be counted.
+        let footer = ReviewQueueFooter(shown: [rec(), rec(preselected: true)], session: ReviewSession())
+        #expect(footer.unselected == 1 && footer.shown == 2)
+    }
+
+    @Test func selectedAndFailedAreNotDismissed() {
+        let failed = rec(.failed)
+        let ticked = rec(preselected: true)
+        let plain = rec()
+        let footer = ReviewQueueFooter(shown: [failed, ticked, plain], session: ReviewSession())
+        #expect(footer.unselected == 1)
+        var session = ReviewSession()
+        session.toggle(plain.suggestion)
+        #expect(ReviewQueueFooter(shown: [failed, ticked, plain], session: session).unselected == 0)
+    }
+
+    @Test func confirmationIsExactlyAboveTen() {
+        let ten = (0..<10).map { _ in rec() }
+        let eleven = (0..<11).map { _ in rec() }
+        #expect(!ReviewQueueFooter(shown: ten, session: ReviewSession()).needsConfirmation)
+        let big = ReviewQueueFooter(shown: eleven, session: ReviewSession())
+        #expect(big.needsConfirmation)
+        #expect(big.confirmationTitle.contains("11"))
+    }
+}

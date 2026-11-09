@@ -37,7 +37,7 @@ struct ReviewInspector: View {
         var listID: String?
         var notes: String
 
-        init(_ s: Suggestion, category: Category, calendar: Calendar, now: Date) {
+        init(_ s: Suggestion, category: Category, defaultNotes: String?, calendar: Calendar, now: Date) {
             title = s.title
             hasDue = s.due != nil
             due = s.due ?? calendar.startOfDay(for: now.addingTimeInterval(86_400))
@@ -45,7 +45,8 @@ struct ReviewInspector: View {
             priority = s.priority
             self.category = category
             listID = s.reminderListID
-            notes = s.notes ?? ""
+            // With no saved notes the field shows the default line as real, editable text.
+            notes = s.notes ?? defaultNotes ?? ""
         }
     }
 
@@ -77,10 +78,11 @@ struct ReviewInspector: View {
         self.onAdd = onAdd
         self.onDismiss = onDismiss
         self.loadRouting = loadRouting
-        _draft = State(initialValue: Draft(record.suggestion, category: record.category, calendar: calendar, now: now))
+        _draft = State(initialValue: Draft(record.suggestion, category: record.category, defaultNotes: ReviewActions.defaultNotes(email: record.email), calendar: calendar, now: now))
     }
 
     private var suggestion: Suggestion { record.suggestion }
+    private var defaultNotes: String? { ReviewActions.defaultNotes(email: record.email) }
     private var senderName: String { record.email.map { ReviewPresentation.senderName($0.sender) } ?? "Unknown sender" }
 
     // MARK: Body
@@ -93,7 +95,7 @@ struct ReviewInspector: View {
                     listRow
                     dueRow
                     priorityRow
-                    tagsRow
+                    categoryRow
                     notesRow
                 }
                 Section {
@@ -114,7 +116,7 @@ struct ReviewInspector: View {
         .environment(\.calendar, calendar)
         .task(id: record.id) { routing = await loadRouting() }
         .onChange(of: suggestion) { _, new in
-            draft = Draft(new, category: record.category, calendar: calendar, now: now)
+            draft = Draft(new, category: record.category, defaultNotes: defaultNotes, calendar: calendar, now: now)
         }
         .onChange(of: record.category) { _, new in draft.category = new }
         .onChange(of: titleFocusRequest) { _, _ in focus = .title }
@@ -245,22 +247,15 @@ struct ReviewInspector: View {
         }
     }
 
-    private var tagsRow: some View {
-        LabeledContent("Tags") {
-            HStack(spacing: 8) {
-                TagPill(text: "#\(draft.category.rawValue)")
-                // A suggestion has one category tag, so Add Tag chooses it.
-                Menu("Add Tag") {
-                    Picker("Tag", selection: $draft.category) {
-                        ForEach(Category.allCases, id: \.self) { Text("#\($0.rawValue)").tag($0) }
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .help("Choose the category tag added to the reminder")
+    private var categoryRow: some View {
+        LabeledContent("Category") {
+            // A suggestion has one category, which becomes the #hashtag on the reminder.
+            Picker("Category", selection: $draft.category) {
+                ForEach(Category.allCases, id: \.self) { Text("#\($0.rawValue)").tag($0) }
             }
+            .labelsHidden()
+            .fixedSize()
+            .help("Choose the category tag added to the reminder")
         }
         .onChange(of: draft.category) { _, new in
             if new != record.category { commit(SuggestionEdit(category: new)) }
@@ -406,9 +401,9 @@ struct ReviewInspector: View {
     }
 
     private func commitNotes() {
-        let trimmed = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed != (suggestion.notes ?? "") else { return }
-        commit(SuggestionEdit(notes: draft.notes))
+        guard let notes = ReviewActions.notesToSave(field: draft.notes, defaultLine: defaultNotes, saved: suggestion.notes)
+        else { return }
+        commit(SuggestionEdit(notes: notes))
     }
 
     private func commit(_ edit: SuggestionEdit) {
@@ -423,7 +418,7 @@ struct ReviewInspector: View {
             return true
         } catch {
             // Revert so the fields show what is actually saved.
-            draft = Draft(suggestion, category: record.category, calendar: calendar, now: now)
+            draft = Draft(suggestion, category: record.category, defaultNotes: defaultNotes, calendar: calendar, now: now)
             errorText = Self.message(for: error)
             return false
         }
@@ -434,7 +429,7 @@ struct ReviewInspector: View {
     private func addToReminders() {
         var pending = SuggestionEdit()
         if draft.title.trimmingCharacters(in: .whitespacesAndNewlines) != suggestion.title { pending.title = draft.title }
-        if draft.notes.trimmingCharacters(in: .whitespacesAndNewlines) != (suggestion.notes ?? "") { pending.notes = draft.notes }
+        pending.notes = ReviewActions.notesToSave(field: draft.notes, defaultLine: defaultNotes, saved: suggestion.notes)
         Task {
             if pending != SuggestionEdit(), !(await save(pending)) { return }
             onAdd()

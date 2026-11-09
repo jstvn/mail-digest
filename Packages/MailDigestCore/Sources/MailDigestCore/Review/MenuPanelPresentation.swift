@@ -53,6 +53,30 @@ public enum MenuPanelPresentation {
         }
     }
 
+    /// "Backlog · 12 Nov · Stopped at 12 of 40": where a paused or stopped job is, in one line. `done` counts
+    /// everything finished (done, failed, skipped) and `total` adds what is still queued. A pause `reason` is
+    /// appended in brackets. Nil for other states.
+    public static func haltedLine(jobTitle: String, state: JobState, done: Int, total: Int, reason: String? = nil,
+                                  locale: Locale = .current) -> String? {
+        let word: String
+        switch state {
+        case .paused: word = "Paused"
+        case .stopped: word = "Stopped"
+        default: return nil
+        }
+        var text = "\(jobTitle) · \(word) at \(ReviewPresentation.number(done, locale)) of "
+            + ReviewPresentation.number(total, locale)
+        if let reason, !reason.isEmpty { text += " (\(reason))" }
+        return text
+    }
+
+    /// `haltedLine` from a stored job's totals.
+    public static func haltedLine(_ job: Job, jobTitle: String, locale: Locale = .current) -> String? {
+        let t = job.totals
+        let done = t.done + t.failed + t.skipped
+        return haltedLine(jobTitle: jobTitle, state: job.state, done: done, total: done + t.queued, locale: locale)
+    }
+
     // MARK: Last Daily digest row
 
     /// "3 suggestions from this morning" with "8 emails · finished 7:28 am". The count is pending plus failed,

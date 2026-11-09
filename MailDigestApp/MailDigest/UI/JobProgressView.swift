@@ -19,7 +19,7 @@ struct JobProgressView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ProgressStripView(progress: progress, onPause: run.pause, onPauseNow: run.pauseNow,
+            ProgressStripView(progress: progress, haltedTitle: run.haltedJobName(for: progress), onPause: run.pause, onPauseNow: run.pauseNow,
                               onResume: { Task { await run.resume() } }, onStop: run.stop)
             recent
             if progress.failed > 0 {

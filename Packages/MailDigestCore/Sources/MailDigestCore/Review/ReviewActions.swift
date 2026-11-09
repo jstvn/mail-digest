@@ -327,18 +327,29 @@ public enum ReviewActions {
 
     // MARK: Reminders content
 
-    /// The Reminders `notes` text; the trailing `#category` is a searchable hashtag (EventKit has no tag API).
-    /// Without email context the From and Subject lines are left out.
+    /// "From Ray White · Rent due Friday": the default Notes line. Nil without email context.
+    public static func defaultNotes(email: EmailContext?) -> String? {
+        guard let email else { return nil }
+        return "From \(ReviewPresentation.senderName(email.sender)) · \(email.subject)"
+    }
+
+    /// The notes value to save for the inspector's Notes field, or nil when nothing needs saving. The default line
+    /// is shown as real text but never stored: a field equal to it, or empty, means "no notes" (saved as ""),
+    /// which `applying` turns into nil.
+    public static func notesToSave(field: String, defaultLine: String?, saved: String?) -> String? {
+        let text = field.trimmingCharacters(in: .whitespacesAndNewlines)
+        let target = text == (defaultLine ?? "") ? "" : text
+        return target == (saved ?? "") ? nil : target
+    }
+
+    /// The Reminders `notes` text: the user's notes (else the default "From … · …" line), then the evidence quote,
+    /// then a `#category` hashtag (EventKit has no tag API). Without email context there is no default line.
     public static func reminderNotes(for suggestion: Suggestion, email: EmailContext?, category: Category) -> String {
         var lines: [String] = []
-        // The user's own words come first, set apart from the email details.
         if let notes = suggestion.notes, !notes.isEmpty {
             lines.append(notes)
-            lines.append("")
-        }
-        if let email {
-            lines.append("From: \(email.sender)")
-            lines.append("Subject: \(email.subject)")
+        } else if let line = defaultNotes(email: email) {
+            lines.append(line)
         }
         lines.append("\"\(suggestion.evidence)\"")
         lines.append("#\(category.rawValue)")

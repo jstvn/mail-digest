@@ -312,6 +312,37 @@ final class DigestRunModel {
         return progress.kind == .daily ? "Daily Digest" : "Backlog"
     }
 
+    /// The name a paused or stopped job goes by: "Daily Digest", or the Backlog job's sidebar title.
+    func haltedJobName(_ job: Job) -> String {
+        job.kind == .daily ? "Daily Digest" : BacklogRowText.title(job, calendar: library.calendar)
+    }
+
+    func haltedJobName(for progress: JobProgress) -> String {
+        if let job = pastJobs.first(where: { $0.id == progress.jobID })?.job { return haltedJobName(job) }
+        return progress.kind == .daily ? "Daily Digest" : "Backlog"
+    }
+
+    /// The newest Daily or Backlog job when it is stopped with work left and nothing is running: the menu shows
+    /// "Stopped at 12 of 40" with a Resume button. A paused job is shown by the progress card instead.
+    var menuStoppedJob: (job: Job, line: String)? {
+        guard activeProgress == nil, !isRunning, let job = pastJobs.first?.job,
+              job.state == .stopped, job.totals.queued > 0,
+              let line = MenuPanelPresentation.haltedLine(job, jobTitle: haltedJobName(job)) else { return nil }
+        return (job, line)
+    }
+
+    /// The Resume next to "Stopped at …". Continues that job in place; a stopped job only ever resumes from
+    /// an explicit click like this one (Q48).
+    func resumeStoppedJob(_ job: Job) async {
+        if job.kind == .daily { await resumeDailyJob(job.id, expecting: .stopped) } else { await resumeJob(job.id) }
+    }
+
+    /// The menu or toolbar Resume for the current Daily job, whichever of paused or stopped it is.
+    func resumeCurrentDaily(_ jobID: UUID) async {
+        let state: JobState = dailyLifecycle.jobs.first(where: { $0.id == jobID })?.state == .stopped ? .stopped : .paused
+        await resumeDailyJob(jobID, expecting: state)
+    }
+
     /// "Local · Qwen3 4B".
     var menuModelLabel: String {
         "Local · " + RoutingPresentation.modelDisplayName(settings.settings.resolvedModel)
@@ -524,7 +555,7 @@ final class DigestRunModel {
         await finishRun(startedAt: startedAt)
     }
 
-    /// The menu's Resume (paused) or Retry (failed) for the current Daily job (Q52). Continues that exact job
+    /// The menu's Resume (paused or stopped) or Retry (failed) for the current Daily job (Q52). Continues that exact job
     /// and its queue; never creates a job. The job is re-read first, so a click on a menu drawn before the job
     /// changed does nothing but refresh. A running Backlog job is pre-empted, as for Run Now.
     func resumeDailyJob(_ jobID: UUID, expecting state: JobState) async {

@@ -42,7 +42,7 @@ struct MenuBarView: View {
     // MARK: Top section
 
     private func hasTopContent(_ attention: DigestRunModel.MenuAttention?) -> Bool {
-        run.activeProgress != nil || attention != nil || run.menuSuggestionsRow(now: Date()) != nil
+        run.activeProgress != nil || run.menuStoppedJob != nil || attention != nil || run.menuSuggestionsRow(now: Date()) != nil
             || run.lastRunSummary != nil || run.dailyNote != nil
     }
 
@@ -50,6 +50,8 @@ struct MenuBarView: View {
     @ViewBuilder private func top(attention: DigestRunModel.MenuAttention?) -> some View {
         if let progress = run.activeProgress {
             jobSection(progress)
+        } else if let stopped = run.menuStoppedJob {
+            stoppedSection(stopped.job, line: stopped.line)
         } else if let attention {
             attentionSection(attention)
         }
@@ -75,21 +77,61 @@ struct MenuBarView: View {
 
     private func jobSection(_ progress: JobProgress) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(run.menuJobTitle(for: progress)).font(.headline)
-                Spacer(minLength: 8)
-                Text(run.menuModelLabel).font(.subheadline).foregroundStyle(.secondary)
+            if progress.state == .paused,
+               let line = MenuPanelPresentation.haltedLine(jobTitle: run.haltedJobName(for: progress), state: .paused,
+                                                           done: progress.done, total: progress.total,
+                                                           reason: progress.pauseReason?.displayText) {
+                // One line for the paused job, in the same form as a stopped one.
+                HStack(alignment: .firstTextBaseline) {
+                    Text(line).font(.headline).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Text(run.menuModelLabel).font(.subheadline).foregroundStyle(.secondary)
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(run.menuJobTitle(for: progress)).font(.headline)
+                    Spacer(minLength: 8)
+                    Text(run.menuModelLabel).font(.subheadline).foregroundStyle(.secondary)
+                }
+                Text(MenuPanelPresentation.statusLine(progress))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Text(MenuPanelPresentation.statusLine(progress))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             bar(progress)
             HStack(spacing: 6) { jobButtons(progress) }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.capsule)
                 .controlSize(.small)
                 .padding(.top, 2)
+        }
+        .padding(EdgeInsets(top: 10, leading: 10, bottom: 12, trailing: 10))
+        .accessibilityElement(children: .contain)
+    }
+
+    /// A stopped job: where it stopped, and a Resume that continues it in place (opens no window).
+    private func stoppedSection(_ job: Job, line: String) -> some View {
+        let totals = job.totals
+        let done = totals.done + totals.failed + totals.skipped
+        let total = done + totals.queued
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(line).font(.headline).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Text(run.menuModelLabel).font(.subheadline).foregroundStyle(.secondary)
+            }
+            ProgressView(value: Double(min(done, total)), total: Double(max(total, 1)))
+                .accessibilityLabel("\(run.haltedJobName(job)) progress")
+                .accessibilityValue("\(done) of \(total)")
+            HStack(spacing: 6) {
+                Button("Resume") { Task { await run.resumeStoppedJob(job) } }
+                    .disabled(job.kind == .daily ? !run.isDailyActionEnabled || access.status?.mode == .unavailable
+                              : run.isRunning || access.status?.mode == .unavailable)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .controlSize(.small)
+            .padding(.top, 2)
         }
         .padding(EdgeInsets(top: 10, leading: 10, bottom: 12, trailing: 10))
         .accessibilityElement(children: .contain)
@@ -215,7 +257,7 @@ struct MenuBarView: View {
         return row(action.title, shortcut: isRetry ? "r" : nil, accessibilityLabel: action.accessibilityLabel) {
             switch action.behavior {
             case .startNew: Task { await run.runNow() }
-            case .resume(let id): Task { await run.resumeDailyJob(id, expecting: .paused) }
+            case .resume(let id): Task { await run.resumeCurrentDaily(id) }
             case .retry(let id): Task { await run.resumeDailyJob(id, expecting: .failed) }
             case .review: showJobs()
             case .none: break

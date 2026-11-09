@@ -75,7 +75,7 @@ struct ReviewWindow: View {
         case .runNow: Task { await run.runNow() }
         case .pause: run.pause()
         case .resumeJob(let id): Task { await run.resumeJob(id) }
-        case .resumeDaily(let id): Task { await run.resumeDailyJob(id, expecting: .paused) }
+        case .resumeDaily(let id): Task { await run.resumeCurrentDaily(id) }
         case .retryDaily(let id): Task { await run.resumeDailyJob(id, expecting: .failed) }
         case .unavailable: break
         }

@@ -1373,7 +1373,7 @@ private func recentMessages(_ count: Int) -> [EmailMessage] {
     @Test func stoppedDailyIsNeitherResumedNorReplaced() async throws {
         let (h, stopped) = try await interruptedDaily { await $0.stop() }
         #expect(stopped.state == .stopped)
-        #expect(try await lifecycle(h).menuAction.behavior == .review)
+        #expect(try await lifecycle(h).menuAction.behavior == .resume(stopped.id))
 
         await #expect(throws: JobRunnerError.dailyJobUnresolved) { try await h.runner.startDaily() }
         #expect(try await h.runner.autoResume(blocked: [:]) == nil)
@@ -1517,7 +1517,7 @@ private func recentMessages(_ count: Int) -> [EmailMessage] {
         let job = try await h.job()
         #expect(job.state == recovered)
         let state = try await lifecycle(h)
-        #expect(state.menuAction.behavior == (recovered == .paused ? .resume(job.id) : .review))
+        #expect(state.menuAction.behavior == .resume(job.id))
         await #expect(throws: JobRunnerError.dailyJobUnresolved) { try await h.runner.startDaily() }
         #expect(try await store.jobs().count == 1)
     }

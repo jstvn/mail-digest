@@ -28,6 +28,41 @@ public struct ReviewQueueFilter: Sendable, Equatable {
     }
 }
 
+/// The Review Queue footer's texts and the Dismiss Unselected rules, over the rows currently shown (loaded and
+/// passing the filter and search). Records still behind Load More or filtered out are never part of `shown`, so
+/// they are never counted or dismissed.
+public struct ReviewQueueFooter: Sendable, Equatable {
+    /// Dismissing more than this many at once asks for confirmation.
+    public static let confirmationThreshold = 10
+
+    /// Ticked pending or failed rows among those shown.
+    public let selected: Int
+    public let shown: Int
+    /// Pending rows among those shown that are not ticked; failed ones are not dismissed.
+    public let unselected: Int
+
+    public init(shown: [SuggestionRecord], session: ReviewSession) {
+        let split = session.recordSplit(shown)
+        selected = split.approve.count
+        self.shown = shown.count
+        unselected = split.dismiss.count
+    }
+
+    /// "3 of 12 selected", the same in every state.
+    public var selectionText: String { "\(selected) of \(shown) selected" }
+    public var dismissTitle: String { "Dismiss \(unselected) Unselected" }
+    public var addTitle: String { "Add \(selected) to Reminders" }
+    /// Whether Dismiss Unselected must be confirmed first.
+    public var needsConfirmation: Bool { unselected > Self.confirmationThreshold }
+    /// The confirmation dialog's title.
+    public var confirmationTitle: String {
+        "Dismiss \(unselected) Unselected Suggestions?"
+    }
+    public var confirmationMessage: String {
+        "They are removed from the Review Queue. Suggestions that aren\u{2019}t shown are not affected."
+    }
+}
+
 /// Selection movement for the Review Queue's list and inspector.
 public enum ReviewQueueNavigation {
     /// The id to select after the visible ids changed from `old` to `new`. A selection that is still there is kept.

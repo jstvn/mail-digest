@@ -261,7 +261,7 @@ public enum ReviewPresentation {
         }
     }
 
-    private static func number(_ n: Int, _ locale: Locale) -> String {
+    static func number(_ n: Int, _ locale: Locale) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
         f.locale = locale

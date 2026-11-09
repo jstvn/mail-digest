@@ -270,7 +270,32 @@ private let emails: [String: EmailContext] = [
     @Test func notesString() {
         let s = sug("Pay fees")
         let notes = ReviewActions.reminderNotes(for: s, email: emails["e1"], category: .finance)
-        #expect(notes == "From: Bursar <Bursar@Uni.edu>\nSubject: Fees due\n\"pay by Friday\"\n#finance")
+        #expect(notes == "From Bursar · Fees due\n\"pay by Friday\"\n#finance")
+    }
+
+    @Test func defaultNotesLine() {
+        #expect(ReviewActions.defaultNotes(email: emails["e1"]) == "From Bursar · Fees due")
+        #expect(ReviewActions.defaultNotes(email: nil) == nil)
+    }
+
+    @Test func emptyNotesFallBackToTheDefaultLine() {
+        var s = sug("Pay fees")
+        s.notes = ""
+        #expect(ReviewActions.reminderNotes(for: s, email: emails["e1"], category: .finance)
+                == "From Bursar · Fees due\n\"pay by Friday\"\n#finance")
+    }
+
+    @Test func notesFieldSavesOnlyRealChanges() {
+        let line = "From Bursar · Fees due"
+        // Untouched default: nothing stored. Cleared with nothing stored: nothing to save.
+        #expect(ReviewActions.notesToSave(field: line, defaultLine: line, saved: nil) == nil)
+        #expect(ReviewActions.notesToSave(field: "", defaultLine: line, saved: nil) == nil)
+        // An edit is stored.
+        #expect(ReviewActions.notesToSave(field: "Bring ID", defaultLine: line, saved: nil) == "Bring ID")
+        // Back to the default or cleared: stored notes are removed.
+        #expect(ReviewActions.notesToSave(field: line, defaultLine: line, saved: "Bring ID") == "")
+        #expect(ReviewActions.notesToSave(field: " ", defaultLine: line, saved: "Bring ID") == "")
+        #expect(ReviewActions.notesToSave(field: "Bring ID", defaultLine: line, saved: "Bring ID") == nil)
     }
 
     @Test func notesWithoutEmailOmitHeaderLines() {
@@ -327,7 +352,7 @@ private let emails: [String: EmailContext] = [
         var s = sug("Pay fees")
         s.notes = "Bring ID"
         let text = ReviewActions.reminderNotes(for: s, email: emails["e1"], category: .finance)
-        #expect(text == "Bring ID\n\nFrom: Bursar <Bursar@Uni.edu>\nSubject: Fees due\n\"pay by Friday\"\n#finance")
+        #expect(text == "Bring ID\n\"pay by Friday\"\n#finance")
     }
 
     @Test func chosenListIsWrittenToAndDeletedListFallsBack() async throws {

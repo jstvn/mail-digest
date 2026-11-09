@@ -43,7 +43,7 @@ import Testing
         let paused = job(.paused)
         #expect(DailyLifecycle(jobs: [paused]) == .paused(paused))
         #expect(DailyLifecycle(jobs: [paused]).menuAction.behavior == .resume(paused.id))
-        #expect(DailyLifecycle(jobs: [paused]).menuAction.title == "Resume")
+        #expect(DailyLifecycle(jobs: [paused]).menuAction.title == "Resume Daily Digest")
 
         for state in [JobState.listing, .running, .pausing] {
             let busy = job(state, queued: 0)
@@ -58,8 +58,8 @@ import Testing
 
         let stopped = job(.stopped)
         #expect(DailyLifecycle(jobs: [stopped]) == .stopped(stopped))
-        #expect(DailyLifecycle(jobs: [stopped]).menuAction.behavior == .review)
-        #expect(DailyLifecycle(jobs: [stopped]).menuAction.title == "Review Daily Job…")
+        #expect(DailyLifecycle(jobs: [stopped]).menuAction.behavior == .resume(stopped.id))
+        #expect(DailyLifecycle(jobs: [stopped]).menuAction.title == "Resume Daily Digest")
 
         let failed = job(.failed, lastError: "Ollama is not reachable.")
         #expect(DailyLifecycle(jobs: [failed]) == .failed(failed))

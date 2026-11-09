@@ -6,6 +6,8 @@ import SwiftUI
 struct ProgressStripView: View {
     let progress: JobProgress
     var pauseReason: String?
+    /// The job's name for the paused line ("Backlog · 12 Nov · Paused at 12 of 40"); without it the older wording shows.
+    var haltedTitle: String?
     var onPause: () -> Void = {}
     /// When set, Pause becomes a menu button with "Pause Now" (cancels the email in flight).
     var onPauseNow: (() -> Void)?
@@ -56,6 +58,11 @@ struct ProgressStripView: View {
         switch progress.state {
         case .listing: return "Looking for new mail…"
         case .paused:
+            let reason = pauseReason ?? progress.pauseReason?.displayText
+            if let haltedTitle, let line = MenuPanelPresentation.haltedLine(
+                jobTitle: haltedTitle, state: .paused, done: progress.done, total: progress.total, reason: reason) {
+                return line
+            }
             return ReviewPresentation.pausedText(progress, reason: pauseReason ?? progress.pauseReason?.displayText)
         case .pausing: return "Pausing after this email · " + ReviewPresentation.counts(progress)
         case .stopping: return "Stopping…"

@@ -102,9 +102,13 @@ private func job(_ boxes: [(String, String)] = [("iCloud", "INBOX"), ("Outlook",
         #expect(start.title == "Retry" && start.behavior == .runNow)
     }
 
-    @Test func decisionStatesStayDisabledRunNow() {
+    @Test func aStoppedDailyJobOffersResume() {
         let stopped = ToolbarRunAction(progress: nil, daily: daily(.stopped(dailyJob(.stopped))))
-        #expect(stopped.title == "Run Now" && stopped.behavior == .unavailable && !stopped.help.isEmpty)
-        #expect(ToolbarRunAction(progress: nil, daily: daily(.conflict([dailyJob(.stopped)]))).behavior == .unavailable)
+        #expect(stopped.title == "Resume" && stopped.behavior == .resumeDaily(id))
+    }
+
+    @Test func conflictingDailyJobsStayDisabledRunNow() {
+        let conflict = ToolbarRunAction(progress: nil, daily: daily(.conflict([dailyJob(.stopped)])))
+        #expect(conflict.title == "Run Now" && conflict.behavior == .unavailable && !conflict.help.isEmpty)
     }
 }

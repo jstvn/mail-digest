@@ -150,3 +150,25 @@ import Testing
         #expect(DigestArchive(summaries: [backlog], now: date(11, 9, 9), calendar: cal).latestDaily == nil)
     }
 }
+
+@Suite struct HaltedLineTests {
+    @Test func pausedAndStoppedReadTheSameWay() {
+        let en = Locale(identifier: "en_AU")
+        #expect(MenuPanelPresentation.haltedLine(jobTitle: "Daily Digest", state: .stopped, done: 12, total: 40, locale: en)
+                == "Daily Digest · Stopped at 12 of 40")
+        #expect(MenuPanelPresentation.haltedLine(jobTitle: "Oct 2026", state: .paused, done: 1_200, total: 2_960, locale: en)
+                == "Oct 2026 · Paused at 1,200 of 2,960")
+        #expect(MenuPanelPresentation.haltedLine(jobTitle: "Daily Digest", state: .paused, done: 2, total: 9,
+                                                 reason: "battery power", locale: en)
+                == "Daily Digest · Paused at 2 of 9 (battery power)")
+        #expect(MenuPanelPresentation.haltedLine(jobTitle: "x", state: .running, done: 1, total: 2) == nil)
+        #expect(MenuPanelPresentation.haltedLine(jobTitle: "x", state: .failed, done: 1, total: 2) == nil)
+    }
+
+    @Test func doneCountsDoneFailedAndSkippedAndTotalAddsQueued() {
+        let job = Job(id: UUID(), kind: .backlog, mailboxes: [], scopeFrom: .now, scopeTo: .now, state: .stopped,
+                      createdAt: .now, totals: JobTotals(queued: 5, done: 3, failed: 1, skipped: 2), autoPaused: false)
+        #expect(MenuPanelPresentation.haltedLine(job, jobTitle: "Backlog", locale: Locale(identifier: "en_AU"))
+                == "Backlog · Stopped at 6 of 11")
+    }
+}
