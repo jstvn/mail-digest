@@ -2,71 +2,30 @@ import Testing
 @testable import MailDigestCore
 
 @Suite struct DockVisibilityTests {
-    @Test func firstOpenSwitchesToRegular() {
-        var v = DockVisibility()
-        #expect(v.windowDidOpen(current: .accessory) == .regular)
+    @Test func windowsOpenFromAccessorySwitchToRegular() {
+        #expect(DockVisibility.change(current: .accessory, realWindowCount: 1) == .regular)
     }
 
-    @Test func repeatedOpenIsIgnored() {
-        var v = DockVisibility()
-        _ = v.windowDidOpen(current: .accessory)
-        #expect(v.windowDidOpen(current: .regular) == nil)
-        #expect(v.windowDidClose() == .accessory)
+    @Test func windowsOpenWhileRegularChangesNothing() {
+        #expect(DockVisibility.change(current: .regular, realWindowCount: 3) == nil)
     }
 
-    @Test func closeRestoresRememberedRegular() {
-        var v = DockVisibility()
-        _ = v.windowDidOpen(current: .regular)
-        #expect(v.windowDidClose() == .regular)
+    @Test func lastWindowClosedSwitchesToAccessory() {
+        #expect(DockVisibility.change(current: .regular, realWindowCount: 0) == .accessory)
     }
 
-    @Test func unbalancedCloseReturnsNil() {
-        var v = DockVisibility()
-        #expect(v.windowDidClose() == nil)
-        _ = v.windowDidOpen(current: .accessory)
-        _ = v.windowDidClose()
-        #expect(v.windowDidClose() == nil)
+    @Test func noWindowsWhileAccessoryChangesNothing() {
+        #expect(DockVisibility.change(current: .accessory, realWindowCount: 0) == nil)
     }
 
-    @Test func reopenAfterCloseReapplies() {
-        var v = DockVisibility()
-        _ = v.windowDidOpen(current: .accessory)
-        _ = v.windowDidClose()
-        #expect(v.windowDidOpen(current: .accessory) == .regular)
-    }
-}
-
-@Suite struct DockVisibilityCycleTests {
-    @Test func repeatedCyclesRestoreEachTime() {
-        var v = DockVisibility()
-        for _ in 1...6 {
-            #expect(v.windowDidOpen(current: .accessory) == .regular)
-            #expect(v.windowDidClose() == .accessory)
+    @Test func openCloseSequence() {
+        let counts = [0, 1, 2, 1, 0, 1]
+        let expected: [DockPolicy?] = [nil, .regular, nil, nil, .accessory, .regular]
+        var current = DockPolicy.accessory
+        for (count, want) in zip(counts, expected) {
+            let change = DockVisibility.change(current: current, realWindowCount: count)
+            #expect(change == want)
+            if let change { current = change }
         }
-    }
-
-    @Test func repeatedCyclesRestoreRememberedRegular() {
-        var v = DockVisibility()
-        for _ in 1...5 {
-            #expect(v.windowDidOpen(current: .regular) == .regular)
-            #expect(v.windowDidClose() == .regular)
-        }
-    }
-
-    @Test func openCloseOpenThenClose() {
-        var v = DockVisibility()
-        #expect(v.windowDidOpen(current: .accessory) == .regular)
-        #expect(v.windowDidClose() == .accessory)
-        #expect(v.windowDidOpen(current: .accessory) == .regular)
-        #expect(v.windowDidClose() == .accessory)
-    }
-
-    @Test func noEventsBetweenOpenAndCloseKeepsState() {
-        // Minimise or in-window navigation produce no events, so the state is unchanged.
-        var v = DockVisibility()
-        _ = v.windowDidOpen(current: .accessory)
-        let snapshot = v
-        #expect(v == snapshot)
-        #expect(v.windowDidClose() == .accessory)
     }
 }

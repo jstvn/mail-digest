@@ -563,3 +563,13 @@ Builds and Core and Persistence tests pass; nothing below has been checked in th
 - The suggestion count updates after approving or dismissing a suggestion, and "this morning" becomes "today" at noon.
 - The Review window's job popover still has Pause Now and the Now line.
 - VoiceOver reads the attention card and the suggestions row. SwiftUI posts no automatic announcement when the card appears, so judge whether that's acceptable.
+
+## Dock presence and app icon, Q75 (2026-11-09)
+
+- Launch at login (or from Finder): no Dock icon and no flash, including when the scheduled run fires.
+- Open Review from the menu bar: Dock icon appears, the window comes to the front and shows in Cmd-Tab. Open Settings too; close Review (icon stays); close Settings (icon goes, menu bar item stays, app keeps running); open a window from the menu bar again (icon returns).
+- New Processing Job, Mail Access and Welcome each add the Dock icon the same way. The menu bar panel, popovers, sheets and alerts never do.
+- While the Dock icon shows, the main menu responds right after opening the window: Mail Digest menu with Settings… (⌘,) and Quit (⌘Q), plus Edit and Window. If the menu stays inert until you switch apps and back, note it here.
+- Minimise Review, then close Settings: the minimised window keeps its Dock tile and restores from it. Cmd-H does not remove the Dock icon.
+- Clicking the Dock icon with only a minimised window restores it, without opening a second copy.
+- With the new icon: not inside a grey rounded square on macOS 26; Dock and Finder show Letter List; dark appearance shows the dark blue background; the Icon Composer preview shows the light background lighter at the top.

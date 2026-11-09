@@ -5,6 +5,7 @@ import SwiftUI
 /// A morning scheduler starts the Daily run after launch.
 @main
 struct MailDigestApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var access = MailAccessModel()
     @State private var run = DigestRunModel()
     @State private var scheduler: MorningScheduler?
@@ -28,7 +29,6 @@ struct MailDigestApp: App {
 
         Window("Mail Digest", id: "review") {
             ReviewWindow(run: run, access: access)
-                .dockPresence()
         }
         .defaultSize(width: 980, height: 680)
 

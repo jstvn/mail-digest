@@ -824,7 +824,7 @@ The app is a menu bar agent that starts at login and schedules its own morning r
 
 **Scheduling (`MorningScheduler`)**
 
-- `LSUIElement = YES` in Info.plist (no Dock icon); login item via `SMAppService.mainApp.register()` from the Settings toggle
+- `LSUIElement = YES` in Info.plist (no Dock icon at launch; the icon shows only while a real window is open, Q75); login item via `SMAppService.mainApp.register()` from the Settings toggle
 - On launch and every 15 minutes, check: if now is past today's run time and no digest exists for today, run the pipeline
 - Use `NSBackgroundActivityScheduler` (identifier `dev.pages.justinwang.maildigest.morning`, interval 15 min, `qualityOfService = .utility`) for the periodic check; it also catches up after sleep
 - A `pmset repeat wakeorpoweron` schedule is optional and documented in the README, not set by the app

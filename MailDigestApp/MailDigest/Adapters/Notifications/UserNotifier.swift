@@ -60,7 +60,7 @@ final class NotificationRouter {
         Task { @MainActor in UNUserNotificationCenter.current().delegate = shared.delegate }
     }
 
-    fileprivate func requestOpenReview() { openReviewRequests += 1 }
+    func requestOpenReview() { openReviewRequests += 1 }
 
     private final class Delegate: NSObject, UNUserNotificationCenterDelegate {
         /// Show the banner even while Mail Digest is frontmost.

@@ -398,3 +398,9 @@ Each item says what the spec leaves open and the interim choice the build uses, 
    - **Pause Now and the Now line:** removed from the menu panel only. The Review window's job popover keeps both, so SPEC's behaviour remains available there.
    - **Start Ollama:** launches `com.electron.ollama` without taking focus, or opens https://ollama.com/download when it is not installed. It does not retry by itself. A job's failure kind is persisted (`job.failure_kind`, migration v6); jobs stored earlier show the generic card.
    - **Implementation choices, open to change:** a Backlog scope starting before 1990 reads "Backlog · Up to 12 Nov". A banner that belongs to no job and has no known kind is titled "Needs Attention". A failed Backlog job shows the card only in the session it failed in, while a failed Daily job also shows it after a relaunch.
+
+## Dock presence (2026-11-09)
+
+75. **Dock icon follows real windows** (decided)
+   - **Decision (approved by Justin, 2026-11-09):** the app launches menu-bar only (`LSUIElement = YES`). It switches to `.regular` and activates when a real window becomes visible (Review, New Processing Job, Mail Access, Welcome, Settings), and back to `.accessory` when the last real window closes. A real window is visible, can become main and is not an `NSPanel`. A Dock click with no real window opens Review. Replaces the Review-only Dock behaviour in Q70's Mac checks.
+   - **Implementation choice, open to change:** a minimised window still counts as real, so closing another window cannot remove its Dock tile and strand it.

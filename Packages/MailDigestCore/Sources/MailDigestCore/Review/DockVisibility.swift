@@ -8,22 +8,12 @@ public enum DockPolicy: Sendable, Equatable {
     case regular
 }
 
-/// Tracks whether the review window is open and which Dock policy to restore when it closes.
-public struct DockVisibility: Sendable, Equatable {
-    private var restoreTo: DockPolicy?
-
-    public init() {}
-
-    /// Returns `.regular` to apply on the first open (remembering `current`); a repeated open returns nil.
-    public mutating func windowDidOpen(current: DockPolicy) -> DockPolicy? {
-        guard restoreTo == nil else { return nil }
-        restoreTo = current
-        return .regular
-    }
-
-    /// Returns the remembered policy to restore; a close without a matching open returns nil.
-    public mutating func windowDidClose() -> DockPolicy? {
-        defer { restoreTo = nil }
-        return restoreTo
+/// Decides the Dock policy from how many real windows are open.
+public enum DockVisibility {
+    /// Returns the policy to apply (`.regular` with any real window, else `.accessory`),
+    /// or nil when `current` already matches.
+    public static func change(current: DockPolicy, realWindowCount: Int) -> DockPolicy? {
+        let wanted: DockPolicy = realWindowCount > 0 ? .regular : .accessory
+        return wanted == current ? nil : wanted
     }
 }
