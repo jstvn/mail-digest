@@ -2,71 +2,113 @@ import AppKit
 import MailDigestCore
 import SwiftUI
 
-/// Explains Mail permissions and lets the user fix them. Compact settings-style window.
+/// Explains Mail permissions, lets the user fix them, and chooses which mailboxes the daily digest reads.
 struct MailAccessView: View {
     let model: MailAccessModel
     let run: DigestRunModel
+    /// This window, so only its own focus changes trigger a re-check.
+    @State private var window: NSWindow?
+    @State private var showsOthers = false
 
     var body: some View {
-        Form {
-            Section {
-                Text("Mail Digest reads your new mail on this Mac to summarise it and suggest reminders. Nothing leaves this Mac. Full Disk Access enables fast local reads of the Mail database and message files. Without it, Mail Digest asks Mail through automation, which is slower for large mailboxes.")
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        VStack(spacing: 0) {
             if let status = model.status {
-                Section {
-                    Label(status.mode.title, systemImage: "envelope")
-                        .font(.headline)
-                    if status.showsAutomationBanner {
-                        Label {
-                            Text("Mail Automation is turned off. Open Automation Settings and enable Mail access for Mail Digest.")
-                                .fixedSize(horizontal: false, vertical: true)
-                        } icon: {
-                            // Only the symbol is tinted; yellow body text would be hard to read.
-                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
-                        }
-                    }
+                let info = MailAccessPresentation(status)
+                Form {
+                    Section { header(info.header) }
+                    permissions(info)
+                    dailyReads
                 }
-                Section("Full Disk Access") {
-                    row(symbol: fdaSymbol(status.fullDiskAccess), text: fdaText(status.fullDiskAccess))
-                    if status.showsFullDiskAccessNotice {
-                        Button("Open Full Disk Access Settings…") { open(MailAccessStatus.fullDiskAccessSettingsURL) }
-                        Text("After changing Full Disk Access, quit and reopen Mail Digest.")
-                            .font(.callout).foregroundStyle(.secondary)
-                    }
-                }
-                Section("Mail Automation") {
-                    row(symbol: autoSymbol(status.automation), text: autoText(status.automation))
-                    if status.canRequestAutomation {
-                        Button("Allow Mail Access…") { Task { await model.requestAutomation() } }
-                    }
-                    if status.automation == .denied {
-                        Button("Open Automation Settings…") { open(MailAccessStatus.automationSettingsURL) }
-                    }
-                }
+                .formStyle(.grouped)
             } else {
-                Section { ProgressView("Checking…") }
+                ProgressView("Checking…").frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            mailboxSection
-            Section {
-                HStack {
-                    Spacer()
-                    Button("Check Again") { Task { await model.refresh() } }
-                        .disabled(model.isChecking)
-                }
-            }
+            footer
         }
-        .formStyle(.grouped)
-        // The grouped form scrolls, so a long mailbox list stays inside the window instead of growing it.
         .frame(minWidth: 440, idealWidth: 480, minHeight: 360, idealHeight: 560)
-        .task {
-            await model.refresh()
-            if canLoadMailboxes, run.mailboxes.isEmpty { await run.loadMailboxes() }
+        .background(WindowReader(window: $window))
+        .task { await model.refresh() }
+        .onChange(of: canLoadMailboxes, initial: true) { _, can in
+            if can, run.mailboxes.isEmpty { Task { await run.loadMailboxes() } }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+        // Coming back from System Settings makes this window key again. Other windows' focus is ignored.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            guard let window, (note.object as? NSWindow) === window else { return }
             Task { await model.refresh() }
         }
     }
+
+    // MARK: Header
+
+    private func header(_ state: MailAccessPresentation.Header) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            TintedSymbolTile(symbol: state.symbol, tint: state.isReady ? .green : .orange)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(state.title).font(.title2.weight(.semibold))
+                Text(state.subtitle)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: Permissions
+
+    private func permissions(_ info: MailAccessPresentation) -> some View {
+        Section {
+            permissionRow(symbol: "internaldrive", title: "Full Disk Access",
+                          subtitle: "Reads Mail's database directly. Fastest for large mailboxes.",
+                          status: info.fullDiskAccessText, color: info.fullDiskAccessOn ? .green : .orange) {
+                if info.showsGrantAccess {
+                    Button("Grant Access…") { open(MailAccessStatus.fullDiskAccessSettingsURL) }
+                        .buttonStyle(.borderedProminent)
+                        .help("Opens Privacy & Security in System Settings, where you turn on Full Disk Access for Mail Digest.")
+                }
+            }
+            permissionRow(symbol: "arrow.triangle.2.circlepath", title: "Mail Automation",
+                          subtitle: "Opens emails in Mail and moves them during Mail Cleanup.",
+                          status: info.automationText, color: info.automationAllowed ? .green : .orange) {
+                switch info.automationAction {
+                case .none: EmptyView()
+                case .request:
+                    Button("Allow…") { Task { await model.requestAutomation() } }
+                        .help("Asks macOS to let Mail Digest control Mail.")
+                case .openSettings:
+                    Button("Allow…") { open(MailAccessStatus.automationSettingsURL) }
+                        .help("Opens Privacy & Security in System Settings, where you turn on Mail under Mail Digest.")
+                }
+            }
+        } header: {
+            Text("Permissions")
+        } footer: {
+            if info.showsPermissionFootnote {
+                Text("After you turn on Mail Digest in Privacy & Security, come back here. This window updates by itself.")
+            }
+        }
+    }
+
+    private func permissionRow<Action: View>(symbol: String, title: String, subtitle: String, status: String,
+                                             color: Color, @ViewBuilder action: () -> Action) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.title3).foregroundStyle(.secondary)
+                .frame(width: 24)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(subtitle).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            StatusDot(text: status, color: color)
+            action()
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    // MARK: Daily Digest Reads
 
     /// Listing mailboxes in automation mode needs the Automation grant, so never load before it.
     private var canLoadMailboxes: Bool {
@@ -74,97 +116,132 @@ struct MailAccessView: View {
         return status.mode == .fastLocal || status.automation == .granted
     }
 
-    private var mailboxGroups: [(account: String, boxes: [MailboxInfo])] {
-        Dictionary(grouping: run.mailboxes, by: { $0.ref.account })
-            .map { (account: $0.key, boxes: $0.value.sorted { $0.ref.name < $1.ref.name }) }
-            .sorted { $0.account < $1.account }
-    }
+    private var stored: [MailboxRef] { run.settings.settings.dailyMailboxes }
+    private var selected: Set<MailboxRef> { DailyMailboxSelection.effective(stored: stored, available: run.mailboxes) }
 
-    @ViewBuilder private var mailboxSection: some View {
-        if canLoadMailboxes {
-            ForEach(mailboxGroups, id: \.account) { group in
-                Section(group.account) {
-                    ForEach(group.boxes, id: \.ref) { box in
+    @ViewBuilder private var dailyReads: some View {
+        Section {
+            if !canLoadMailboxes {
+                Text("Allow Mail access first to see your mailboxes.").foregroundStyle(.secondary)
+            } else if run.mailboxes.isEmpty {
+                if run.isLoadingMailboxes {
+                    ProgressView("Loading mailboxes…")
+                } else {
+                    Text(run.mailboxError ?? "No mailboxes found in Mail.").foregroundStyle(.secondary)
+                }
+            } else {
+                let rows = DailyMailboxSelection.rows(run.mailboxes)
+                ForEach(rows.inboxes) { row in mailboxToggle(row, symbol: "tray") }
+                if rows.otherCount > 0 {
+                    DisclosureGroup(isExpanded: $showsOthers) {
+                        ForEach(rows.others) { account in
+                            ForEach(account.rows) { row in mailboxToggle(row, symbol: "folder") }
+                        }
+                    } label: {
                         HStack {
-                            if box.kind == .inbox {
-                                Image(systemName: "tray").accessibilityLabel("Inbox")
-                            }
-                            Text(box.ref.name)
+                            Text("Show Other Mailboxes")
                             Spacer()
-                            Text(box.messageCount, format: .number)
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
+                            Text(rows.otherCount, format: .number).monospacedDigit().foregroundStyle(.secondary)
                         }
                     }
                 }
             }
-            Section("Mailboxes") {
-                if run.isLoadingMailboxes {
-                    ProgressView("Loading mailboxes…")
-                } else if let error = run.mailboxError {
-                    Text(error).foregroundStyle(.secondary)
-                } else {
-                    Text("Daily runs read every inbox (\(run.inboxCount))")
-                        .foregroundStyle(.secondary)
-                }
-                Button("Refresh") { Task { await run.loadMailboxes() } }
-                    .disabled(run.isLoadingMailboxes)
-            }
-        } else if model.status != nil {
-            Section("Mailboxes") {
-                Text("Allow Mail access first to see your mailboxes.")
-                    .foregroundStyle(.secondary)
-            }
+        } header: {
+            Text("Daily Digest Reads")
+        } footer: {
+            Text("Empty folders, Junk, Sent and Deleted mail are hidden. Backlog jobs can still pick any mailbox.")
         }
     }
 
-    private func row(symbol: (name: String, color: Color, label: String), text: String) -> some View {
-        Label {
-            Text(text)
-        } icon: {
-            Image(systemName: symbol.name).foregroundStyle(symbol.color)
-                .accessibilityLabel(symbol.label)
+    private func mailboxToggle(_ row: MailboxTreeRow, symbol: String) -> some View {
+        let ref = row.info.ref
+        let isOn = selected.contains(ref)
+        return Toggle(isOn: Binding(
+            get: { isOn },
+            set: { on in
+                // Takes effect on the next run: the run model rebuilds its runner when this setting changes.
+                run.settings.settings.dailyMailboxes = DailyMailboxSelection.toggled(
+                    ref, on: on, stored: stored, available: run.mailboxes)
+            })) {
+            HStack {
+                Image(systemName: symbol).foregroundStyle(Color.accentColor).accessibilityHidden(true)
+                Text(MailboxTree.displayTitle(row)) + Text(" · \(ref.account)").foregroundStyle(.secondary)
+                Spacer()
+                Text(row.info.messageCount, format: .number).monospacedDigit().foregroundStyle(.secondary)
+            }
         }
+        .toggleStyle(.checkbox)
+        .disabled(isOn && !DailyMailboxSelection.canUntick(ref, stored: stored, available: run.mailboxes))
+        .help(isOn && !DailyMailboxSelection.canUntick(ref, stored: stored, available: run.mailboxes)
+              ? "The daily digest needs at least one mailbox." : "")
+        .accessibilityLabel(DailyMailboxSelection.label(row))
+        .accessibilityValue(Text("\(row.info.messageCount) emails"))
+    }
+
+    // MARK: Footer
+
+    private var footer: some View {
+        HStack {
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                Text(MailAccessCheckedText.text(checkedAt: model.lastChecked, now: context.date, calendar: run.library.calendar))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Check Again") {
+                Task {
+                    await model.refresh()
+                    if canLoadMailboxes { await run.loadMailboxes() }
+                }
+            }
+            .disabled(model.isChecking)
+        }
+        .padding(.horizontal, 20).padding(.vertical, 12)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 
     private func open(_ url: String) {
         if let u = URL(string: url) { NSWorkspace.shared.open(u) }
     }
+}
 
-    private func fdaSymbol(_ s: FullDiskAccessState) -> (name: String, color: Color, label: String) {
-        switch s {
-        case .granted: return ("checkmark.circle.fill", .green, "Granted")
-        case .denied: return ("xmark.circle.fill", .red, "Not granted")
-        default: return ("exclamationmark.triangle.fill", .yellow, "Warning")
-        }
+/// Reports the hosting `NSWindow` so the view can tell its own key-window changes from other windows'.
+private struct WindowReader: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { window = view.window }
+        return view
     }
 
-    private func fdaText(_ s: FullDiskAccessState) -> String {
-        switch s {
-        case .granted: return "Granted. Mail Digest can read the Mail database directly."
-        case .denied: return "Not granted. Mail Digest will use Mail automation instead."
-        case .mailDataMissing: return "Mail data not found. Open Mail and set up an account."
-        case .unsupportedStore: return "This version of Mail's database is not supported."
-        case .busy: return "Mail is busy. Try again in a moment."
-        case .unknown: return "Could not be determined."
-        }
-    }
-
-    private func autoSymbol(_ s: AutomationState) -> (name: String, color: Color, label: String) {
-        switch s {
-        case .granted: return ("checkmark.circle.fill", .green, "Granted")
-        case .denied: return ("xmark.circle.fill", .red, "Not granted")
-        default: return ("exclamationmark.triangle.fill", .yellow, "Warning")
-        }
-    }
-
-    private func autoText(_ s: AutomationState) -> String {
-        switch s {
-        case .granted: return "Allowed. Mail Digest can ask Mail for messages."
-        case .denied: return "Not allowed. Enable Mail access for Mail Digest in Automation settings."
-        case .notDetermined: return "Not requested yet."
-        case .mailNotRunning: return "Mail is not running. It will be opened when needed."
-        case .unknown: return "Could not be determined."
-        }
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { if window !== view.window { window = view.window } }
     }
 }
+
+#if DEBUG
+private let previewMailboxes: [MailboxInfo] = [
+    MailboxInfo(ref: MailboxRef(account: "iCloud", name: "INBOX"), messageCount: 2555, unreadCount: 0, kind: .inbox),
+    MailboxInfo(ref: MailboxRef(account: "Outlook", name: "Inbox"), messageCount: 1075, unreadCount: 0, kind: .inbox),
+    MailboxInfo(ref: MailboxRef(account: "iCloud", name: "Archive"), messageCount: 900, unreadCount: 0, kind: .archive),
+    MailboxInfo(ref: MailboxRef(account: "Outlook", name: "Receipts"), messageCount: 40, unreadCount: 0, kind: .custom),
+    MailboxInfo(ref: MailboxRef(account: "iCloud", name: "Sent"), messageCount: 300, unreadCount: 0, kind: .sent),
+]
+
+#Preview("Ready") {
+    MailAccessView(model: MailAccessModel(preview: MailAccessStatus(fullDiskAccess: .granted, automation: .granted),
+                                          checkedAt: Date()),
+                   run: DigestRunModel(preview: SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
+                                       mailboxes: previewMailboxes))
+        .frame(width: 480, height: 560)
+}
+
+#Preview("Limited") {
+    MailAccessView(model: MailAccessModel(preview: MailAccessStatus(fullDiskAccess: .denied, automation: .granted),
+                                          checkedAt: Date()),
+                   run: DigestRunModel(preview: SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
+                                       mailboxes: previewMailboxes))
+        .frame(width: 480, height: 560)
+}
+#endif

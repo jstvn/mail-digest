@@ -621,3 +621,15 @@ Builds, Core tests (including the new estimate, naming, noise-folder, histogram,
 - Run mode: "Overnight While Plugged In" (default) stores the job paused as "outside the run window" when you start it during the day, and it appears in the sidebar at once as "Scheduled" and in Activity. Verify the whole path with a short window: set the Background Work window to open in a few minutes, create an overnight job with a handful of emails, leave the app running, and confirm the job starts by itself when the window opens, only while plugged in, and pauses again when the window closes. Also check: Resume on the scheduled job before the window opens stays paused with the reason; Stop on it leaves it Stopped and it never starts by itself; "Start Now" runs at once as before.
 - Known gaps to decide: a scheduled job starts only while Mail Digest keeps running (a quit and relaunch leaves it paused until you press Resume, per Q44), and the Mac must be awake in the window (nothing keeps it awake). Selecting a Scheduled job in the sidebar shows "Scheduled" with the window times instead of an empty list.
 - The old Step 3 email list with per-email ticks is gone (the design has no list). Say if per-email untick is still wanted.
+
+## UI redesign Phase 5: Mail Access (2026-11-09)
+
+Builds and Core tests pass (new `MailAccessPresentationTests`). Nothing below has been checked in the running app or against `Mail-Access-*@2x.png`.
+
+- Compare both states with the PNGs in light and dark (previews "Ready" and "Limited"): header tile, two permission rows, Daily Digest Reads card, footer. The design draws grey cards; this uses a grouped Form, so check spacing and that the footer stays pinned while the form scrolls.
+- Grant Full Disk Access in System Settings and come back: the window should flip to Ready by itself (key-window re-check), without pressing Check Again. Switch to other Mail Digest windows and confirm they don't trigger a check (watch the footer time). Revoke it and repeat.
+- Automation: with it never asked, "Allow…" shows the system prompt; after denying, "Allow…" opens Privacy & Security > Automation. Check the "Not Allowed" and "Allowed" states and the footnote ("After you turn on Mail Digest…") appearing only while something is missing.
+- Header copy for states the design doesn't draw (Full Disk Access on but Automation off: "Mail Automation Is Off"; neither route works: "Mail Digest Can't Read Your Mail Yet") needs a read and approval.
+- Daily Digest Reads: with no stored choice every account's Inbox is ticked. Untick one, quit and relaunch: the choice persists, and the next daily run reads only the ticked mailboxes. Tick it again: the stored list returns to empty (default, new accounts included). The last ticked mailbox is disabled. Expand "Show Other Mailboxes N" and tick Archive or a custom folder; Sent, Junk, Deleted, empty and system folders must not appear.
+- Check Again and "Checked just now / 8:10 pm" text (12-hour lowercase); the old full mailbox dump and Refresh button are gone.
+- Settings no longer has "Daily mailboxes"; until Phase 6 adds the read-only summary there is no pointer to Mail Access there.

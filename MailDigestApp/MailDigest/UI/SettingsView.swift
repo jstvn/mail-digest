@@ -64,7 +64,6 @@ private struct GeneralSettingsTab: View {
             }
             BacklogPowerSection(store: store)
             HistorySection(run: run)
-            MailboxesSection(run: run)
         }
         .formStyle(.grouped)
     }
@@ -156,60 +155,6 @@ private struct BacklogPowerSection: View {
             set: { date in
                 let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
                 store.settings[keyPath: keyPath] = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
-            })
-    }
-}
-
-/// Daily mailboxes: all inboxes by default, or a chosen set.
-private struct MailboxesSection: View {
-    let run: DigestRunModel
-
-    private var chosen: [MailboxRef] { run.settings.settings.dailyMailboxes }
-
-    var body: some View {
-        Section("Daily mailboxes") {
-            Toggle("All inboxes", isOn: Binding(
-                get: { chosen.isEmpty },
-                set: { allInboxes in
-                    if allInboxes {
-                        run.settings.settings.dailyMailboxes = []
-                    } else {
-                        // Start from the inboxes so turning this off doesn't change what runs.
-                        run.settings.settings.dailyMailboxes = run.mailboxes.filter { $0.kind == .inbox }.map(\.ref)
-                        Task { await run.loadMailboxes() }
-                    }
-                }))
-            if !chosen.isEmpty {
-                if run.isLoadingMailboxes {
-                    ProgressView("Loading mailboxes…")
-                } else if run.mailboxes.isEmpty {
-                    Text(run.mailboxError ?? "Mailboxes appear once Mail access is allowed.")
-                        .foregroundStyle(.secondary)
-                    Button("Load Mailboxes") { Task { await run.loadMailboxes() } }
-                }
-                ForEach(selectable, id: \.ref) { box in
-                    Toggle(isOn: binding(for: box.ref)) {
-                        Text("\(box.ref.account) · \(box.ref.name)")
-                    }
-                }
-            }
-        }
-    }
-
-    /// Sent, Drafts, Junk and Trash are hidden; processing them rarely makes sense.
-    private var selectable: [MailboxInfo] {
-        run.mailboxes.filter { ![.sent, .drafts, .junk, .trash].contains($0.kind) }
-            .sorted { ($0.ref.account, $0.ref.name) < ($1.ref.account, $1.ref.name) }
-    }
-
-    private func binding(for ref: MailboxRef) -> Binding<Bool> {
-        Binding(
-            get: { chosen.contains(ref) },
-            set: { on in
-                var list = chosen
-                if on { if !list.contains(ref) { list.append(ref) } } else { list.removeAll { $0 == ref } }
-                // An empty list would mean "all inboxes", so keep at least one mailbox.
-                if !list.isEmpty { run.settings.settings.dailyMailboxes = list }
             })
     }
 }
