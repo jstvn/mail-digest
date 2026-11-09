@@ -180,6 +180,11 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         migrator.registerMigration("v7") { db in
             try db.execute(sql: "ALTER TABLE job ADD COLUMN name TEXT")
         }
+        // v8: a job created as "Overnight While Plugged In" only runs inside the overnight window. Older rows
+        // are not overnight jobs.
+        migrator.registerMigration("v8") { db in
+            try db.execute(sql: "ALTER TABLE job ADD COLUMN overnight_only INTEGER NOT NULL DEFAULT 0")
+        }
         return migrator
     }
 
@@ -568,13 +573,17 @@ public final class GRDBDigestStore: DigestStore, Sendable {
         let mailboxes = try JSON.encode(job.mailboxes)
         let created = JobEvent(jobID: job.id, kind: .created, at: job.createdAt)
         let payload = try JSON.encode(created.payload)
+        // The name and the overnight flag are written once here; updates never touch them.
+        var arguments = Self.jobArguments(job, mailboxes: mailboxes)
+        arguments += [job.name, job.overnightOnly]
+        let insertArguments = arguments
         try await writer.write { db in
             try db.execute(sql: """
                 INSERT INTO job (id, kind, mailboxes, scope_from, scope_to, state, created_at,
                                  queued, done, failed, skipped, auto_paused, last_error, pause_reason,
-                                 started_at, ended_at, failure_kind)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, arguments: Self.jobArguments(job, mailboxes: mailboxes))
+                                 started_at, ended_at, failure_kind, name, overnight_only)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, arguments: insertArguments)
             try Self.insertEvent(db, created, payload: payload)
         }
     }
@@ -676,7 +685,7 @@ public final class GRDBDigestStore: DigestStore, Sendable {
             startedAt: (row["started_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
             endedAt: (row["ended_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
             failureKind: (row["failure_kind"] as String?).flatMap(JobFailureKind.init(rawValue:)),
-            name: row["name"])
+            name: row["name"], overnightOnly: row["overnight_only"] ?? false)
     }
 
     // MARK: Queue

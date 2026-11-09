@@ -64,12 +64,26 @@ public struct ResourcePolicy: Sendable, Equatable {
     /// Nil means no quiet hours.
     public var quietHours: QuietHours?
     public var timeZone: TimeZone
+    /// The Background Work window (its times are kept even while "Only run during this time window" is off).
+    /// Jobs created as "Overnight While Plugged In" use it regardless of that toggle.
+    public var overnightWindow: QuietHours
 
     public init(pauseBacklogOnBattery: Bool = true, quietHours: QuietHours? = nil,
-                timeZone: TimeZone = TimeZone(identifier: "Australia/Brisbane") ?? .current) {
+                timeZone: TimeZone = TimeZone(identifier: "Australia/Brisbane") ?? .current,
+                overnightWindow: QuietHours? = nil) {
         self.pauseBacklogOnBattery = pauseBacklogOnBattery
         self.quietHours = quietHours
         self.timeZone = timeZone
+        self.overnightWindow = overnightWindow ?? quietHours ?? QuietHours(startMinute: 22 * 60, endMinute: 7 * 60)
+    }
+
+    /// The extra block for a job created as overnight-only, on top of `blockingReason`: it never runs on
+    /// battery (even when "Pause on Battery" is off) and only inside the overnight window. Low Power Mode and
+    /// heat come from `blockingReason`, which the caller checks first.
+    public func overnightBlockingReason(conditions: ResourceConditions, now: Date) -> PauseReason? {
+        if conditions.onBattery { return .battery }
+        if !overnightWindow.allowsRunning(at: now, in: timeZone) { return .quietHours }
+        return nil
     }
 
     /// Why a job of this kind must not run now, or nil when it may. When several rules apply, the most

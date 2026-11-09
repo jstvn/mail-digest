@@ -55,7 +55,7 @@ struct SidebarView: View {
                     backlogRow(backlog)
                 }
                 Button {
-                    openWindow(id: "job-setup")
+                    openWindow(id: "new-backlog-job")
                     NSApp.activate()
                 } label: {
                     Label("New Backlog Job…", systemImage: "plus")
@@ -166,6 +166,9 @@ struct SidebarView: View {
         case .listing, .running, .pausing:
             guard named, let job else { return scope }
             return BacklogRowText.runningSubtitle(accounts: BacklogRowText.accounts(of: job), percent: percent)
+        case .paused where job.map(BacklogRowText.isScheduled) == true:
+            // An overnight job waiting for its window; the app starts it when the window opens.
+            return BacklogRowText.scheduledSubtitle(percent: named ? percent : nil)
         case .paused, .stopped, .stopping:
             let word = state == .paused ? "Paused" : "Stopped"
             let detail = named ? percent.map { "\($0)%" } : scope

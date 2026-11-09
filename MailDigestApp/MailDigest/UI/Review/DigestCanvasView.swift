@@ -32,6 +32,8 @@ struct DigestCanvasView: View {
         case neverRun
         case noDigestToday
         case noNewMail(lastRun: Date?)
+        /// A Backlog job that has stored no digest yet, for example one waiting for the overnight window.
+        case backlogPending
         case digest
     }
 
@@ -156,7 +158,10 @@ struct DigestCanvasView: View {
     // MARK: Phase and titles
 
     private var phase: Phase {
-        guard let content else { return loadFailed ? .failed : .loading }
+        guard let content else {
+            if case .backlog(let id) = kind, !loadFailed, library.isDigestless(backlog: id) { return .backlogPending }
+            return loadFailed ? .failed : .loading
+        }
         switch kind {
         case .today:
             if !content.digestIDs.isEmpty {
@@ -215,6 +220,8 @@ struct DigestCanvasView: View {
                 emptyState("No digest yet", systemImage: "envelope.open", "Choose Run Now to read your new mail.")
             case .noDigestToday:
                 emptyState("No digest yet today", systemImage: "envelope.open", "Choose Run Now to read your new mail.")
+            case .backlogPending:
+                backlogPendingState
             case .noNewMail(let lastRun):
                 emptyState("Inbox zero for today", systemImage: "tray",
                            lastRun.map { "Last run \($0.formatted(date: .omitted, time: .shortened))" } ?? "")
@@ -231,6 +238,25 @@ struct DigestCanvasView: View {
             }
         }
         .searchable(text: $searchText, placement: .toolbar, prompt: "Search This Page")
+    }
+
+    /// What a Backlog job with no results yet says, by why it is idle.
+    @ViewBuilder private var backlogPendingState: some View {
+        let job: Job? = { if case .backlog(let id) = kind { return library.backlogJobs[id] } else { return nil } }()
+        if let job, BacklogRowText.isScheduled(job) {
+            let s = run.settings.settings
+            let window = QuietHours(startMinute: s.quietHoursStartMinute, endMinute: s.quietHoursEndMinute)
+            let hours = window.startMinute == window.endMinute
+                ? "whenever your Mac is plugged in"
+                : "between \(BacklogEstimate.clockText(minute: window.startMinute)) and \(BacklogEstimate.clockText(minute: window.endMinute)) while your Mac is plugged in"
+            ContentUnavailableView("Scheduled", systemImage: "moon.zzz",
+                                   description: Text("This job runs \(hours). Suggestions show up here as each batch finishes."))
+                .frame(maxWidth: .infinity, minHeight: 240)
+        } else {
+            ContentUnavailableView("No Results Yet", systemImage: "tray",
+                                   description: Text("Suggestions show up here as each email finishes."))
+                .frame(maxWidth: .infinity, minHeight: 240)
+        }
     }
 
     // MARK: Today header

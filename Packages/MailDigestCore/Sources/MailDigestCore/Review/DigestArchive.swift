@@ -64,6 +64,8 @@ public struct ArchiveBacklog: Sendable, Equatable, Identifiable {
     public var emailCount: Int
     /// Pending plus failed suggestions.
     public var actionableCount: Int
+    /// False for a job that has not stored a digest yet, for example one waiting for the overnight window.
+    public var hasDigest: Bool = true
 }
 
 /// The sidebar's view of every digest (Q54 to Q56), built purely from summaries, a `now` and a calendar
@@ -89,7 +91,9 @@ public struct DigestArchive: Sendable, Equatable {
     private let digestsByDay: [DigestDay: [UUID]]
     private let today: DigestDay
 
-    public init(summaries: [DigestSummary], now: Date, calendar: Calendar) {
+    /// - Parameter backlogJobs: Backlog jobs from the store. A job that has no digest yet (nothing finished,
+    ///   or not started) is still listed, so a new job shows in the sidebar at once.
+    public init(summaries: [DigestSummary], backlogJobs: [Job] = [], now: Date, calendar: Calendar) {
         let today = DigestDay(now, calendar: calendar)
         let start = calendar.startOfDay(for: now)
         self.today = today
@@ -120,8 +124,15 @@ public struct DigestArchive: Sendable, Equatable {
             .map { ArchiveMonth(month: $0.key, days: $0.value.sorted { $0.day > $1.day }) }
             .sorted { $0.month > $1.month }
 
-        backlogs = summaries.filter { $0.kind == .backlog }.sorted { $0.createdAt > $1.createdAt }
+        let digestBacklogs = summaries.filter { $0.kind == .backlog }.sorted { $0.createdAt > $1.createdAt }
             .map { ArchiveBacklog(id: $0.id, createdAt: $0.createdAt, emailCount: $0.emailCount, actionableCount: actionable($0)) }
+        let withDigest = Set(summaries.map(\.id))
+        // A job that finished without a digest, or failed before queuing anything, has nothing to show.
+        let digestless = backlogJobs.filter { job in
+            job.kind == .backlog && !withDigest.contains(job.id) && job.state != .finished
+                && (job.state != .failed || job.totals.queued + job.totals.done + job.totals.failed + job.totals.skipped > 0)
+        }.map { ArchiveBacklog(id: $0.id, createdAt: $0.createdAt, emailCount: 0, actionableCount: 0, hasDigest: false) }
+        backlogs = (digestBacklogs + digestless).sorted { $0.createdAt > $1.createdAt }
     }
 
     /// The Daily digests of an earlier day, in creation order; empty for today or a day without a digest.

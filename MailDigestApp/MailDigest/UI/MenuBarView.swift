@@ -22,7 +22,7 @@ struct MenuBarView: View {
             VStack(spacing: 0) {
                 row("Open Review Panel", shortcut: "o") { show("review") }
                 dailyRow
-                row("New Backlog Job…", shortcut: "n") { show("job-setup") }
+                row("New Backlog Job…", shortcut: "n") { show("new-backlog-job") }
                     .disabled(run.isRunning || access.status?.mode == .unavailable)
                 row("Mail Access…") { show("mail-access") }
                 row("Settings…", shortcut: ",") {

@@ -81,6 +81,31 @@ struct EnvelopeIndexReader: Sendable {
                   arguments: [mailboxURL, from.timeIntervalSince1970, to.timeIntervalSince1970])
     }
 
+    /// Live messages per local calendar day in `[from, to)` across the given mailboxes: one grouped COUNT over
+    /// the index, so no subject, sender or body is read. Days follow the Mac's time zone (`localtime`).
+    func dailyCounts(mailboxURLs: [String], from: Date, to: Date) throws -> [DayCount] {
+        guard !mailboxURLs.isEmpty else { return [] }
+        let placeholders = Array(repeating: "?", count: mailboxURLs.count).joined(separator: ", ")
+        var arguments = StatementArguments(mailboxURLs)
+        arguments += [from.timeIntervalSince1970, to.timeIntervalSince1970]
+        let bound = arguments
+        return try withDatabase { db in
+            let sql = """
+                SELECT date(m.date_received, 'unixepoch', 'localtime') AS day, COUNT(*)
+                FROM messages m
+                JOIN mailboxes mb ON mb.ROWID = m.mailbox
+                WHERE mb.url IN (\(placeholders)) AND m.deleted = 0 AND m.date_received >= ? AND m.date_received < ?
+                GROUP BY day
+                """
+            return try Row.fetchAll(db, sql: sql, arguments: bound).compactMap { row -> DayCount? in
+                guard let text: String = row[0] else { return nil }
+                let parts = text.split(separator: "-").compactMap { Int($0) }
+                guard parts.count == 3 else { return nil }
+                return DayCount(day: DigestDay(year: parts[0], month: parts[1], day: parts[2]), count: row[1])
+            }
+        }
+    }
+
     /// The live row with this ROWID, for verifying a stored locator hint.
     func row(rowID: Int64) throws -> StoreRow? {
         try query(where: "m.ROWID = ? AND m.deleted = 0", arguments: [rowID]).first

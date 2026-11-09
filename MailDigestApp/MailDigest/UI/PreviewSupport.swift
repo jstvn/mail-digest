@@ -15,13 +15,13 @@ enum PreviewSupport {
     static func run(review: ReviewViewModel = review(), coordinator: ReviewCoordinator? = nil, reminders: RemindersAuthorization = .granted, progress: JobProgress? = nil, banner: String? = nil,
                     failedJobID: UUID? = nil, foundNothing: Bool = false, jobs: [Job] = [],
                     scheduledRunWaiting: Bool = false, bannerKind: JobFailureKind? = nil,
-                    dailyStartFailedAt: Date? = nil) -> DigestRunModel {
+                    dailyStartFailedAt: Date? = nil, mailboxes: [MailboxInfo] = []) -> DigestRunModel {
         DigestRunModel(preview: SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
                        review: review, coordinator: coordinator, reminders: RemindersAccessModel(preview: reminders), progress: progress, banner: banner, failedJobID: failedJobID,
                        lastRunAt: PreviewFixtures.now, lastRunFoundNothing: foundNothing,
                        lastRunSummary: "Last run 6:45 AM · 4 suggestions · 23 emails",
                        jobs: jobs, scheduledRunWaiting: scheduledRunWaiting,
-                       bannerKind: bannerKind, dailyStartFailedAt: dailyStartFailedAt)
+                       bannerKind: bannerKind, dailyStartFailedAt: dailyStartFailedAt, mailboxes: mailboxes)
     }
 
     /// A persisted job for the menu's Daily action previews (Q52); `PreviewFixtures.jobID` by default, the

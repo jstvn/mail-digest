@@ -60,6 +60,7 @@ final class DigestRunModel {
     /// Watches power, Low Power Mode, heat and quiet hours (Mac-only adapter).
     @ObservationIgnored let monitor = ResourceMonitor()
     @ObservationIgnored private var lastBlocked: [JobKind: PauseReason] = [:]
+    @ObservationIgnored private var lastOvernightBlock: PauseReason?
 
     private static let log = Logger(subsystem: "dev.pages.justinwang.maildigest", category: "run")
 
@@ -108,7 +109,8 @@ final class DigestRunModel {
          reminders: RemindersAccessModel = RemindersAccessModel(preview: .granted), progress: JobProgress? = nil, banner: String? = nil, failedJobID: UUID? = nil,
          lastRunAt: Date? = nil, lastRunFoundNothing: Bool = false, lastRunSummary: String? = nil,
          jobs: [Job] = [], scheduledRunWaiting: Bool = false,
-         bannerKind: JobFailureKind? = nil, dailyStartFailedAt: Date? = nil) {
+         bannerKind: JobFailureKind? = nil, dailyStartFailedAt: Date? = nil, mailboxes: [MailboxInfo] = []) {
+        self.mailboxes = mailboxes
         self.settings = preview
         self.review = review
         let coordinator = coordinator ?? ReviewCoordinator.empty(review: review)
@@ -493,7 +495,7 @@ final class DigestRunModel {
         let runner = await runner(for: inboxes, store: store)
         let startedAt = clock.now()
         do {
-            await runner.setResourceBlockers(currentBlockers())
+            await runner.setResourceBlockers(currentBlockers(), overnight: currentOvernightBlock())
             try await runner.startDaily()
             evaluateResources(force: true)
             await runner.waitUntilIdle()
@@ -543,7 +545,7 @@ final class DigestRunModel {
         }
         guard let runner = await ensureRunner() else { return }
         do {
-            await runner.setResourceBlockers(currentBlockers())
+            await runner.setResourceBlockers(currentBlockers(), overnight: currentOvernightBlock())
             try await runner.resume(jobID: jobID)
             restoredProgress = nil
             await runner.waitUntilIdle()
@@ -600,7 +602,7 @@ final class DigestRunModel {
         defer { busyFlag = false; progressText = nil }
         guard let runner = await ensureRunner() else { return }
         do {
-            await runner.setResourceBlockers(currentBlockers())
+            await runner.setResourceBlockers(currentBlockers(), overnight: currentOvernightBlock())
             try await runner.resume(jobID: jobID)
             restoredProgress = nil
             await runner.waitUntilIdle()
@@ -622,7 +624,7 @@ final class DigestRunModel {
         defer { busyFlag = false; progressText = nil }
         guard let runner = await ensureRunner() else { return }
         do {
-            await runner.setResourceBlockers(currentBlockers())
+            await runner.setResourceBlockers(currentBlockers(), overnight: currentOvernightBlock())
             try await runner.retryFailed(jobID: jobID)
             restoredProgress = nil
             await runner.waitUntilIdle()
@@ -635,9 +637,34 @@ final class DigestRunModel {
     }
 
     /// Job setup: lists headers for the plan and reports what Start would queue. Nothing is queued.
-    func previewJob(_ plan: JobPlan) async throws -> JobPreview {
+    func previewJob(_ plan: JobPlan, secondsPerEmail: Double? = nil) async throws -> JobPreview {
         guard let runner = await ensureRunner() else { throw JobSetupError.databaseUnavailable }
-        return try await runner.preview(plan)
+        return try await runner.preview(plan, secondsPerEmail: secondsPerEmail)
+    }
+
+    /// Job setup (Q79): the median seconds per email of the last 5 completed jobs on the local model, or 360
+    /// seconds when there is no such history. Reads job items only, never mail.
+    func backlogSecondsPerEmail() async -> Double {
+        guard let store = await openStore() else { return BacklogEstimate.fallbackSecondsPerEmail }
+        let jobs = (try? await store.jobs()) ?? []
+        var samples: [Double] = []
+        for job in BacklogEstimate.completedJobs(jobs) where samples.count < BacklogEstimate.sampleJobCount {
+            guard let items = try? await store.items(job: job.id) else { continue }
+            if let seconds = BacklogEstimate.secondsPerEmail(of: items) { samples.append(seconds) }
+        }
+        return BacklogEstimate.secondsPerEmail(samples: samples)
+    }
+
+    /// Job setup, "Since Last Job": where the newest earlier Backlog job's scope ended.
+    func lastBacklogScopeEnd() async -> Date? {
+        guard let store = await openStore(), let jobs = try? await store.jobs() else { return nil }
+        return jobs.first { $0.kind == .backlog && $0.state != .failed }?.scopeTo
+    }
+
+    /// Job setup: emails per day from the Mail index (Full Disk Access), or nil when it is unavailable.
+    /// One grouped query; no message is opened and Mail is not scripted.
+    func dailyVolume(in refs: [MailboxRef], from: Date, to: Date) async -> [DayCount]? {
+        try? await source.dailyCounts(in: refs, from: from, to: to)
     }
 
     /// Job setup: queues exactly the confirmed plan and starts it in the background. Returns once the job is
@@ -653,7 +680,7 @@ final class DigestRunModel {
         }
         do {
             // Q43: a job created while a rule applies is stored paused before any email is read.
-            await runner.setResourceBlockers(currentBlockers())
+            await runner.setResourceBlockers(currentBlockers(), overnight: currentOvernightBlock())
             try await runner.start(plan)
         } catch {
             busyFlag = false; progressText = nil
@@ -661,6 +688,9 @@ final class DigestRunModel {
                                        previewOutdated: (error as? JobRunnerError) == .previewOutdated)
         }
         evaluateResources(force: true)
+        // The new job shows in the sidebar and Activity at once, before it has a digest.
+        await library.refresh()
+        await refreshJobLists()
         Task {
             await runner.waitUntilIdle()
             busyFlag = false
@@ -767,16 +797,25 @@ final class DigestRunModel {
     func evaluateResources(force: Bool = false) {
         let policy = settings.settings.resourcePolicy()
         let now = clock.now()
-        monitor.scheduleBoundary(at: policy.quietHours?.nextBoundary(after: now, in: policy.timeZone))
+        // The overnight window matters even with "Only run during this time window" off, because a job created
+        // as "Overnight While Plugged In" waits for it; the boundary timer is what starts that job tonight.
+        monitor.scheduleBoundary(at: policy.overnightWindow.nextBoundary(after: now, in: policy.timeZone))
         let blocked = currentBlockers()
-        guard force || blocked != lastBlocked else { return }
+        let overnight = currentOvernightBlock()
+        guard force || blocked != lastBlocked || overnight != lastOvernightBlock else { return }
         lastBlocked = blocked
+        lastOvernightBlock = overnight
         guard let runner else { return }
         Task {
-            do { try await runner.applyResourceRules(blocked) } catch {
+            do { try await runner.applyResourceRules(blocked, overnight: overnight) } catch {
                 Self.log.error("resource rules failed: \(String(describing: error), privacy: .public)")
             }
         }
+    }
+
+    /// The extra rule for jobs created as overnight-only: outside the overnight window, or on battery.
+    private func currentOvernightBlock() -> PauseReason? {
+        settings.settings.resourcePolicy().overnightBlockingReason(conditions: monitor.conditions, now: clock.now())
     }
 
     /// The resource rules that apply right now, by job kind (Daily only honours Low Power Mode).
@@ -866,6 +905,8 @@ final class DigestRunModel {
         relevant.autoFileEnabledAt = nil
         relevant.pauseBacklogOnBattery = true
         relevant.quietHoursEnabled = false
+        relevant.quietHoursStartMinute = DigestSettings().quietHoursStartMinute
+        relevant.quietHoursEndMinute = DigestSettings().quietHoursEndMinute
         // Cloud settings are read live for every email, so they never need a new runner.
         let cloudDefaults = DigestSettings()
         relevant.cloudDigestEnabled = cloudDefaults.cloudDigestEnabled

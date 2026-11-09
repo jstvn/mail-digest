@@ -30,6 +30,9 @@ public struct JobPreview: Sendable, Equatable {
     /// An estimate: headers have no bulk-mail signals, so real tiers can differ.
     public var estimatedTiers: TierEstimate
     public var estimatedSeconds: TimeInterval
+    /// Otherwise eligible emails left out only because of the Daily per-run cap (Q26). Always 0 for Backlog,
+    /// which has no cap.
+    public var deferredByLimit: Int = 0
     /// The first 200 emails of `toProcess`, for the checkbox list.
     public var firstItems: [MessageHeader]
 }
@@ -70,6 +73,7 @@ public struct JobPreviewBuilder: Sendable {
                           alreadyProcessed: sel.alreadyProcessed, excluded: sel.excluded,
                           toProcess: sel.toProcess, dateRangeFound: range, estimatedTiers: tiers,
                           estimatedSeconds: perEmail * Double(sel.toProcess.count),
+                          deferredByLimit: sel.deferredByLimit,
                           firstItems: Array(sel.toProcess.prefix(listLimit)))
     }
 
@@ -99,6 +103,8 @@ public struct JobPreviewBuilder: Sendable {
         var toProcess: [MessageHeader] = []
         var alreadyProcessed = 0
         var excluded = 0
+        /// Eligible emails dropped by `limit`.
+        var deferredByLimit = 0
     }
 
     /// The single place that decides what gets queued, so preview and start can't drift apart.
@@ -122,7 +128,10 @@ public struct JobPreviewBuilder: Sendable {
             .sorted { $0.element.receivedAt != $1.element.receivedAt
                 ? $0.element.receivedAt > $1.element.receivedAt : $0.offset < $1.offset }
             .map(\.element)
-        if let limit { sel.toProcess = Array(sel.toProcess.prefix(limit)) }
+        if let limit, sel.toProcess.count > limit {
+            sel.deferredByLimit = sel.toProcess.count - limit
+            sel.toProcess = Array(sel.toProcess.prefix(limit))
+        }
         return sel
     }
 }

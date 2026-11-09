@@ -39,10 +39,10 @@ struct MailDigestApp: App {
         .defaultSize(width: 480, height: 560)
         .windowResizability(.contentMinSize)
 
-        Window("New Processing Job", id: "job-setup") {
+        Window("New Backlog Job", id: "new-backlog-job") {
             JobSetupView(run: run)
         }
-        .defaultSize(width: 680, height: 640)
+        .windowResizability(.contentSize)
 
         Window("Welcome to Mail Digest", id: "onboarding") {
             OnboardingView(run: run, access: access)

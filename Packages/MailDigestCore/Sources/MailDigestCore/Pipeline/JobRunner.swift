@@ -96,6 +96,8 @@ public actor JobRunner {
     private var autoPausedThisSession: Set<UUID> = []
     /// The resource rules that apply now, by job kind; Start and Resume check them first (Q43).
     private var resourceBlockers: [JobKind: PauseReason] = [:]
+    /// The extra block for overnight-only jobs (battery, outside the overnight window); nil when none applies.
+    private var overnightBlocker: PauseReason?
     private var cancelRequested = false
     private var itemActive = false
     private var inFlight: Task<EmailOutcome, Error>?
@@ -245,11 +247,15 @@ public actor JobRunner {
     }
 
     /// Lists headers for the plan and reports what `start(plan)` would queue. Queues nothing and creates no job.
-    public func preview(_ plan: JobPlan) async throws -> JobPreview {
+    /// `secondsPerEmail` replaces the rolling-average estimate (the New Backlog Job window uses its own, Q79),
+    /// which also saves reading every job's items on each preview.
+    public func preview(_ plan: JobPlan, secondsPerEmail: Double? = nil) async throws -> JobPreview {
         let (headers, unavailable) = try await listHeaders(plan)
         let builder = JobPreviewBuilder(filter: settings.filter)
+        let average: Double?
+        if let secondsPerEmail { average = secondsPerEmail } else { average = try await rollingAverage() }
         var result = builder.build(plan: plan, headers: headers, isProcessedOrQueued: unavailable,
-                                   averageSecondsPerEmail: try await rollingAverage(),
+                                   averageSecondsPerEmail: average,
                                    limit: dailyLimit(plan))
         // Backlog start queues exactly what was previewed (and ticked), not a fresh listing.
         if plan.kind == .backlog { result.plan.confirmedMessageIDs = Set(result.toProcess.map(\.id)) }
@@ -344,6 +350,13 @@ public actor JobRunner {
         emit(force: true)
     }
 
+    /// The rule that stops a job of this kind from running now: the global one, else the overnight-only one.
+    private func blocker(kind: JobKind, overnightOnly: Bool) -> PauseReason? {
+        resourceBlockers[kind] ?? (kind == .backlog && overnightOnly ? overnightBlocker : nil)
+    }
+
+    private func blocker(for job: Job) -> PauseReason? { blocker(kind: job.kind, overnightOnly: job.overnightOnly) }
+
     /// Pauses the active job after the current email because of a resource rule (battery, Low Power Mode,
     /// heat, quiet hours), recording the reason. Does nothing when no job runs or one is already pausing.
     public func autoPause(_ reason: PauseReason) {
@@ -359,12 +372,13 @@ public actor JobRunner {
     /// not in `blocked`). A job the user paused or stopped, one paused for a Daily job, or one auto-paused
     /// in an earlier session is never resumed here. Returns the resumed job id.
     @discardableResult
-    public func autoResume(blocked: [JobKind: PauseReason]) async throws -> UUID? {
+    public func autoResume(blocked: [JobKind: PauseReason], overnight: PauseReason? = nil) async throws -> UUID? {
         resourceBlockers = blocked
+        overnightBlocker = overnight
         guard !busy else { return nil }
         let candidate = try await store.jobs().first {
             autoPausedThisSession.contains($0.id) && $0.state == .paused && $0.pauseReason != nil
-                && blocked[$0.kind] == nil
+                && blocker(kind: $0.kind, overnightOnly: $0.overnightOnly) == nil
         }
         guard let candidate else { return nil }
         try await resume(jobID: candidate.id, trigger: .automatic)
@@ -373,19 +387,21 @@ public actor JobRunner {
 
     /// Applies the current resource rules: pauses the active job if its kind is blocked, otherwise
     /// auto-resumes a job paused for a reason that has cleared.
-    public func applyResourceRules(_ blocked: [JobKind: PauseReason]) async throws {
+    public func applyResourceRules(_ blocked: [JobKind: PauseReason], overnight: PauseReason? = nil) async throws {
         resourceBlockers = blocked
+        overnightBlocker = overnight
         if let run, loopTask != nil {
-            if let reason = blocked[run.job.kind] { autoPause(reason) }
+            if let reason = blocker(for: run.job) { autoPause(reason) }
             return
         }
-        try await autoResume(blocked: blocked)
+        try await autoResume(blocked: blocked, overnight: overnight)
     }
 
     /// Records the resource rules that apply now without pausing or resuming anything. Call it before
     /// `start`, `startDaily`, `resume` or `retryFailed` so they see the current rules (Q43).
-    public func setResourceBlockers(_ blocked: [JobKind: PauseReason]) {
+    public func setResourceBlockers(_ blocked: [JobKind: PauseReason], overnight: PauseReason? = nil) {
         resourceBlockers = blocked
+        overnightBlocker = overnight
     }
 
     /// Cancels the in-flight email (it returns to `queued`) and ends the run. The job is persisted as
@@ -417,7 +433,7 @@ public actor JobRunner {
             if let jobID, jobID != run.job.id { throw JobRunnerError.alreadyRunning }
             if run.committed {
                 await waitUntilIdle()
-            } else if pauseRequested && !stopRequested, let reason = resourceBlockers[run.job.kind] {
+            } else if pauseRequested && !stopRequested, let reason = blocker(for: run.job) {
                 // Q43: Resume never overrides an active resource rule; let the pause go ahead as an auto-pause.
                 autoPauseRequested = true
                 autoPauseReason = reason
@@ -450,7 +466,7 @@ public actor JobRunner {
             guard var job else { busy = false; return }
             // Q43: an active resource rule keeps the job paused; it resumes once the rule clears (Q44). A stopped
             // or failed job keeps its state, so it is never resumed without the user (Q48).
-            if let reason = resourceBlockers[job.kind] {
+            if let reason = blocker(for: job) {
                 if job.state == .paused { try await parkBlocked(&job, reason: reason) }
                 resumeAfter = backlogToResume
                 try await parkPreemptedBacklog()
@@ -548,7 +564,8 @@ public actor JobRunner {
         let now = clock.now()
         var job = Job(id: UUID(), kind: plan.kind, mailboxes: plan.mailboxes, scopeFrom: plan.from,
                       scopeTo: plan.to, state: .listing, createdAt: now,
-                      totals: JobTotals(queued: 0, done: 0, failed: 0, skipped: 0), autoPaused: false)
+                      totals: JobTotals(queued: 0, done: 0, failed: 0, skipped: 0), autoPaused: false,
+                      name: plan.name, overnightOnly: plan.kind == .backlog && plan.overnightOnly)
         // Backlog selects first, so a refusal leaves no job and no events behind.
         var backlogHeaders: [MessageHeader]?
         if plan.kind == .backlog {
@@ -579,7 +596,7 @@ public actor JobRunner {
             let digest = Digest(id: job.id, createdAt: now, headline: "", emailCount: 0,
                                 suggestions: [], info: [], skipped: [])
             // Q43: a job created while a resource rule applies is stored paused before any email runs.
-            if let reason = resourceBlockers[plan.kind] {
+            if let reason = blocker(kind: plan.kind, overnightOnly: plan.overnightOnly) {
                 try await parkBlocked(&job, reason: reason)
                 try await parkPreemptedBacklog()
                 let parked = try await loadRun(job, newDigest: digest)
@@ -674,7 +691,7 @@ public actor JobRunner {
             do {
                 guard var job = try await store.jobs().first(where: { $0.id == next }), job.state == .paused else { break }
                 // The hand-off is a resume too: a rule that applies now keeps the Backlog job paused (Q43).
-                if let reason = resourceBlockers[job.kind] {
+                if let reason = blocker(for: job) {
                     try await parkBlocked(&job, reason: reason)
                     break
                 }
@@ -710,7 +727,7 @@ public actor JobRunner {
         guard let id = resumeAfter else { return }
         resumeAfter = nil
         guard var job = try await store.jobs().first(where: { $0.id == id }), job.state == .paused else { return }
-        if let reason = resourceBlockers[job.kind] { try await parkBlocked(&job, reason: reason) }
+        if let reason = blocker(for: job) { try await parkBlocked(&job, reason: reason) }
     }
 
     // MARK: Refresh before resuming

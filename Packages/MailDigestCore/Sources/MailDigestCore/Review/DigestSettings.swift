@@ -182,7 +182,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         ResourcePolicy(pauseBacklogOnBattery: pauseBacklogOnBattery,
                        quietHours: quietHoursEnabled
                            ? QuietHours(startMinute: quietHoursStartMinute, endMinute: quietHoursEndMinute) : nil,
-                       timeZone: timeZone ?? RunnerSettings().timeZone)
+                       timeZone: timeZone ?? RunnerSettings().timeZone,
+                       overnightWindow: QuietHours(startMinute: quietHoursStartMinute, endMinute: quietHoursEndMinute))
     }
 
     /// The Ollama endpoint, or the default when the text isn't a usable http(s) URL.

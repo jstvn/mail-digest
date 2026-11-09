@@ -78,9 +78,16 @@ public struct JobPlan: Codable, Sendable, Equatable {
     /// queues only these and refuses with `previewOutdated` if any is no longer selectable. Nil means
     /// "whatever the selection finds now" (Daily, and callers that never previewed).
     public var confirmedMessageIDs: Set<String>?
+    /// The user's name for a new Backlog job, stored with it at creation; nil leaves the job unnamed.
+    public var name: String?
+    /// True when the job may only run inside the overnight window and while plugged in. It waits (paused,
+    /// "outside the run window") until then, using the same resource rules as any other pause.
+    public var overnightOnly: Bool
 
     public init(kind: JobKind, mailboxes: [MailboxRef], from: Date, to: Date, excludedMessageIDs: Set<String>,
-                confirmedMessageIDs: Set<String>? = nil) {
+                confirmedMessageIDs: Set<String>? = nil, name: String? = nil, overnightOnly: Bool = false) {
+        self.name = name
+        self.overnightOnly = overnightOnly
         self.kind = kind
         self.mailboxes = mailboxes
         self.from = from
@@ -129,12 +136,16 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
     public var endedAt: Date?
     /// The user's name for the job ("October"); nil until one is set, and for jobs stored before names existed.
     public var name: String?
+    /// Set when the user chose "Overnight While Plugged In": the job only runs inside the overnight window and
+    /// on mains power, whatever the global Background Work toggles say. Fixed at creation.
+    public var overnightOnly: Bool
 
     public init(id: UUID, kind: JobKind, mailboxes: [MailboxRef], scopeFrom: Date, scopeTo: Date,
                 state: JobState, createdAt: Date, totals: JobTotals, autoPaused: Bool, lastError: String? = nil,
                 pauseReason: PauseReason? = nil, startedAt: Date? = nil, endedAt: Date? = nil,
-                failureKind: JobFailureKind? = nil, name: String? = nil) {
+                failureKind: JobFailureKind? = nil, name: String? = nil, overnightOnly: Bool = false) {
         self.name = name
+        self.overnightOnly = overnightOnly
         self.failureKind = failureKind
         self.startedAt = startedAt
         self.endedAt = endedAt
@@ -149,6 +160,26 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
         self.createdAt = createdAt
         self.totals = totals
         self.autoPaused = autoPaused
+    }
+
+    // Decodes older stored jobs, which have no `overnightOnly` (or `name`, `failureKind` ...).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try c.decode(UUID.self, forKey: .id), kind: try c.decode(JobKind.self, forKey: .kind),
+                  mailboxes: try c.decode([MailboxRef].self, forKey: .mailboxes),
+                  scopeFrom: try c.decode(Date.self, forKey: .scopeFrom),
+                  scopeTo: try c.decode(Date.self, forKey: .scopeTo),
+                  state: try c.decode(JobState.self, forKey: .state),
+                  createdAt: try c.decode(Date.self, forKey: .createdAt),
+                  totals: try c.decode(JobTotals.self, forKey: .totals),
+                  autoPaused: try c.decode(Bool.self, forKey: .autoPaused),
+                  lastError: try c.decodeIfPresent(String.self, forKey: .lastError),
+                  pauseReason: try c.decodeIfPresent(PauseReason.self, forKey: .pauseReason),
+                  startedAt: try c.decodeIfPresent(Date.self, forKey: .startedAt),
+                  endedAt: try c.decodeIfPresent(Date.self, forKey: .endedAt),
+                  failureKind: try c.decodeIfPresent(JobFailureKind.self, forKey: .failureKind),
+                  name: try c.decodeIfPresent(String.self, forKey: .name),
+                  overnightOnly: try c.decodeIfPresent(Bool.self, forKey: .overnightOnly) ?? false)
     }
 
     /// Clears the pause markers when a job starts running again.

@@ -115,9 +115,10 @@ final class ReviewLibrary {
             do {
                 let summaries = try await store.digestSummaries()
                 let jobs = try await store.jobs()
-                archive = DigestArchive(summaries: summaries, now: clock.now(), calendar: calendar)
-                backlogJobs = Dictionary(jobs.filter { $0.kind == .backlog }.map { ($0.id, $0) },
-                                         uniquingKeysWith: { a, _ in a })
+                let backlog = jobs.filter { $0.kind == .backlog }
+                // Jobs without a digest yet (a new or scheduled job) are listed too.
+                archive = DigestArchive(summaries: summaries, backlogJobs: backlog, now: clock.now(), calendar: calendar)
+                backlogJobs = Dictionary(backlog.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
                 loadFailed = false
             } catch {
                 Self.log.error("could not load summaries: \(String(describing: error), privacy: .public)")
@@ -137,9 +138,15 @@ final class ReviewLibrary {
         }
     }
 
-    /// "Backlog · iCloud Inbox"; plain "Backlog" when the job row is gone.
+    /// The job's own name when it has one, else "Backlog · iCloud Inbox"; plain "Backlog" when the job row is gone.
     func title(forBacklog id: UUID) -> String {
-        backlogJobs[id].map(JobSummaryText.title) ?? ReviewPresentation.jobName(.backlog)
+        if let name = backlogJobs[id]?.name { return name }
+        return backlogJobs[id].map(JobSummaryText.title) ?? ReviewPresentation.jobName(.backlog)
+    }
+
+    /// Whether the job exists but has stored no digest yet, so its canvas has nothing to load.
+    func isDigestless(backlog id: UUID) -> Bool {
+        archive.backlogs.first { $0.id == id }.map { !$0.hasDigest } ?? false
     }
 
     /// "iCloud Inbox"; plain "Backlog" when the job row is gone. The sidebar row, which has no kind prefix.

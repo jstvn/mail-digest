@@ -116,4 +116,16 @@ public enum BacklogRowText {
         guard let percent else { return accounts }
         return accounts.isEmpty ? "\(percent)%" : "\(accounts) · \(percent)%"
     }
+
+    /// True while an overnight-only job waits for its window (paused, "outside the run window"). A job the user
+    /// paused or stopped is not scheduled, and neither is one waiting on battery, Low Power Mode or heat.
+    public static func isScheduled(_ job: Job) -> Bool {
+        job.overnightOnly && job.state == .paused && job.pauseReason == .quietHours
+    }
+
+    /// "Scheduled", or "Scheduled · 52%" once the job has started and is waiting for the next night.
+    public static func scheduledSubtitle(percent: Int?) -> String {
+        guard let percent, percent > 0 else { return "Scheduled" }
+        return "Scheduled · \(percent)%"
+    }
 }

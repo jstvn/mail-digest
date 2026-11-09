@@ -131,3 +131,40 @@ import MailDigestCore
         #expect(try await store.jobs().first?.name == nil)
     }
 }
+
+/// v8: the overnight flag, and the name written when a job is created.
+@Suite struct JobOvernightMigrationTests {
+    @Test func v7DatabaseMigratesWithOvernightOff() async throws {
+        let queue = try DatabaseQueue()
+        try GRDBDigestStore.migrator.migrate(queue, upTo: "v7")
+        let jobID = UUID()
+        try await queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO job (id, kind, mailboxes, scope_from, scope_to, state, created_at, queued, done, failed,
+                                 skipped, auto_paused, last_error)
+                VALUES (?, 'backlog', '[]', 0, 0, 'finished', ?, 0, 1, 0, 0, 0, NULL)
+                """, arguments: [jobID.uuidString, t0.timeIntervalSince1970])
+        }
+        let store = try GRDBDigestStore(writer: queue)
+        let job = try #require(try await store.jobs().first)
+        #expect(job.overnightOnly == false && job.name == nil)
+    }
+
+    @Test func createJobStoresNameAndOvernightFlagAndUpdatesKeepThem() async throws {
+        let store = try GRDBDigestStore(writer: try DatabaseQueue())
+        var job = makeJob(state: .paused)
+        job.name = "October Backlog"
+        job.overnightOnly = true
+        job.pauseReason = .quietHours
+        job.autoPaused = true
+        try await store.createJob(job)
+        var stored = try #require(try await store.jobs().first)
+        #expect(stored.name == "October Backlog" && stored.overnightOnly && stored.pauseReason == .quietHours)
+        stored.state = .running
+        stored.name = nil
+        stored.overnightOnly = false
+        try await store.updateJob(stored)
+        let after = try #require(try await store.jobs().first)
+        #expect(after.state == .running && after.name == "October Backlog" && after.overnightOnly)
+    }
+}

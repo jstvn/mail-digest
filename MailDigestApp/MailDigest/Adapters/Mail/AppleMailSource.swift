@@ -4,7 +4,7 @@ import os
 
 /// Hybrid read adapter: SQLite + `.emlx` fast path with per-operation and per-message JXA fallback.
 /// Read-only; it only asks Mail to act through `CheckMail.js`.
-struct AppleMailSource: MailSource {
+struct AppleMailSource: MailSource, MailVolumeSource {
     private let locator: MailStoreLocator
     private let jxa: AppleScriptMailSource
     private let parser: EmlxParser
@@ -132,6 +132,23 @@ struct AppleMailSource: MailSource {
         return references.compactMap { ref in
             guard seen.insert(ref.messageID).inserted else { return nil }
             return found[ref.messageID]
+        }
+    }
+
+    // MARK: Volume
+
+    /// Per-day message counts for the New Backlog Job chart, from the SQLite index only. Nil without the
+    /// store (no Full Disk Access, unsupported schema): the chart is then left out rather than asking Mail
+    /// message by message.
+    func dailyCounts(in mailboxes: [MailboxRef], from: Date, to: Date) async throws -> [DayCount]? {
+        do {
+            return try await Self.offload { [self] in
+                let store = try openStore()
+                let urls = try mailboxes.compactMap { try resolveMailboxURL(for: $0, reader: store.reader) }
+                return try store.reader.dailyCounts(mailboxURLs: urls, from: from, to: to)
+            }
+        } catch is MailStoreError {
+            return nil
         }
     }
 
