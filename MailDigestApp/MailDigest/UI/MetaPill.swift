@@ -110,7 +110,7 @@ struct StaticSuggestionPills: View {
     }
 }
 
-/// The evidence quote: an accent bar, the sender, the quote and the open-in-Mail button.
+/// The evidence quote: an accent bar, the sender, the quote and the open-in-Mail button, on a faint tile.
 struct EvidenceQuote: View {
     let sender: String
     let evidence: String
@@ -136,5 +136,8 @@ struct EvidenceQuote: View {
                 .accessibilityLabel("Open email in Mail")
         }
         .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 6))
     }
 }

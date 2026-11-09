@@ -15,6 +15,15 @@ import Testing
             autoPaused: reason != nil, pauseReason: reason)
     }
 
+    @Test func mailboxTitleHasNoKindPrefixAndNormalisesInbox() {
+        #expect(JobSummaryText.mailboxTitle(job(.paused)) == "iCloud Inbox and Outlook Inbox")
+        #expect(JobSummaryText.mailboxTitle(job(.paused, boxes: [MailboxRef(account: "Gmail", name: "INBOX")])) == "Gmail Inbox")
+        #expect(JobSummaryText.mailboxTitle(job(.paused, boxes: [MailboxRef(account: "Gmail", name: "inbox")])) == "Gmail Inbox")
+        #expect(JobSummaryText.mailboxTitle(job(.paused, boxes: [MailboxRef(account: "Gmail", name: "INBOX/Receipts")])) == "Gmail INBOX/Receipts")
+        #expect(JobSummaryText.mailboxTitle(job(.paused, boxes: [])) == "no mailboxes")
+        #expect(JobSummaryText.title(job(.paused, boxes: [MailboxRef(account: "Gmail", name: "INBOX")])) == "Backlog · Gmail Inbox")
+    }
+
     @Test func titleNamesMailboxes() {
         #expect(JobSummaryText.title(job(.paused)) == "Backlog · iCloud Inbox and Outlook Inbox")
         #expect(JobSummaryText.title(job(.paused, boxes: [icloud])) == "Backlog · iCloud Inbox")

@@ -128,4 +128,14 @@ public struct DigestPipeline: Sendable {
     static func fallbackHeadline(emails: Int, suggestions: Int) -> String {
         "\(emails) \(emails == 1 ? "email" : "emails"), \(suggestions) \(suggestions == 1 ? "suggestion" : "suggestions")."
     }
+
+    /// Whether `text` is exactly what `fallbackHeadline` would write for some counts. The counts are read back
+    /// and the sentence is rebuilt, so the two cannot drift apart.
+    static func isFallbackHeadline(_ text: String) -> Bool {
+        let pattern = #"^(\d+) emails?, (\d+) suggestions?\.$"#
+        guard text.range(of: pattern, options: .regularExpression) != nil else { return false }
+        let numbers = text.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+        guard numbers.count == 2 else { return false }
+        return fallbackHeadline(emails: numbers[0], suggestions: numbers[1]) == text
+    }
 }

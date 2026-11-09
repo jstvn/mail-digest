@@ -1,10 +1,12 @@
+import MailDigestCore
 import SwiftUI
 
 /// The large title, secondary subtitle and optional headline that open every canvas.
 struct CanvasHeader: View {
     let title: String
     var subtitle: String?
-    /// The digest's one-sentence headline, in comfortable reading type.
+    /// The digest's one-sentence headline, in comfortable reading type. A bare "12 emails, 3 suggestions."
+    /// is not shown: the subtitle already says that.
     var headline: String = ""
 
     var body: some View {
@@ -15,7 +17,7 @@ struct CanvasHeader: View {
             if let subtitle, !subtitle.isEmpty {
                 Text(subtitle).font(.title3).foregroundStyle(.secondary)
             }
-            if !headline.isEmpty {
+            if !headline.isEmpty, !ReviewPresentation.isCountOnlyHeadline(headline) {
                 Text("“\(headline)”")
                     .font(.title3)
                     .foregroundStyle(.secondary)

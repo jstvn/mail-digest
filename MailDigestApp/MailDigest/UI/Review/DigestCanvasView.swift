@@ -156,7 +156,8 @@ struct DigestCanvasView: View {
         default: break
         }
         guard let content, !content.digestIDs.isEmpty else { return nil }
-        return "\(content.emailCount) \(content.emailCount == 1 ? "email" : "emails") processed"
+        // All suggestions whatever their status, so the number holds still while the user triages.
+        return ReviewPresentation.countsSubtitle(emailCount: content.emailCount, suggestionCount: content.records.count)
     }
 
     // MARK: Body
@@ -303,18 +304,21 @@ struct DigestCanvasView: View {
     }
 
     private func infoCards(_ items: [InfoItem]) -> some View {
-        LazyVStack(alignment: .leading, spacing: 6) {
-            ForEach(items) { item in
-                InfoCard(item: item, email: email(for: item.emailID), provider: provider(for: item.emailID),
-                         notesState: coordinator.notes.states[item.id] ?? .idle,
-                         onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: item.emailID)) },
-                         onTogglePin: { Task { await coordinator.setPinned(!item.pinned, item: item) } },
-                         onSaveToNotes: { Task { await coordinator.saveToNotes(item) } })
-                .id(item.id)
-                if item.id != items.last?.id { Divider() }
+        InfoCardList {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(items) { item in
+                    InfoCard(item: item, email: email(for: item.emailID), provider: provider(for: item.emailID),
+                             notesState: coordinator.notes.states[item.id] ?? .idle,
+                             userNames: [NSFullUserName()],
+                             onOpen: { NSWorkspace.shared.open(ReviewActions.messageURL(for: item.emailID)) },
+                             onTogglePin: { Task { await coordinator.setPinned(!item.pinned, item: item) } },
+                             onSaveToNotes: { Task { await coordinator.saveToNotes(item) } })
+                    .id(item.id)
+                    if item.id != items.last?.id { Divider() }
+                }
             }
         }
-        .padding(.leading, 4)
+        .padding(.top, 6)
     }
 
     // MARK: Skipped

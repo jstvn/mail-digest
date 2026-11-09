@@ -524,3 +524,17 @@ Run on this Mac, read-only (the script's `verify` action, no mutation): `byId` +
 - Cancel the setup window on the Preview step and reopen it: no earlier preview appears.
 - Stale start: with Start enabled, make the previewed mail unavailable (for example, pause another job holding it), then click Start. The window stays open, reloads the preview and shows "These emails changed after the preview…".
 - The empty-preview explanation wraps cleanly and VoiceOver reads it.
+
+## Review window polish (2026-11-09)
+
+- Suggestion rows are two lines, with and without a due date: Priority and Category stay flush right, the quote tile's edge lines up with the title text, and a long title truncates before the pills.
+- With no due date, Add Date appears on hover and keyboard focus, clicking the empty slot when it's hidden does nothing, and VoiceOver reads it.
+- Round checkbox: click, space key, disabled state, scale animation, and no animation with Reduce Motion on. VoiceOver reads it as a toggle with its state.
+- Sidebar icon colours are distinct with the Multicolor accent and with a single accent colour, and stay legible on a selected row in the focused and unfocused window.
+- A Backlog row shows "iCloud Inbox" with its date range beneath, and a two-line title keeps a sensible row height.
+- The toolbar shows no title next to the sidebar toggle, while the Window menu and Mission Control still name the window. Activity's centred pickers still fit.
+- Today shows "8 emails processed · 2 suggestions" and no quoted count line; a day with a real model headline still shows it.
+- Info cards in light and dark mode: surface and border, top line truncation, relative time wording, actions appear on hover and keyboard focus without shifting the row, and a set pin or Notes state stays visible.
+- Redundant bullets (sender, your name, a bare date) are gone. The name comes from the macOS account, so a different name on the email isn't filtered.
+- Scroll Today and Review Queue to the end: the floating bar clears the last item, and content passes under its material while scrolling.
+- Run a real digest: new summaries and headlines don't say "User received…" or use your name. Summaries already stored keep their old wording.

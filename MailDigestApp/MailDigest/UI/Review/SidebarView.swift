@@ -24,11 +24,13 @@ struct SidebarView: View {
     var body: some View {
         List(selection: selection) {
             Section {
-                row(.today, badge: archive.todayCount) { Label("Today", systemImage: "sun.max") }
-                row(.reviewQueue, badge: archive.reviewQueueCount) { Label("Review Queue", systemImage: "tray.full") }
-                row(.logbook) { Label("Logbook", systemImage: "checkmark.circle") }
-                row(.mailCleanup) { Label("Mail Cleanup", systemImage: "archivebox") }
-                row(.activity) { Label("Activity", systemImage: "clock.arrow.circlepath") }
+                row(.today, badge: archive.todayCount, tint: .fixed(.orange)) { Label("Today", systemImage: "sun.max.fill") }
+                row(.reviewQueue, badge: archive.reviewQueueCount, tint: .fixed(.blue)) {
+                    Label("Review Queue", systemImage: "tray.fill")
+                }
+                row(.logbook, tint: .fixed(.green)) { Label("Logbook", systemImage: "checkmark.square.fill") }
+                row(.mailCleanup, tint: .fixed(.purple)) { Label("Mail Cleanup", systemImage: "archivebox.fill") }
+                row(.activity, tint: .monochrome) { Label("Activity", systemImage: "waveform.path.ecg") }
             }
 
             if !archive.months.isEmpty {
@@ -45,10 +47,7 @@ struct SidebarView: View {
 
             Section("Backlog Jobs") {
                 ForEach(archive.backlogs) { backlog in
-                    row(.backlog(backlog.id), badge: backlog.actionableCount) {
-                        Label(library.title(forBacklog: backlog.id), systemImage: "tray.and.arrow.down")
-                            .lineLimit(1)
-                    }
+                    row(.backlog(backlog.id), badge: backlog.actionableCount) { backlogLabel(backlog.id) }
                 }
                 Button {
                     openWindow(id: "job-setup")
@@ -70,9 +69,27 @@ struct SidebarView: View {
     }
 
     /// A selectable sidebar row; the order of `.badge` and `.tag` lives in `selectableRow`.
-    private func row<Content: View>(_ item: SidebarItem, badge: Int? = nil,
+    /// `tint` colours the row's icon. Fixed tints, so the colours stay distinct under any system accent colour.
+    private func row<Content: View>(_ item: SidebarItem, badge: Int? = nil, tint: ListItemTint? = nil,
                                     @ViewBuilder content: () -> Content) -> some View {
-        content().selectableRow(item, badge: badge)
+        content().listItemTint(tint).selectableRow(item, badge: badge)
+    }
+
+    /// The mailbox name (up to two lines) over the job's date scope.
+    private func backlogLabel(_ id: UUID) -> some View {
+        let title = library.sidebarTitle(forBacklog: id)
+        let scope = library.scope(forBacklog: id)
+        return Label {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).lineLimit(2)
+                if let scope {
+                    Text(scope).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            .help(scope.map { "\(title)\n\($0)" } ?? title)
+        } icon: {
+            Image(systemName: "tray.and.arrow.down")
+        }
     }
 
     // MARK: Recent digests

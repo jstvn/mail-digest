@@ -4,16 +4,25 @@ import Foundation
 public enum JobSummaryText {
     /// "Backlog · iCloud Inbox and Outlook Inbox".
     public static func title(_ job: Job) -> String {
+        "\(ReviewPresentation.jobName(job.kind)) · \(mailboxTitle(job))"
+    }
+
+    /// "iCloud Inbox and Outlook Inbox": the mailbox text without the job-kind prefix.
+    public static func mailboxTitle(_ job: Job) -> String {
         var seen = Set<MailboxRef>()
-        let names = job.mailboxes.filter { seen.insert($0).inserted }.map { "\($0.account) \($0.name)" }
-        let boxes: String
+        let names = job.mailboxes.filter { seen.insert($0).inserted }
+            .map { "\($0.account) \(displayName(of: $0))" }
         switch names.count {
-        case 0: boxes = "no mailboxes"
-        case 1: boxes = names[0]
-        case 2: boxes = "\(names[0]) and \(names[1])"
-        default: boxes = "\(names.count) mailboxes"
+        case 0: return "no mailboxes"
+        case 1: return names[0]
+        case 2: return "\(names[0]) and \(names[1])"
+        default: return "\(names.count) mailboxes"
         }
-        return "\(ReviewPresentation.jobName(job.kind)) · \(boxes)"
+    }
+
+    /// IMAP reserves the name INBOX (any case); show it as "Inbox". Other folder names are left as they are.
+    static func displayName(of mailbox: MailboxRef) -> String {
+        mailbox.name.caseInsensitiveCompare("INBOX") == .orderedSame ? "Inbox" : mailbox.name
     }
 
     /// "3 Oct 2026 to 2 Nov 2026", or "Everything up to 2 Nov 2026" when the scope starts before 1990.

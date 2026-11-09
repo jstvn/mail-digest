@@ -18,7 +18,9 @@ struct ReviewWindow: View {
         } detail: {
             canvas
                 .id(coordinator.selection)
+                // Named for the Window menu, Mission Control and VoiceOver; the canvas header shows it instead.
                 .navigationTitle(windowTitle)
+                .toolbar(removing: .title)
         }
         .frame(minWidth: 760, minHeight: 520)
         .toolbar {

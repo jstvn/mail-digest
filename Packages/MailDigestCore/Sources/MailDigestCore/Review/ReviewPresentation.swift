@@ -101,6 +101,56 @@ public enum ReviewPresentation {
         return "\(prefix) · \(day) · \(digest.emailCount) \(noun)"
     }
 
+    /// "8 emails processed · 2 suggestions"; the suggestions part is left out when there are none.
+    /// `suggestionCount` is every suggestion in the content whatever its status, so it stays put while triaging.
+    public static func countsSubtitle(emailCount: Int, suggestionCount: Int) -> String {
+        var text = "\(emailCount) \(emailCount == 1 ? "email" : "emails") processed"
+        if suggestionCount > 0 { text += " · \(suggestionCount) \(suggestionCount == 1 ? "suggestion" : "suggestions")" }
+        return text
+    }
+
+    /// True for the count-only sentence the pipeline writes when the model gave no headline
+    /// ("12 emails, 3 suggestions."); the header already shows those counts, so it hides this one.
+    public static func isCountOnlyHeadline(_ headline: String) -> Bool {
+        DigestPipeline.isFallbackHeadline(headline.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    // MARK: Key facts
+
+    /// Key facts worth showing: drops a fact that is only the sender, the reader or a bare date, because the
+    /// row already shows (or implies) those. Compared whole-string, case-insensitively, after trimming
+    /// whitespace, leading bullets and surrounding punctuation. "Due 2026-12-01" and "Total $17.45" stay.
+    /// `userNames` are full names; the full name and each single word of it count as the reader.
+    public static func displayFacts(_ facts: [String], sender: String?, userNames: [String]) -> [String] {
+        var banned = Set<String>()
+        if let sender {
+            banned.insert(factKey(sender))
+            banned.insert(factKey(senderName(sender)))
+            banned.insert(factKey(MailFilter.address(from: sender)))
+        }
+        for name in userNames {
+            banned.insert(factKey(name))
+            for token in name.split(whereSeparator: \.isWhitespace) { banned.insert(factKey(String(token))) }
+        }
+        banned.remove("")
+        return facts.filter { fact in
+            let key = factKey(fact)
+            return !key.isEmpty && !banned.contains(key) && !isBareISODate(key)
+        }
+    }
+
+    private static func factKey(_ text: String) -> String {
+        var junk = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters).union(.symbols)
+        junk.insert(charactersIn: "\u{2022}\u{25CF}\u{25E6}\u{00B7}")
+        return text.trimmingCharacters(in: junk).lowercased()
+    }
+
+    /// 2026-12-01 or 2026-12-01T17:00[:00][Z|+10:00] on its own.
+    private static func isBareISODate(_ key: String) -> Bool {
+        let pattern = #"^\d{4}-\d{2}-\d{2}([t ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(z|[+-]\d{2}:?\d{2})?)?$"#
+        return key.range(of: pattern, options: .regularExpression) != nil
+    }
+
     // MARK: Progress strip
 
     /// "Daily digest" or "Backlog".

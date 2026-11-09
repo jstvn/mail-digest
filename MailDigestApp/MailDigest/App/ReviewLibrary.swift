@@ -142,6 +142,11 @@ final class ReviewLibrary {
         backlogJobs[id].map(JobSummaryText.title) ?? ReviewPresentation.jobName(.backlog)
     }
 
+    /// "iCloud Inbox"; plain "Backlog" when the job row is gone. The sidebar row, which has no kind prefix.
+    func sidebarTitle(forBacklog id: UUID) -> String {
+        backlogJobs[id].map(JobSummaryText.mailboxTitle) ?? ReviewPresentation.jobName(.backlog)
+    }
+
     /// "Everything up to 2 Nov 2026"; nil when the job row is gone.
     func scope(forBacklog id: UUID) -> String? {
         backlogJobs[id].map { JobSummaryText.scope($0, timeZone: calendar.timeZone) }

@@ -62,19 +62,22 @@ struct SuggestionRow: View {
     private var isRevealed: Bool { hovering || isFocused || addDateFocused }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Toggle(isOn: Binding(get: { isSelected }, set: { _ in onToggle() })) { EmptyView() }
-                .toggleStyle(.checkbox)
-                .labelsHidden()
-                .disabled(!isEditable)
-                .accessibilityLabel("Select \(suggestion.title)")
-                .padding(.top, 2)
-
+        VStack(alignment: .leading, spacing: 6) {
+            // Line 1: checkbox, title (truncates), then the pills on the trailing edge.
+            HStack(alignment: .center, spacing: 10) {
+                Toggle(isOn: Binding(get: { isSelected }, set: { _ in onToggle() })) { EmptyView() }
+                    .toggleStyle(SuggestionCheckboxStyle())
+                    .labelsHidden()
+                    .disabled(!isEditable)
+                    .accessibilityLabel("Select \(suggestion.title)")
+                titleField.layoutPriority(1)
+                Spacer(minLength: 8)
+                pills.fixedSize()
+            }
+            // Line 2 and the notes sit under the title, so they share its leading edge.
             VStack(alignment: .leading, spacing: 4) {
-                titleAndPills
                 EvidenceQuote(sender: email.map { ReviewPresentation.senderName($0.sender) } ?? "Unknown sender",
                               evidence: suggestion.evidence, emphasised: isRevealed, onOpen: onOpen)
-                    .padding(.top, 2)
                 if let errorText {
                     Text(errorText).font(.caption).foregroundStyle(.red)
                         .accessibilityLabel("Edit not saved. \(errorText)")
@@ -84,14 +87,15 @@ struct SuggestionRow: View {
                         .font(.caption).foregroundStyle(.orange)
                 }
             }
+            .padding(.leading, SuggestionCheckboxStyle.width + 10)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .padding(.horizontal, 8)
         .background {
             if isFocused {
                 RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.12))
             } else if hovering {
-                RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.5))
+                RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.02))
             }
         }
         .contentShape(Rectangle())
@@ -102,14 +106,6 @@ struct SuggestionRow: View {
     }
 
     // MARK: Title and pills
-
-    /// The title, then a metadata line with the pills. One layout, so nothing is built twice.
-    private var titleAndPills: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            titleField
-            pills
-        }
-    }
 
     private var titleField: some View {
         TextField("Title", text: $draft.title)
@@ -159,8 +155,10 @@ struct SuggestionRow: View {
                     showDatePopover = true
                 }
                 .focused($addDateFocused)
-                // Hidden visually but still hit-testable, focusable and exposed to VoiceOver.
+                // Hidden visually but still focusable and exposed to VoiceOver. It keeps its slot so the other
+                // pills stay flush right, and ignores clicks while invisible (a click would write a due date).
                 .opacity(isRevealed || showDatePopover ? 1 : 0)
+                .allowsHitTesting(isRevealed || showDatePopover)
             }
         }
         .popover(isPresented: $showDatePopover, arrowEdge: .bottom) { datePopover }

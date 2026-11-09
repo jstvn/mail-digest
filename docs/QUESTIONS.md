@@ -377,3 +377,10 @@ Each item says what the spec leaves open and the interim choice the build uses, 
    - **Resuming:** a stopped job stays resumable by explicit id, and creating a new job doesn't touch its items. An item whose message has since been processed by another job is skipped, not processed twice.
    - **Start:** a Backlog job queues exactly the IDs confirmed in its preview. Start creates no job when the selection is empty, or when any confirmed email can no longer be selected. In the second case the setup window reloads the preview and says why.
    - **Why:** a job stopped at 1 of 7 held its 6 queued emails, and a reopened setup window still offered its old preview. Start re-derived the selection, found nothing and recorded `Completed · 0 of 0` twice.
+
+## Review window polish (2026-11-09)
+
+72. **Should info rows have an Archive action?** (open)
+   - **Context:** the 2026-11-09 visual pass asked for hover actions "pin/archive/open mail" on info rows. Neither `docs/SPEC.md` nor the code has an archive action for info items, and the only existing mail-moving actions are Mail Cleanup's Trash and Move to Mail Digest folder.
+   - **Interim:** info rows offer the spec's three actions: pin, Save to Notes and open in Mail.
+   - **To decide:** whether Archive should dismiss the item within Mail Digest only, or move the email in Mail.app, which needs a target mailbox per account, Undo and the Mail automation error handling Mail Cleanup has.

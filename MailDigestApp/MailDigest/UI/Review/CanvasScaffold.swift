@@ -53,6 +53,8 @@ struct CanvasScaffold<Content: View>: View {
                 .padding(.vertical, 28)
                 .frame(maxWidth: .infinity)
             }
+            // Room under the last row for the floating bar, only while the bar is showing.
+            .contentMargins(.bottom, records.isEmpty ? 0 : 80, for: .scrollContent)
             // A Recent row asked to show an email: scroll to its first suggestion or info card.
             .onChange(of: coordinator.revealedEmailID) { _, emailID in
                 guard let emailID else { return }
@@ -68,7 +70,7 @@ struct CanvasScaffold<Content: View>: View {
                 if let id { proxy.scrollTo(id) }
             }
         }
-        .safeAreaInset(edge: .bottom) {
+        .overlay(alignment: .bottom) {
             if !records.isEmpty {
                 TriageBar(coordinator: coordinator, records: records, isPartial: isPartial)
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))

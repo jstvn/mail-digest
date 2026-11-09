@@ -117,3 +117,50 @@ private func sug(_ n: Int, confidence: Double, status: SuggestionStatus = .pendi
         #expect(ReviewState(digest: d).selection.count == 2)
     }
 }
+
+@Suite struct CanvasHeaderTextTests {
+    @Test func countsSubtitleHandlesPluralsAndZero() {
+        #expect(ReviewPresentation.countsSubtitle(emailCount: 8, suggestionCount: 2) == "8 emails processed · 2 suggestions")
+        #expect(ReviewPresentation.countsSubtitle(emailCount: 1, suggestionCount: 1) == "1 email processed · 1 suggestion")
+        #expect(ReviewPresentation.countsSubtitle(emailCount: 8, suggestionCount: 0) == "8 emails processed")
+    }
+
+    @Test func countOnlyHeadlineMatchesThePipelineFallback() {
+        for (e, s) in [(0, 0), (1, 1), (1, 2), (23, 0), (1081, 7)] {
+            #expect(ReviewPresentation.isCountOnlyHeadline(DigestPipeline.fallbackHeadline(emails: e, suggestions: s)))
+        }
+        #expect(ReviewPresentation.isCountOnlyHeadline("  3 emails, 1 suggestion.\n"))
+    }
+
+    @Test func realHeadlinesAreNotCountOnly() {
+        #expect(!ReviewPresentation.isCountOnlyHeadline("Rent is due Friday and 3 emails need a reply."))
+        #expect(!ReviewPresentation.isCountOnlyHeadline("3 emails, 1 suggestion. Rent is due."))
+        #expect(!ReviewPresentation.isCountOnlyHeadline("1 emails, 2 suggestion."))
+        #expect(!ReviewPresentation.isCountOnlyHeadline(""))
+    }
+}
+
+@Suite struct DisplayFactsTests {
+    private func facts(_ input: [String], sender: String? = "Ray White <ray@whitere.example>",
+                       users: [String] = ["Justin Wang"]) -> [String] {
+        ReviewPresentation.displayFacts(input, sender: sender, userNames: users)
+    }
+
+    @Test func dropsSenderAndAddress() {
+        #expect(facts(["Ray White", "ray@whitere.example", "• RAY WHITE.", "Ray White Realty"]) == ["Ray White Realty"])
+    }
+
+    @Test func dropsUserFullNameAndSingleTokens() {
+        #expect(facts(["Justin Wang", "justin", "Wang,", "Justin Wang's lease"]) == ["Justin Wang's lease"])
+    }
+
+    @Test func dropsBareISODatesOnly() {
+        #expect(facts(["2026-12-01", "2026-12-01T17:00", "2026-12-01T17:00:00+10:00", "- 2026-12-01.",
+                       "Due 2026-12-01", "Total $17.45", "Brisbane"]) == ["Due 2026-12-01", "Total $17.45", "Brisbane"])
+    }
+
+    @Test func keepsEverythingWithNoSenderOrNames() {
+        #expect(facts(["A", "B"], sender: nil, users: []) == ["A", "B"])
+        #expect(facts(["", "  "], sender: nil, users: []).isEmpty)
+    }
+}
