@@ -96,6 +96,8 @@ struct ReviewQueueView: View {
                     Text(position)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
+                        // Plain text gets no button inset, so it sits against the group's trailing edge without this.
+                        .padding(.trailing, 6)
                         .accessibilityLabel("Suggestion \(position)")
                 }
             }
