@@ -121,12 +121,12 @@ public struct MailJSONDecoder: Sendable {
         try Self.convert(decode(RawMessage.self, from: data))
     }
 
-    /// Parses a raw RFC 5322 header block and keeps only `List-Unsubscribe`, `Precedence` and
-    /// `Auto-Submitted`, under those canonical spellings. The first occurrence wins.
+    /// Parses a raw RFC 5322 header block and keeps only `List-Unsubscribe`, `Precedence`,
+    /// `Auto-Submitted` and `X-ICLOUD-HME`, under those canonical spellings. The first occurrence wins.
     public static func filterHeaders(_ raw: String) -> [String: String] {
         let unfolded = unfoldHeaderLines(raw)
 
-        let keep = ["List-Unsubscribe", "Precedence", "Auto-Submitted"]
+        let keep = ["List-Unsubscribe", "Precedence", "Auto-Submitted", RelaySender.headerName]
         var out: [String: String] = [:]
         for line in unfolded {
             guard let colon = line.firstIndex(of: ":") else { continue }

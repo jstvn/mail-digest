@@ -49,23 +49,24 @@ public struct MailFilter: Sendable {
     /// Tier for a fully loaded email, in Q9 order:
     /// Blocked → VIP → Ignored → Trusted Newsletter → ordinary bulk/newsletter → normal mail.
     public func tier(_ email: EmailMessage) -> MailTier {
-        let addr = Self.address(from: email.sender)
-        return senderTier(addr) ?? (hasBulkHeaders(email.headers) || Self.hasBulkLocalPart(addr) ? .infoOnly : .full)
+        let addrs = Self.addresses(for: email)
+        return senderTier(addrs) ?? (hasBulkHeaders(email.headers) || addrs.contains(where: Self.hasBulkLocalPart)
+                                     ? .infoOnly : .full)
     }
 
     /// Estimate from the sender alone, for the job preview (headers aren't loaded yet).
     /// Uses the same sender precedence as `tier(_:)`.
     public func estimatedTier(for header: MessageHeader) -> MailTier {
         let addr = Self.address(from: header.sender)
-        return senderTier(addr) ?? (Self.hasBulkLocalPart(addr) ? .infoOnly : .full)
+        return senderTier([addr]) ?? (Self.hasBulkLocalPart(addr) ? .infoOnly : .full)
     }
 
     /// True when the email gets Trusted Newsletter treatment: the sender is on the allowlist and no
     /// higher-precedence rule (block, VIP, ignore) applies. VIP mail keeps the ordinary limit.
     public func isTrustedNewsletter(_ email: EmailMessage) -> Bool {
-        let addr = Self.address(from: email.sender)
-        return matches(addr, in: .newsletters) && !matches(addr, in: .blocked)
-            && !matches(addr, in: .vip) && !matches(addr, in: .ignored)
+        let addrs = Self.addresses(for: email)
+        return matchesAny(addrs, in: .newsletters) && !matchesAny(addrs, in: .blocked)
+            && !matchesAny(addrs, in: .vip) && !matchesAny(addrs, in: .ignored)
     }
 
     /// The most task suggestions this email may produce: 8 for a Trusted Newsletter, otherwise 3.
@@ -74,19 +75,29 @@ public struct MailFilter: Sendable {
     }
 
     /// The tier decided by sender rules alone, or nil when the bulk checks decide.
-    private func senderTier(_ addr: String) -> MailTier? {
-        if matches(addr, in: .blocked) { return .skip }
-        if matches(addr, in: .vip) { return .full }
-        if matches(addr, in: .ignored) { return .skip }
-        if matches(addr, in: .newsletters) { return .full }
+    private func senderTier(_ addrs: [String]) -> MailTier? {
+        if matchesAny(addrs, in: .blocked) { return .skip }
+        if matchesAny(addrs, in: .vip) { return .full }
+        if matchesAny(addrs, in: .ignored) { return .skip }
+        if matchesAny(addrs, in: .newsletters) { return .full }
         return nil
+    }
+
+    /// The From address plus, for a verified Hide My Email relay, the original sender. A rule matches either.
+    static func addresses(for email: EmailMessage) -> [String] {
+        let from = address(from: email.sender)
+        guard let original = RelaySender.originalSender(from: email.sender, headers: email.headers) else { return [from] }
+        return [from, original]
+    }
+
+    private func matchesAny(_ addrs: [String], in list: SenderList) -> Bool {
+        addrs.contains { matches($0, in: list) }
     }
 
     /// Why an email is skipped, or nil if it isn't in the skip tier.
     public func skipReason(_ email: EmailMessage) -> String? {
         guard tier(email) == .skip else { return nil }
-        let addr = Self.address(from: email.sender)
-        return matches(addr, in: .blocked) ? "blocked sender" : "ignored sender"
+        return matchesAny(Self.addresses(for: email), in: .blocked) ? "blocked sender" : "ignored sender"
     }
 
     private func hasBulkHeaders(_ headers: [String: String]) -> Bool {

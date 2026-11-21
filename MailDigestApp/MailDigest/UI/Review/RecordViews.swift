@@ -128,6 +128,9 @@ struct SettledRecordRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 titleText
+                ForEach(record.suggestion.steps, id: \.self) { step in
+                    Text("• \(step)").font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                }
                 StaticSuggestionPills(suggestion: record.suggestion, category: record.category)
                 EvidenceQuote(sender: email.map { ReviewPresentation.senderName($0.sender) } ?? "Unknown sender",
                               evidence: record.suggestion.evidence, emphasised: hovering) {

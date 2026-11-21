@@ -54,7 +54,7 @@ private let footer = "\n\nUnsubscribe. Example Media Pty Ltd, 100 Sample Street,
     }
 
     @Test func tfn() {
-        #expect(filter.classify(input(body: "Number 123 456 782 noted")) == .private("pattern.tfn"))
+        #expect(filter.classify(input(body: "TFN 123 456 782 noted")) == .private("pattern.tfn"))
         #expect(filter.classify(input(body: "Number 123 456 783 noted")) == amb)
         #expect(filter.classify(input(body: "Your TFN is on file")) == .private("kw.tax.record"))
         #expect(filter.classify(input(body: "TFN supplied")) == amb)

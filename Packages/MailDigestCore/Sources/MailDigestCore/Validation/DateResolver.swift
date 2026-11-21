@@ -46,6 +46,12 @@ public struct DateResolver: Sendable {
         calendar.isDate(a, inSameDayAs: b)
     }
 
+    /// `YYYY-MM-DD` of the instant's calendar day in the resolver's time zone; a stable grouping key.
+    func dayKey(_ d: Date) -> String {
+        let c = calendar.dateComponents([.year, .month, .day], from: d)
+        return "\(c.year ?? 0)-\(c.month ?? 0)-\(c.day ?? 0)"
+    }
+
     private func parse(_ s: String) -> ResolvedDue? {
         let parts = s.split(separator: "T", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         guard let datePart = parts.first else { return nil }

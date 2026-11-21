@@ -81,7 +81,7 @@ public struct TriageInputBuilder: Sendable {
 
     public func plan(_ email: EmailMessage) -> TriagePlan {
         let prefix = "Subject: \(String(Self.collapse(email.subject).prefix(Self.maxSubject)))\n"
-            + "From: \(String(Self.collapse(email.sender).prefix(Self.maxSender)))\nBody: "
+            + "From: \(String(Self.collapse(RelaySender.displaySender(from: email.sender, headers: email.headers)).prefix(Self.maxSender)))\nBody: "
         let room = Self.maxStateCharacters - prefix.count
         let chunks = Self.chunks(Array(PrivacyAssessmentText.prepare(body: email.body)), room: room)
         guard chunks.count <= Self.maxChunks else {

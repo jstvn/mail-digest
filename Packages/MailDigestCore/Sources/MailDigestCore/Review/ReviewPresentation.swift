@@ -23,6 +23,11 @@ public struct InfoGroup: Sendable, Equatable, Identifiable {
 public enum ReviewPresentation {
     // MARK: Suggestions
 
+    /// "1 step" or "N steps"; nil when there are none.
+    public static func stepCountText(_ count: Int) -> String? {
+        count <= 0 ? nil : count == 1 ? "1 step" : "\(count) steps"
+    }
+
     /// Suggestions the user can still act on, in digest order.
     public static func actionable(_ suggestions: [Suggestion]) -> [Suggestion] {
         suggestions.filter { $0.status == .pending || $0.status == .failed }

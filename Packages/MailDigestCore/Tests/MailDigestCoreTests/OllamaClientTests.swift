@@ -70,6 +70,9 @@ extension StubNetworkTests {
             For an ordinary email, return at most 3 tasks. For a sender explicitly configured as a Trusted Newsletter, return at most 8 actionable tasks. The application applies the same sender-specific limit during validation.
             This sender is not a Trusted Newsletter: return at most 3 tasks.
             Task title: short imperative phrase under 60 characters.
+            One task per goal. If several actions serve the same goal (attending one event, joining one meeting, completing one application), return one task for that goal and put the supporting actions or details (meeting ID, passcode, ticket or QR code, form to fill) in its steps. Never return a detail of another task as a separate task.
+            steps: up to 4 short phrases, each under 60 characters. Empty if none.
+            Marketing calls to action are not tasks: browsing offers or deals, referring a friend, following on social media, leaving a review or rating, downloading, upgrading or setting up an app or card, adding a card to a wallet, unsubscribing. Include one only when the email states a deadline or obligation that applies to the user personally.
             due: ISO 8601 date (YYYY-MM-DD) or date-time (YYYY-MM-DDTHH:MM) in Australia/Brisbane, or null if no date is stated.
             evidence: copy the exact sentence from the email that justifies the task.
             confidence: 0 to 1, how sure you are the user must act.
@@ -79,7 +82,7 @@ extension StubNetworkTests {
     @Test func infoOnlyPromptHasRuleLine() {
         let text = Prompts.extractionSystem(today: today, timeZone: tz, tier: .infoOnly)
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-        #expect(lines.count == 13)
+        #expect(lines.count == 16)
         #expect(lines[8] == "tasks must be an empty array.")
         #expect(!text.contains("This sender is"))
     }

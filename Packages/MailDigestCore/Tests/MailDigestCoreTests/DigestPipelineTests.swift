@@ -73,7 +73,7 @@ private func fixture(_ prefix: String) throws -> EmailMessage {
         #expect(calls.map(\.tier) == [.infoOnly, .full])
     }
 
-    @Test func ordinaryFullMailStaysAtThree() async throws {
+    @Test func ordinaryFullMailFoldsSameGoal() async throws {
         let email = try fixture("bill-rent-04")
         let evidence = try #require(email.body.split(separator: "\n").map(String.init)
             .first { $0.trimmingCharacters(in: .whitespaces).count > 10 })
@@ -84,7 +84,9 @@ private func fixture(_ prefix: String) throws -> EmailMessage {
         let llm = StubLLMClient(results: [email.id: ExtractionResult(
             summary: "Rent.", category: .finance, importance: 3, keyFacts: [], tasks: tasks)])
         let out = try await run(pipeline(llm), email)
-        #expect(out.suggestions.count == 3)
+        // Six undated tasks are one goal: one reminder, the rest as steps (capped at 6).
+        #expect(out.suggestions.count == 1)
+        #expect(out.suggestions[0].steps.count == 5)
         #expect(await llm.extractCalls.map(\.trustedNewsletter) == [false])
     }
 

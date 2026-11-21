@@ -462,9 +462,10 @@ public protocol LLMClient: Sendable {
           "due_has_time": { "type": "boolean" },
           "priority": { "enum": ["high", "medium", "low"] },
           "evidence": { "type": "string" },
-          "confidence": { "type": "number" }
+          "confidence": { "type": "number" },
+          "steps": { "type": "array", "maxItems": 4, "items": { "type": "string" } }
         },
-        "required": ["title", "due", "due_has_time", "priority", "evidence", "confidence"]
+        "required": ["title", "due", "due_has_time", "priority", "evidence", "confidence", "steps"]
       }
     }
   },
@@ -485,6 +486,9 @@ tasks: only things the user must do or attend. Empty if none.
 For an ordinary email, return at most 3 tasks. For a sender explicitly configured as a Trusted Newsletter, return at most 8 actionable tasks. The application applies the same sender-specific limit during validation.
 {info_only_rule}
 Task title: short imperative phrase under 60 characters.
+One task per goal. If several actions serve the same goal (attending one event, joining one meeting, completing one application), return one task for that goal and put the supporting actions or details (meeting ID, passcode, ticket or QR code, form to fill) in its steps. Never return a detail of another task as a separate task.
+steps: up to 4 short phrases, each under 60 characters. Empty if none.
+Marketing calls to action are not tasks: browsing offers or deals, referring a friend, following on social media, leaving a review or rating, downloading, upgrading or setting up an app or card, adding a card to a wallet, unsubscribing. Include one only when the email states a deadline or obligation that applies to the user personally.
 due: ISO 8601 date (YYYY-MM-DD) or date-time (YYYY-MM-DDTHH:MM) in {tz}, or null if no date is stated.
 evidence: copy the exact sentence from the email that justifies the task.
 confidence: 0 to 1, how sure you are the user must act.
@@ -729,10 +733,15 @@ Architecture: the review data layer is cross-digest. Core holds the testable log
 2. `DateResolver` parses `due` in the user's timezone. Reject dates before today or more than 365 days out (keep the task, clear the date)
 3. If `evidence` contains no date or time words but `due` is set, clear the date
 4. Title: trim, 3 to 80 characters, no URLs. Otherwise drop
-5. Max 3 suggestions per ordinary email and 8 per explicitly configured Trusted Newsletter email. There is no digest-wide data-generation or persistence cap. Daily shows the top 25 highest-confidence suggestions first and exposes the rest in an expanded view; Backlog has no digest-wide cap and is reviewed in groups of 50 source emails.
-6. Dedupe against pending and approved suggestions from the last 14 days by normalised title plus due date
-7. Flag `money-new-sender` when the title or evidence mentions pay, payment, invoice, bank, transfer or gift card and the sender has no earlier approved decision. Flagged items are never preselected
+5. Max 3 suggestions per ordinary email and 8 per explicitly configured Trusted Newsletter email, applied after the same-goal fold below. There is no digest-wide data-generation or persistence cap. Daily shows the top 25 highest-confidence suggestions first and exposes the rest in an expanded view; Backlog has no digest-wide cap and is reviewed in groups of 50 source emails.
+6. Dedupe against pending and approved suggestions from the last 14 days by normalised folded title plus due date
+7. Flag `money-new-sender` when the title, evidence or steps mention pay, payment, invoice, bank, transfer or gift card and the sender has no earlier approved decision. Flagged items are never preselected
 8. `preselected = confidence >= 0.75 && flags.isEmpty`; suggestions under 0.4 are dropped
+
+**Steps and same-goal fold (Q88; not numbered, so rules 5–8 keep their numbers)**
+
+- `steps` are cleaned like titles: 3 to 80 characters, no URL, deduplicated. Up to 4 come from the model.
+- For ordinary mail only (not Trusted Newsletters), tasks sharing a due day form one suggestion; undated tasks join the group of the most confident dated task, or form one group if none is dated. The primary (title, evidence, due) is the most confident member, preferring dated members; the earliest timed member sets the time; other members' titles and steps become steps (max 6); priority and confidence are the group maximum; flags are the union; `preselected` is recomputed by rule 8. Tasks with different due days stay separate reminders.
 
 **Protocol (core)**
 
@@ -752,7 +761,7 @@ public protocol ReminderWriter: Sendable {
 - `title` = suggestion title; `calendar` = the app's list
 - `dueDateComponents` = date only, or date plus hour and minute when `dueHasTime`; add an `EKAlarm` at 9:00 on the day for date-only, or 1 hour before for timed items
 - `priority` = high 1, medium 5, low 9
-- `notes` = `From: <sender>\nSubject: <subject>\n"<evidence>"\n#<category>`
+- `notes` = `From <sender> · <subject>` (prefilled when Notes is empty and editable before adding, or the user's own text), then one `• <step>` line per step, then `"<evidence>"`, then `#<category>` (Q83, Q88). EventKit has no subtask API
 - **Tags:** EventKit has no public API for Reminders tags. v1 writes the category as a `#category` hashtag at the end of `notes` (searchable in Reminders). The agent must note this in `MAC_TODO.md` so Justin can check how it shows on macOS 26 and iOS; if Reminders doesn't treat it as a real tag, it stays as searchable text. No private APIs
 - `url` = `message://%3C<message-id>%3E`
 - Save with `commit: true`; store the returned `calendarItemIdentifier` on the suggestion and set status `approved`. On error set `failed` and show it inline on the row
@@ -886,9 +895,9 @@ Local Qwen3 4B stays the default and the always-available fallback. An email rea
 
 `EmailMessage.contentInspection: ContentInspection` = `.complete`, `.uninspectedParts` or `.unknown` (default, so fixtures and older callers fail closed).
 
-- `EmlxParser` reports `.complete` only when every MIME leaf is `text/plain` or `text/html`, none has `Content-Disposition: attachment`, every part decoded, and nothing was cut short. `text/plain` and `text/html` alternatives inside `multipart/alternative` count as one representation. Any other leaf (images, calendar, PDF, S/MIME, unknown types) or a partial message → `.uninspectedParts`.
+- `EmlxParser` reports `.complete` only when every MIME leaf is `text/plain` or `text/html`, none has `Content-Disposition: attachment`, every part decoded, and nothing was cut short. `text/plain` and `text/html` alternatives inside `multipart/alternative` count as one representation. Any other leaf (images, calendar, PDF, S/MIME, unknown types) → `.uninspectedParts`; so does a partial message unless the Q89 check below passes.
 - The JXA fallback always reports `.unknown`.
-- `EmailMessage.inspectionGap: InspectionGap?` records why (metadata only, never content or file names): `attachment`, `nonTextPart`, `undecodablePart`, `partialMessage`, `structureUnavailable`; nil when complete or unknown. `EmlxParser` priority when several apply: attachment, then non-text part, then undecodable part. A partial `.emlx` is `partialMessage` (overrides); the JXA fallback is `structureUnavailable`. The gap never changes routing; only `.complete` content may reach a cloud provider.
+- `EmailMessage.inspectionGap: InspectionGap?` records why (metadata only, never content or file names): `attachment`, `nonTextPart`, `undecodablePart`, `partialMessage`, `structureUnavailable`; nil when complete or unknown. `EmlxParser` priority when several apply: attachment, then non-text part, then undecodable part. A partial `.emlx` is `complete` only when normal inspection is complete, no MIME leaf has an `X-Apple-Content-Length` header or an empty text body, and no `Attachments/<rowid>` directory exists next to `Messages` (a stat error other than not-found counts as existing); otherwise it is `partialMessage` (overrides) (Q89). The JXA fallback is `structureUnavailable`. The gap never changes routing; only `.complete` content may reach a cloud provider.
 - Never relax this to raise cloud coverage; improve MIME inspection instead.
 
 ### PrivacyPreFilter (Core, pure, deterministic)
@@ -898,6 +907,8 @@ Input: sender, subject, full body, filter headers, inspection. Output: class plu
 Three levels of evidence (Q69):
 
 - **Strong private indicators** (direct to local, always win, override the allowlist): OTP / verification / sign-in-code language; password reset and credential language; Luhn-checked card numbers, IBAN, BSB + account, checksum-validated TFN; personal financial, medical and tax record phrases (`kw.financial.record`, `kw.medical.record`, `kw.tax.record`). Some record phrases count only when a digit-bearing value follows within 6 tokens ("Amount due: $120.50" yes, "track amount due automatically" no).
+- **Digits in URLs and labels (Q89):** card, IBAN, BSB + account and TFN patterns ignore digits inside URLs (tokens containing `://` or `www.`). TFN counts only with "TFN" or "tax file number" within 6 tokens. Unlabelled Luhn-valid numbers outside URLs stay strong indicators. A false positive sends mail to System One, never straight to cloud.
+- **Hide My Email (Q89):** the `X-ICLOUD-HME` header is kept with the filter headers. Its `s=` sender is trusted only when the From address is an `icloud.com` alias whose local part starts with `<s local, . → _>_at_<s domain, . → _>_`. The verified original sender drives sender rules (exact or `@domain`), the bulk local-part check, the public allowlist and the System One `From:` line. The sensitive-domain check may also use an unverified `s=` claim, which only ever makes the result more local. `d=` is never the sender. The relay address still keys the job preview estimate, the Backlog ignored-sender check, per-sender approval history (rule 7), and the displayed and stored sender.
 - **Contextual risk signals** (`risk.embedded.conversation`, `risk.medical.identifiable`, `risk.identifiable.sensitive`, `risk.financial.personal`, `risk.medical.personal`): embedded reply or forward structure; a diagnosis term within 300 characters of a street address, phone number or labelled date of birth, or a named person directly tied to a diagnosis; another sensitive personal matter within 300 characters of an identifier; personal financial or medical wording without a value. On a trusted sender they trigger selective System One assessment, and on other senders they are recorded with the triage. They never classify a message as private on their own.
 - **General topic words** (invoice, statement, payment, transaction, receipt, medical, health, tax, and similar) trigger nothing without personal or transactional context. A name, an address, or a public figure's office details alone are not evidence of private content.
 - **Sensitive sender domains** (`*.gov.au`, `*.gov`, built-in bank and health lists, on host label boundaries, so `notgov.au` never matches) are contextual evidence: local when the message has no valid `List-Unsubscribe` or has a strong private indicator; otherwise `needsTriage` with trigger `sensitiveSender`, and never direct to Gemini.
@@ -932,7 +943,7 @@ Three levels of evidence (Q69):
 ### Credentials and settings
 
 - `CredentialStore` protocol in Core (`read`, `save`, `delete`), `InMemoryCredentialStore` fake. App adapter `KeychainCredentialStore`: generic password, service `"<bundle id>.gemini"`, account `"api-key"`, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, not synchronizable, no custom access group. The key is read once at job start and kept only in the client for that job.
-- `DigestSettings` gains `cloudDigestEnabled` (false), `geminiModel` (`gemini-3.5-flash-lite`), `triageModel` (`kev:4b-q4_K_M`; a stored retired `kev:0.8b-q8_0` is migrated once: to Kev 4B if written before default revision 2, to Tev1 if written at revision 2; other values are never changed), `privacyThreshold` (0.90), `cloudPrivacyAcknowledgedRevision: Int?` (nil). Missing keys decode to defaults. Whether a key exists is read from the Keychain, never stored.
+- `DigestSettings` gains `cloudDigestEnabled` (false), `geminiModel` (`gemini-3.5-flash-lite`), `triageModel` (`kev:4b-q4_K_M`; a stored retired `kev:0.8b-q8_0` is migrated once, by the migration at settings revision 3: to Kev 4B if written before default revision 2, to Tev1 if written at revision 2 (Q70); other values are never changed), `privacyThreshold` (0.90), `cloudPrivacyAcknowledgedRevision: Int?` (nil). Missing keys decode to defaults. Whether a key exists is read from the Keychain, never stored.
 - **Settings > Model > Cloud AI (Gemini)** section: `SecureField`, Save (Update when a key exists), Remove Key, "API key saved in Keychain" or "No API key" status, Test Connection with status text, the Cloud Digest toggle (disabled without a key), triage model picker with installed or missing status, threshold control, and the persistent disclosure (Q63). Removing the key turns Cloud Digest off. The section also shows a "Cloud Digest Model" row (display name of the configured model, raw id in secondary monospaced text when different) with an editable "Model ID" field under it, and a caption under the toggle stating whether cloud processing is actually active. Test Connection shows "Connection successful" with "<Model> is available with this API key." and "No email content was sent during this test.", or short friendly errors (copy in `GeminiConnectionMessage`); it never changes the toggle, and the result clears when the key or model id changes.
 - **Acknowledgement (Q63):** turning the toggle on while `cloudPrivacyAcknowledgedRevision < currentRevision` (1) shows a sheet with the disclosure; only "I Understand, Enable" sets the revision and the toggle. Cancel leaves it off. Saving a key never enables cloud.
 

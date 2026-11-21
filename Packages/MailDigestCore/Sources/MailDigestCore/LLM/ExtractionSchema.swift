@@ -28,8 +28,12 @@ public enum ExtractionSchema {
                         "priority": .object(["enum": strings(["high", "medium", "low"])]),
                         "evidence": .object(["type": .string("string")]),
                         "confidence": .object(["type": .string("number")]),
+                        "steps": .object([
+                            "type": .string("array"), "maxItems": .number(4),
+                            "items": .object(["type": .string("string")]),
+                        ]),
                     ]),
-                    "required": strings(["title", "due", "due_has_time", "priority", "evidence", "confidence"]),
+                    "required": strings(["title", "due", "due_has_time", "priority", "evidence", "confidence", "steps"]),
                 ]),
             ]),
         ]),

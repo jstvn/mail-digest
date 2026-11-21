@@ -40,6 +40,7 @@ public enum SuggestionAccessibility {
                              locale: Locale = Locale(identifier: "en_AU")) -> String {
         let s = record.suggestion
         var parts = [s.title]
+        if !s.steps.isEmpty { parts.append("Steps: " + s.steps.joined(separator: ", ")) }
         if s.priority == .high { parts.append("High priority") }
         if !s.flags.isEmpty { parts.append("Needs review") }
         if let due = s.due { parts.append(dueText(due, hasTime: s.dueHasTime, now: now, calendar: calendar, locale: locale)) }

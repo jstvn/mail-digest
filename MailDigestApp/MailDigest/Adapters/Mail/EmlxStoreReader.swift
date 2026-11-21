@@ -5,6 +5,9 @@ import MailDigestCore
 struct EmlxFile: Sendable {
     var data: Data
     var source: EmlxSource
+    /// Whether `Attachments/<ROWID>` exists next to the `Messages` folder (unknown counts as yes).
+    /// Only checked for partial files; a hit means Mail keeps parts outside the `.emlx`.
+    var hasAttachmentsDirectory = false
 }
 
 /// Why a message file could not be read. Never carries paths or content.
@@ -75,7 +78,15 @@ struct EmlxStoreReader: Sendable {
             }
             try requireInside(file, root: root)
             do {
-                return EmlxFile(data: try Data(contentsOf: file.resolvingSymlinksInPath()), source: source)
+                var result = EmlxFile(data: try Data(contentsOf: file.resolvingSymlinksInPath()), source: source)
+                if source == .partialEmlx {
+                    // Existence only: the attachments themselves are never opened.
+                    let dir = messages.deletingLastPathComponent().appendingPathComponent("Attachments", isDirectory: true)
+                        .appendingPathComponent(String(rowID), isDirectory: true)
+                    var ast = stat()
+                    result.hasAttachmentsDirectory = lstat(dir.path, &ast) == 0 || (errno != ENOENT && errno != ENOTDIR)
+                }
+                return result
             } catch {
                 throw Self.failure(from: error)
             }

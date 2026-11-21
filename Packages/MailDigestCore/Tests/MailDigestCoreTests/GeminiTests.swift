@@ -54,9 +54,10 @@ private func failure(_ response: StubResponse) async -> GeminiError? {
         "importance":{"type":"integer","minimum":1,"maximum":5},
         "key_facts":{"type":"array","maxItems":4,"items":{"type":"string"}},
         "tasks":{"type":"array","maxItems":8,"items":{"type":"object",
-        "required":["title","due","due_has_time","priority","evidence","confidence"],"properties":{
+        "required":["title","due","due_has_time","priority","evidence","confidence","steps"],"properties":{
         "title":{"type":"string"},"due":{"type":["string","null"]},"due_has_time":{"type":"boolean"},
-        "priority":{"enum":["high","medium","low"]},"evidence":{"type":"string"},"confidence":{"type":"number"}}}}}}
+        "priority":{"enum":["high","medium","low"]},"evidence":{"type":"string"},"confidence":{"type":"number"},
+        "steps":{"type":"array","maxItems":4,"items":{"type":"string"}}}}}}}
         """.utf8))
         #expect(GeminiSchemaAdapter.adapt() == expected)
     }

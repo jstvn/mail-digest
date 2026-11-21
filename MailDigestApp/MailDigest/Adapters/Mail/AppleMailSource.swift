@@ -222,15 +222,19 @@ struct AppleMailSource: MailSource, MailVolumeSource {
                     fallback(ref, "unusable.\(reason.rawValue)")
                 case .usable(let parsed):
                     guard parsed.messageID == ref.messageID else { fallback(ref, "idMismatch"); continue }
+                    // A partial file counts as inspected only when it holds every part (Q66).
+                    var inspection = parsed.inspection, gap = parsed.inspectionGap
+                    if file.source == .partialEmlx {
+                        (inspection, gap) = PartialEmlxPolicy.verdict(
+                            for: parsed, hasAttachmentsDirectory: file.hasAttachmentsDirectory)
+                    }
                     out.messages.append(EmailMessage(
                         id: ref.messageID, account: mailbox.account, mailbox: mailbox.name,
                         sender: parsed.sender.isEmpty ? row.sender : parsed.sender,
                         subject: parsed.subject.isEmpty ? row.fullSubject : parsed.subject,
                         receivedAt: row.receivedAt, body: parsed.body, headers: parsed.filterHeaders,
                         sourceReference: MailMessageReference(messageID: ref.messageID, storeRowID: row.rowID),
-                        // A partial .emlx may be missing parts, so it is never fully inspected (Q66).
-                        contentInspection: file.source == .partialEmlx ? .uninspectedParts : parsed.inspection,
-                        inspectionGap: file.source == .partialEmlx ? .partialMessage : parsed.inspectionGap,
+                        contentInspection: inspection, inspectionGap: gap,
                         bimiIndicator: BIMIIndicator.headerValue(inRawHeaders: parsed.rawHeaderBlock)))
                     if file.source == .partialEmlx { out.partialCount += 1 } else { out.emlxCount += 1 }
                 }

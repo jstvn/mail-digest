@@ -10,6 +10,8 @@ import MailDigestCore
 //   EvalCLI systemone report --fixtures <path> --results <a.jsonl> [<b.jsonl> ...] [--json <path>]
 //   EvalCLI systemone route --fixtures <A.json> [<B.json>] --model <tag> --out <F.jsonl> [--base-url URL] [--limit N]
 //   EvalCLI systemone route-report --fixtures <A.json> [<B.json>] --results <a.jsonl> ... [--baseline <dir>] [--json <path>]
+//   EvalCLI systemone replay --mail-dir <dir> --model <tag> --thresholds 0.90,0.85 --out <F.jsonl> [--since-days 14] [--limit N] [--base-url URL]
+//   EvalCLI systemone replay-report --results <F.jsonl>
 
 func stderr(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
 
@@ -25,6 +27,8 @@ usage:
   EvalCLI systemone report --fixtures <path> --results <a.jsonl> [<b.jsonl> ...] [--json <path>]
   EvalCLI systemone route --fixtures <A.json> [<B.json>] --model <tag> --out <F.jsonl> [--base-url URL] [--limit N]
   EvalCLI systemone route-report --fixtures <A.json> [<B.json>] --results <a.jsonl> ... [--baseline <dir>] [--json <path>]
+  EvalCLI systemone replay --mail-dir <dir> --model <tag> --thresholds 0.90,0.85 --out <F.jsonl> [--since-days 14] [--limit N] [--base-url http://localhost:11434]
+  EvalCLI systemone replay-report --results <F.jsonl>
 """
 
 /// `--key value [value ...]` pairs; a key collects every following non-flag argument.
@@ -324,5 +328,7 @@ case "run": await runCommand(options)
 case "report": reportCommand(options)
 case "route": await routeCommand(options)
 case "route-report": routeReportCommand(options)
+case "replay": await replayCommand(options)
+case "replay-report": replayReportCommand(options)
 default: fail(usage)
 }

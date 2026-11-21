@@ -187,21 +187,99 @@ private let validator = SuggestionValidator(timeZone: brisbane)
     }
 
     @Test func atMostThreePerEmailBestFirst() {
-        let body = "Please do all of these things."
+        let body = "Please do all of these things on 5 November."
+        // Distinct due days, so nothing folds and the cap applies.
         let tasks = [0.5, 0.9, 0.6, 0.8, 0.9].enumerated().map { i, c in
-            task("Task number \(i)", evidence: body, confidence: c)
+            task("Task number \(i)", due: "2026-11-0\(5 + i)", evidence: body, confidence: c)
         }
         let out = validator.validate(tasks, email: email(body), context: context())
         #expect(out.map(\.title) == ["Task number 1", "Task number 4", "Task number 3"])
     }
 
     @Test func trustedNewsletterKeepsUpToEight() {
-        let body = "Please do all of these things."
-        let tasks = (0..<10).map { task("Task number \($0)", evidence: body, confidence: 0.9 - Double($0) * 0.01) }
+        let body = "Please do all of these things on 5 November."
+        let tasks = (0..<10).map { task("Task number \($0)", due: "2026-11-\(String(format: "%02d", 5 + $0))", evidence: body, confidence: 0.9 - Double($0) * 0.01) }
         #expect(validator.validate(tasks, email: email(body), context: context(max: 8)).count == 8)
         #expect(validator.validate(tasks, email: email(body), context: context()).count == 3)
         // The limit can never exceed the schema maximum.
         #expect(context(max: 50).maxSuggestions == 8)
+    }
+
+    // MARK: Steps and same-goal folding
+
+    private func stepTask(_ title: String, due: String? = nil, hasTime: Bool = false, priority: Priority = .medium,
+                          confidence: Double = 0.9, steps: [String] = []) -> ExtractedTask {
+        ExtractedTask(title: title, due: due, dueHasTime: hasTime, priority: priority,
+                      evidence: "Join on 12 November.", confidence: confidence, steps: steps)
+    }
+
+    private let foldBody = "Join on 12 November."
+
+    @Test func stepsAreCleaned() {
+        let t = stepTask("Join the meeting", steps: ["  Note meeting ID ", "note meeting id.", "ab", "Join the meeting",
+                                                      "See https://x.com/a", String(repeating: "x", count: 81), "Save passcode"])
+        let out = validator.validate([t], email: email(foldBody), context: context())
+        #expect(out[0].steps == ["Note meeting ID", "Save passcode"])
+    }
+
+    @Test func moneyStepFlagsNewSender() {
+        let t = stepTask("Finish the form", steps: ["Pay the fee"])
+        #expect(validator.validate([t], email: email(foldBody), context: context())[0].flags == ["money-new-sender"])
+        #expect(validator.validate([t], email: email(foldBody), context: context(approved: true))[0].flags.isEmpty)
+    }
+
+    @Test func undatedTasksFoldIntoOne() {
+        let tasks = [stepTask("Join meeting", confidence: 0.9), stepTask("Note meeting ID", confidence: 0.8),
+                     stepTask("Save passcode", confidence: 0.7)]
+        let out = validator.validate(tasks, email: email(foldBody), context: context())
+        #expect(out.count == 1)
+        #expect(out[0].title == "Join meeting")
+        #expect(out[0].steps == ["Note meeting ID", "Save passcode"])
+    }
+
+    @Test func differentDueDaysStaySeparate() {
+        let tasks = [stepTask("A task", due: "2026-11-12"), stepTask("B task", due: "2026-11-13"),
+                     stepTask("C task", due: "2026-11-20")]
+        #expect(validator.validate(tasks, email: email(foldBody), context: context()).count == 3)
+    }
+
+    @Test func datedPrimaryWinsOverMoreConfidentUndated() {
+        let tasks = [stepTask("Attend the event", due: "2026-11-12", confidence: 0.9, steps: ["Bring ticket"]),
+                     stepTask("Present QR code", due: "2026-11-12", confidence: 0.8),
+                     stepTask("Scan QR code", confidence: 0.95)]
+        let out = validator.validate(tasks, email: email(foldBody), context: context())
+        #expect(out.count == 1)
+        #expect(out[0].title == "Attend the event")
+        #expect(out[0].due != nil)
+        #expect(out[0].confidence == 0.95)
+        #expect(out[0].steps == ["Bring ticket", "Scan QR code", "Present QR code"])
+    }
+
+    @Test func foldTakesEarliestTimeAndUnionsFlagsAndMaxPriority() {
+        let tasks = [stepTask("Pay the fee", due: "2026-11-12T15:00", hasTime: true, priority: .low, confidence: 0.9),
+                     stepTask("Attend session", due: "2026-11-12T09:00", hasTime: true, priority: .high, confidence: 0.8)]
+        let out = validator.validate(tasks, email: email(foldBody), context: context())
+        #expect(out.count == 1)
+        #expect(out[0].title == "Pay the fee")
+        #expect(out[0].dueHasTime)
+        #expect(out[0].due == DateResolver(timeZone: brisbane).resolve("2026-11-12T09:00", today: today)?.date)
+        #expect(out[0].priority == .high)
+        #expect(out[0].flags == ["money-new-sender"])
+        #expect(!out[0].preselected)
+    }
+
+    @Test func foldedStepsCapAtSix() {
+        let tasks = [stepTask("Main goal", confidence: 0.99, steps: ["Step one", "Step two", "Step three", "Step four"])]
+            + (0..<4).map { stepTask("Extra task \($0)", confidence: 0.8, steps: ["Detail \($0)"]) }
+        let out = validator.validate(tasks, email: email(foldBody), context: context())
+        #expect(out.count == 1 && out[0].steps.count == 6)
+    }
+
+    @Test func trustedNewsletterDoesNotFold() {
+        let tasks = [stepTask("First thing", steps: ["Model step"]), stepTask("Second thing"), stepTask("Third thing")]
+        let out = validator.validate(tasks, email: email(foldBody), context: context(max: 8))
+        #expect(out.count == 3)
+        #expect(out[0].steps == ["Model step"])
     }
 
     @Test func makeIDIsUsed() {

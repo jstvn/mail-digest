@@ -24,6 +24,7 @@ struct ReviewQueueRow: View {
     /// "Philip Fraser · In 11 days", with a note when the suggestion needs a look or couldn't be added.
     private var metaLine: String {
         var parts = [senderName, RelativeDue.make(due: suggestion.due, hasTime: suggestion.dueHasTime, now: now, calendar: calendar).top]
+        if let steps = ReviewPresentation.stepCountText(suggestion.steps.count) { parts.append(steps) }
         if suggestion.status == .failed { parts.append("Couldn't add") } else if !suggestion.flags.isEmpty { parts.append("Needs review") }
         return parts.joined(separator: " · ")
     }

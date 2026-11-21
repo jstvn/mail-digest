@@ -127,6 +127,7 @@ private struct DayButtonStyle: ButtonStyle {
     }
 }
 
+#if DEBUG
 #Preview("Mini month calendar") {
     let library = PreviewSupport.library()
     MiniMonthCalendar(archive: library.archive, calendar: library.calendar,
@@ -134,3 +135,4 @@ private struct DayButtonStyle: ButtonStyle {
         .padding()
         .frame(width: 240)
 }
+#endif

@@ -97,6 +97,7 @@ struct SuggestionCard: View {
                     titleView
                     pills
                 }
+                stepsList
                 quoteLine
                 if let errorText {
                     Text(errorText).font(.caption).foregroundStyle(.red)
@@ -252,6 +253,17 @@ struct SuggestionCard: View {
     }
 
     // MARK: Second line
+
+    /// The supporting actions of the same goal, as quiet bulleted lines under the title.
+    @ViewBuilder private var stepsList: some View {
+        if !suggestion.steps.isEmpty {
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(suggestion.steps, id: \.self) { step in
+                    Text("• \(step)").font(.system(size: 12.5)).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+        }
+    }
 
     private var quoteLine: some View {
         HStack(spacing: 6) {

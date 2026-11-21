@@ -137,10 +137,17 @@ public struct PrivacyPreFilter: Sendable {
     private static let otpWords: Set<String> = ["code", "codes", "otp", "pin", "passcode", "verification", "verify"]
 
     public func classify(_ input: PrivacyInput) -> PreFilterVerdict {
-        let host = Self.host(of: input.sender)
+        // A verified Hide My Email relay is judged by its original sender, not by icloud.com.
+        let relayOriginal = RelaySender.originalSender(from: input.sender, headers: input.headers)
+        let fromHost = Self.host(of: input.sender)
+        let host = relayOriginal.flatMap(Self.host(of:)) ?? fromHost
+        // Fail closed: the sensitive-domain check also looks at every host that could name the sender,
+        // including an unverified `s=` claim (it can only make mail more local).
+        let sensitiveHosts = [fromHost, host, RelaySender.claimedSender(headers: input.headers).flatMap(Self.host(of:))]
+        let sensitiveRule = sensitiveHosts.compactMap { $0 }.lazy.compactMap(Self.sensitiveDomainRule(host:)).first
         let hasUnsub = Self.hasValidUnsubscribe(input.headers)
         let strong = strongRule(for: input)
-        if let host, let domain = Self.sensitiveDomainRule(host: host) {
+        if let domain = sensitiveRule {
             // One-to-one mail from a bank, agency or clinic stays private; so does anything with transactional
             // evidence. A bulk announcement without it goes to System One, never straight to the cloud.
             if strong != nil || !hasUnsub { return .private(domain) }
@@ -170,10 +177,12 @@ public struct PrivacyPreFilter: Sendable {
                 return rule.ruleID
             }
         }
-        if Self.hasCardNumber(text) { return "pattern.card" }
-        if Self.hasIBAN(text) { return "pattern.iban" }
-        if Self.hasBSBAccount(text) { return "pattern.bsb" }
-        if Self.hasTFN(text) { return "pattern.tfn" }
+        // Digits inside URLs (tracking ids, timestamps) are never account data.
+        let numeric = Self.maskingURLs(text)
+        if Self.hasCardNumber(numeric) { return "pattern.card" }
+        if Self.hasIBAN(numeric) { return "pattern.iban" }
+        if Self.hasBSBAccount(numeric) { return "pattern.bsb" }
+        if Self.hasTFN(numeric) { return "pattern.tfn" }
         if Self.hasOTPCode(tokens) { return "pattern.otp" }
         return nil
     }
@@ -350,12 +359,33 @@ public struct PrivacyPreFilter: Sendable {
         return zip(ds, weights).reduce(0) { $0 + $1.0 * $1.1 } % 11 == 0
     }
 
+    private static let urlRegex = try? NSRegularExpression(pattern: #"\S*://\S*|\bwww\.\S+"#, options: [.caseInsensitive])
+
+    /// Replaces URL spans with a line break so digits inside them never join a number outside.
+    static func maskingURLs(_ text: String) -> String {
+        guard let urlRegex else { return text }
+        return urlRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text),
+                                                 withTemplate: "\n")
+    }
+
+    /// A checksum-valid TFN (9 digits, or three groups of 3) with "TFN" or "tax file number" within
+    /// `valueWindow` tokens before or after it. Unlabelled numbers are too often just other numbers.
     static func hasTFN(_ text: String) -> Bool {
-        for run in digitGroupRuns(text) where run.count >= 3 {
-            for start in 0...(run.count - 3) {
-                let w = run[start..<(start + 3)]
-                if w.allSatisfy({ $0.count == 3 }), tfnValid(w.joined()) { return true }
-            }
+        let toks = tokens(text)
+        var labels: [(start: Int, end: Int)] = []
+        for (i, t) in toks.enumerated() {
+            if t == "tfn" { labels.append((i, i)) }
+            else if t == "tax", i + 2 < toks.count, toks[i + 1] == "file", toks[i + 2] == "number" { labels.append((i, i + 2)) }
+        }
+        guard !labels.isEmpty else { return false }
+        func labelled(_ first: Int, _ last: Int) -> Bool {
+            labels.contains { ($0.end < first && first - $0.end <= valueWindow) || ($0.start > last && $0.start - last <= valueWindow) }
+        }
+        let digits = { (s: String) in s.allSatisfy { $0.isASCII && $0.isNumber } }
+        for i in toks.indices where digits(toks[i]) {
+            if toks[i].count == 9, tfnValid(toks[i]), labelled(i, i) { return true }
+            if i + 2 < toks.count, toks[i...(i + 2)].allSatisfy({ $0.count == 3 && digits($0) }),
+               tfnValid(toks[i...(i + 2)].joined()), labelled(i, i + 2) { return true }
         }
         return false
     }

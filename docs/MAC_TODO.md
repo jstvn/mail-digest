@@ -746,3 +746,12 @@ Builds and Core tests pass; not checked in the running app.
 - With a failed Daily job and no digest today, the empty state reads "Today's Digest Didn't Run" with the reason and its prominent button says Retry, even before the scheduled time and on a first launch. Clicking it retries the same job.
 - With a paused or stopped Daily job, the button says Resume and resumes in place. It matches the toolbar's label and enabled state.
 - While a Daily job runs, the state reads "Today's Digest Is Running" and Run Now is disabled.
+
+## Reminder steps and routing coverage (2026-11-22)
+
+Nothing below has been checked on the running app, in Reminders or against real mail yet.
+
+- Review panel: "· N steps" on queue rows, bulleted steps on cards and settled rows; VoiceOver reads steps; long steps truncate cleanly.
+- Approve a folded suggestion: Reminders notes show the `• step` lines between the From line and the evidence quote (macOS and iOS).
+- Real mail: `.partial.emlx` items with all parts present show as inspected; those with `Attachments/<rowid>` or placeholder parts stay "Content not fully inspected".
+- Real mail: Hide My Email senders (e.g. Glassdoor, EatClub) are matched by sender rules using the original address; a relayed bank/government sender stays local.

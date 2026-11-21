@@ -68,6 +68,8 @@ public struct Suggestion: Codable, Sendable, Equatable, Identifiable {
     public var reminderListID: String?
     /// The user's own notes, written above the email details in the reminder. Nil when empty.
     public var notes: String?
+    /// Supporting actions of the same goal, shown under the title and written into the reminder notes.
+    public var steps: [String]
 
     /// `dueSource` as the UI should read it: nil without a date, and `.email` for older records.
     public var effectiveDueSource: DueSource? { due == nil ? nil : (dueSource ?? .email) }
@@ -76,7 +78,8 @@ public struct Suggestion: Codable, Sendable, Equatable, Identifiable {
                 priority: Priority, evidence: String, confidence: Double, preselected: Bool,
                 flags: [String], status: SuggestionStatus, reminderID: String?, category: Category? = nil,
                 decidedAt: Date? = nil, dueSource: DueSource? = nil, reminderListID: String? = nil,
-                notes: String? = nil) {
+                notes: String? = nil, steps: [String] = []) {
+        self.steps = steps
         self.dueSource = dueSource
         self.reminderListID = reminderListID
         self.notes = notes
@@ -94,6 +97,29 @@ public struct Suggestion: Codable, Sendable, Equatable, Identifiable {
         self.flags = flags
         self.status = status
         self.reminderID = reminderID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        emailID = try c.decode(String.self, forKey: .emailID)
+        title = try c.decode(String.self, forKey: .title)
+        due = try c.decodeIfPresent(Date.self, forKey: .due)
+        dueHasTime = try c.decode(Bool.self, forKey: .dueHasTime)
+        priority = try c.decode(Priority.self, forKey: .priority)
+        evidence = try c.decode(String.self, forKey: .evidence)
+        confidence = try c.decode(Double.self, forKey: .confidence)
+        preselected = try c.decode(Bool.self, forKey: .preselected)
+        flags = try c.decode([String].self, forKey: .flags)
+        status = try c.decode(SuggestionStatus.self, forKey: .status)
+        reminderID = try c.decodeIfPresent(String.self, forKey: .reminderID)
+        category = try c.decodeIfPresent(Category.self, forKey: .category)
+        decidedAt = try c.decodeIfPresent(Date.self, forKey: .decidedAt)
+        dueSource = try c.decodeIfPresent(DueSource.self, forKey: .dueSource)
+        reminderListID = try c.decodeIfPresent(String.self, forKey: .reminderListID)
+        notes = try c.decodeIfPresent(String.self, forKey: .notes)
+        // Records stored before steps existed have no key.
+        steps = try c.decodeIfPresent([String].self, forKey: .steps) ?? []
     }
 }
 

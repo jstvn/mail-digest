@@ -8,8 +8,12 @@ public struct ExtractedTask: Codable, Sendable, Equatable {
     public var priority: Priority
     public var evidence: String
     public var confidence: Double
+    /// Supporting actions or details of the same goal (meeting ID, passcode, form to fill). Empty when none.
+    public var steps: [String]
 
-    public init(title: String, due: String?, dueHasTime: Bool, priority: Priority, evidence: String, confidence: Double) {
+    public init(title: String, due: String?, dueHasTime: Bool, priority: Priority, evidence: String, confidence: Double,
+                steps: [String] = []) {
+        self.steps = steps
         self.title = title
         self.due = due
         self.dueHasTime = dueHasTime
@@ -21,7 +25,7 @@ public struct ExtractedTask: Codable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey {
         case title, due
         case dueHasTime = "due_has_time"
-        case priority, evidence, confidence
+        case priority, evidence, confidence, steps
     }
 
     public init(from decoder: Decoder) throws {
@@ -32,6 +36,8 @@ public struct ExtractedTask: Codable, Sendable, Equatable {
         priority = try c.decode(Priority.self, forKey: .priority)
         evidence = try c.decode(String.self, forKey: .evidence)
         confidence = try c.decode(Double.self, forKey: .confidence)
+        // Older JSON and fixtures have no steps.
+        steps = try c.decodeIfPresent([String].self, forKey: .steps) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -43,6 +49,7 @@ public struct ExtractedTask: Codable, Sendable, Equatable {
         try c.encode(priority, forKey: .priority)
         try c.encode(evidence, forKey: .evidence)
         try c.encode(confidence, forKey: .confidence)
+        try c.encode(steps, forKey: .steps)
     }
 }
 

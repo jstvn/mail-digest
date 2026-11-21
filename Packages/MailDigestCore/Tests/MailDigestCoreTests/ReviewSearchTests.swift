@@ -48,6 +48,16 @@ import Testing
         #expect(text == "Attend Tanda AI Hackathon. High priority. Due in 11 days, Friday 20 November at 5:30 pm. From Philip Fraser. Selected.")
     }
 
+    @Test func spokenLabelIncludesSteps() {
+        var r = Self.record(due: nil, hasTime: false)
+        r.suggestion.steps = ["Note meeting ID", "Save passcode"]
+        let text = SuggestionAccessibility.label(for: r, isSelected: false, now: Self.now, calendar: Self.calendar)
+        #expect(text.hasPrefix("Attend Tanda AI Hackathon. Steps: Note meeting ID, Save passcode. High priority."))
+        #expect(ReviewPresentation.stepCountText(0) == nil)
+        #expect(ReviewPresentation.stepCountText(1) == "1 step")
+        #expect(ReviewPresentation.stepCountText(3) == "3 steps")
+    }
+
     @Test func noDateReviewAndStatuses() {
         let r = Self.record(due: nil, hasTime: false, flags: ["money-new-sender"])
         let text = SuggestionAccessibility.label(for: r, isSelected: false, now: Self.now, calendar: Self.calendar)

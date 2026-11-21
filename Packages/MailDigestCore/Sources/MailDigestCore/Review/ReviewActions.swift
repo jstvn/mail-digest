@@ -351,6 +351,7 @@ public enum ReviewActions {
         } else if let line = defaultNotes(email: email) {
             lines.append(line)
         }
+        lines += suggestion.steps.map { "• \($0)" }
         lines.append("\"\(suggestion.evidence)\"")
         lines.append("#\(category.rawValue)")
         return lines.joined(separator: "\n")
