@@ -472,7 +472,7 @@ Each item says what the spec leaves open and the interim choice the build uses, 
 
 ## Onboarding for other users (2026-11-22)
 
-92. **First-run setup without Terminal** (to do, open)
+92. **First-run setup without Terminal** (decided, to do)
    - Context: the main barrier for a new user is getting Ollama installed, running and stocked with the right models, not how Ollama looks. Llama.app (`ggml-org/Llama-macOS`) and switching to llama.cpp were considered and not pursued for now: it is arm64-only, and `/v1/systemone` triage (Q62), model downloads (Q87) and the health checks rely on the Ollama API.
    - Today: `OnboardingView` step 2 runs `checkOllama()` and shows one status with Check Again. Its copy tells the user to start Ollama and run `ollama pull qwen3:4b` in Terminal. "Start Ollama" (Q74) and "Download Model" (Q87) exist elsewhere but are not part of onboarding.
    - Wanted: onboarding walks the user step by step, with no Terminal command:
@@ -480,4 +480,8 @@ Each item says what the spec leaves open and the interim choice the build uses, 
      2. Installed but not running → "Start Ollama", then re-check.
      3. Running but a model is missing (digest model, and the privacy model if Cloud Digest is used) → download it in place with progress and Cancel, reusing the Q87 `/api/pull` flow.
      4. All ready → continue to Mail access.
-   - To decide before implementing: whether the privacy model is offered during onboarding or only when Cloud Digest is turned on; whether a re-check runs automatically after Start Ollama or the user presses Check Again (Start Ollama currently does not retry by itself); minimum Ollama version check (0.40.4, Q62) and its message; exact copy and HIG layout. Update SPEC "First-run flow" step 2 once decided.
+   - **Decision (approved by Justin, 2026-11-22):**
+     - Onboarding checks only the digest model. The privacy model is downloaded when the user turns on Cloud Digest, not during onboarding.
+     - After "Start Ollama" the step re-checks by itself until Ollama answers or a short timeout passes; Check Again stays available.
+     - Ollama older than 0.40.4 (Q62) counts as not ready: the step says the installed version is too old, asks the user to update Ollama to the latest version and offers the download page.
+     - Exact copy and layout follow the HIG and are settled in review.

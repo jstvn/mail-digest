@@ -858,7 +858,7 @@ The app is a menu bar agent that starts at login and schedules its own morning r
 **First-run flow (`OnboardingView`)**
 
 1. Onboarding sheet explains what the app reads and that nothing leaves the Mac
-2. Check Ollama (`healthCheck`) and show the fix if it fails
+2. Set up Ollama without Terminal (Q92): not installed → open the download page; installed but not running → "Start Ollama", then re-check automatically; older than 0.40.4 → ask the user to update to the latest version; digest model missing → download it in place (Q87 `/api/pull` flow, progress and Cancel). The privacy model is only offered when Cloud Digest is turned on
 3. Trigger the Mail Automation prompt with a harmless call (`CheckMail.js`)
 4. Request Reminders full access
 5. Pick the default Reminders list and run time, then offer "Run now"
