@@ -391,12 +391,14 @@ struct ModelsSettingsTab: View {
         thresholdRow
         providerPicker
         switch store.settings.cloudProvider {
-        case .gemini:
+        case nil:
+            EmptyView()
+        case .gemini?:
             cloudModelPicker
             apiKeyRow
             billingNote
                 .listRowBackground(Color.orange.tintedFill(scheme))
-        case .claudeCode:
+        case .claudeCode?:
             ClaudeCodeRows(model: run.claudeCode, claudeModel: claudeModelBinding)
             claudeDisclosure
                 .listRowBackground(Color.orange.tintedFill(scheme))
@@ -418,8 +420,8 @@ struct ModelsSettingsTab: View {
             Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         } else {
             LabeledContent {
-                if effectiveOffReason == .acknowledgementRequired {
-                    Button("Review Privacy Notice…") { presentAcknowledgement(for: store.settings.cloudProvider) }
+                if effectiveOffReason == .acknowledgementRequired, let provider = store.settings.cloudProvider {
+                    Button("Review Privacy Notice…") { presentAcknowledgement(for: provider) }
                 }
             } label: {
                 Text(text).font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
@@ -432,10 +434,12 @@ struct ModelsSettingsTab: View {
             get: { store.settings.cloudProvider },
             set: { new in
                 store.settings.cloudProvider = new
-                if needsAcknowledgement(new) { presentAcknowledgement(for: new) }
+                if let new, needsAcknowledgement(new) { presentAcknowledgement(for: new) }
             })) {
-            // Claude Code first, Gemini second (display order only; the default stays Gemini).
-            ForEach(CloudProvider.allCases, id: \.self) { Text($0.displayName).tag($0) }
+            Text("Choose…").tag(CloudProvider?.none)
+            Divider()
+            // Claude Code first, Gemini second (display order only).
+            ForEach(CloudProvider.allCases, id: \.self) { Text($0.displayName).tag(CloudProvider?.some($0)) }
         }
     }
 
@@ -634,7 +638,8 @@ struct ModelsSettingsTab: View {
                 store.settings.cloudDigestEnabled = on
                 pendingEnable = false
                 guard on else { return }
-                let provider = store.settings.cloudProvider
+                // With no provider chosen there is nothing to acknowledge yet; picking one shows its notice.
+                guard let provider = store.settings.cloudProvider else { return }
                 if needsAcknowledgement(provider) { pendingEnable = true; presentAcknowledgement(for: provider) }
             })
     }

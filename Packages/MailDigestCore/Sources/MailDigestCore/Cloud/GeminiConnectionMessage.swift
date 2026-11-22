@@ -37,12 +37,14 @@ public struct GeminiConnectionMessage: Sendable, Equatable {
     /// the selected provider, independent of any test.
     public static func cloudStatusText(settings: DigestSettings, hasGeminiKey: Bool,
                                        claudeCode: ClaudeCodeStatus) -> String {
-        let provider = settings.cloudProvider
+        let provider = settings.cloudProvider ?? .gemini
         switch CloudPrivacyPolicy.offReason(settings: settings, hasGeminiKey: hasGeminiKey, claudeCode: claudeCode) {
         case .cloudDisabled?:
             return "Cloud processing is currently disabled. Emails continue to be processed locally."
         case .acknowledgementRequired?:
             return "Cloud processing is inactive until you accept the privacy notice. Emails are processed locally."
+        case .noProvider?:
+            return "Choose a cloud provider. Until then every email stays on this Mac."
         case .providerUnavailable?:
             return "Cloud processing is inactive until Claude Code is installed, up to date and signed in. Emails are processed locally."
         case .noCredential?:

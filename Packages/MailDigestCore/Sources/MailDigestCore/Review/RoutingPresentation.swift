@@ -203,7 +203,7 @@ public enum RoutingPresentation {
     /// Why an email ran on this Mac, bucketed from persisted provenance only.
     public enum LocalBucket: String, Sendable, Equatable, CaseIterable {
         case contentNotInspected, privateRule, systemOneSensitive, systemOneLowConfidence
-        case cloudDisabled, noCredential, providerUnavailable, acknowledgementRequired, cloudFailed, triageUnavailable
+        case cloudDisabled, noCredential, providerUnavailable, noProvider, acknowledgementRequired, cloudFailed, triageUnavailable
         case notRecorded
 
         public var label: String {
@@ -215,6 +215,7 @@ public enum RoutingPresentation {
             case .cloudDisabled: return "cloud off"
             case .noCredential: return "no API key"
             case .providerUnavailable: return "provider unavailable"
+            case .noProvider: return "no cloud provider chosen"
             case .acknowledgementRequired: return "notice not accepted"
             case .cloudFailed: return "cloud failed"
             case .triageUnavailable: return "privacy check unavailable"
@@ -251,6 +252,7 @@ public enum RoutingPresentation {
         case .acknowledgementRequired: return .acknowledgementRequired
         case .noCredential: return .noCredential
         case .providerUnavailable: return .providerUnavailable
+        case .noProvider: return .noProvider
         case .contentNotInspected: return .contentNotInspected
         case .privateContent: return a.method == .systemOne ? .systemOneSensitive : .privateRule
         case .triageUnavailable: return .triageUnavailable
@@ -282,6 +284,7 @@ public enum RoutingPresentation {
         case .acknowledgementRequired: return "The Cloud Digest privacy notice has not been accepted, so it stayed on this Mac."
         case .noCredential: return "No Gemini API key is saved, so it stayed on this Mac."
         case .providerUnavailable: return "The cloud provider was unavailable, so it stayed on this Mac."
+        case .noProvider: return "No cloud provider is chosen, so it stayed on this Mac."
         case .contentNotInspected:
             return "Content not fully inspected, so it stayed on this Mac."
         case .privateContent: return "It looks private, so it stayed on this Mac."

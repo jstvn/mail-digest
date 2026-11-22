@@ -52,6 +52,7 @@ import Testing
         full.autoFileProcessed = true
         full.autoFileEnabledAt = Date(timeIntervalSince1970: 1_800_000_000)
         full.cloudPrivacyAcknowledgedRevision = 1
+        // A nil provider is still written (as null) so it cannot be mistaken for a pre-Q93 blob.
         let keys = try JSONSerialization.jsonObject(with: JSONEncoder().encode(full)) as? [String: Any]
         #expect(Set(keys?.keys ?? [:].keys) == [
             "maxEmailsPerRun", "autoFileEnabledAt", "runHour", "runMinute", "lookbackHours", "ollamaURL", "ollamaModel", "remindersListName", "retention",

@@ -176,10 +176,44 @@ private func failure(_ out: ProcessOutput) async -> ClaudeCodeError? {
                        cloudProvider: provider, claudeCodePrivacyAcknowledgedRevision: claude)
     }
 
-    @Test func oldJSONDecodesToDefaults() throws {
-        let s = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"cloudDigestEnabled":true,"cloudPrivacyAcknowledgedRevision":1}"#.utf8))
+    private func decode(_ json: String) throws -> DigestSettings {
+        try JSONDecoder().decode(DigestSettings.self, from: Data(json.utf8))
+    }
+
+    @Test func oldJSONFromAcknowledgedGeminiUserKeepsGemini() throws {
+        let s = try decode(#"{"cloudDigestEnabled":true,"cloudPrivacyAcknowledgedRevision":1}"#)
         #expect(s.cloudProvider == .gemini && s.claudeCodeModel == "haiku")
         #expect(s.claudeCodePrivacyAcknowledgedRevision == nil && s.cloudPrivacyAcknowledgedRevision == 1)
+    }
+
+    @Test func freshAndUnacknowledgedSettingsHaveNoProvider() throws {
+        #expect(DigestSettings().cloudProvider == nil)
+        #expect(try decode("{}").cloudProvider == nil)
+        #expect(try decode(#"{"cloudDigestEnabled":true}"#).cloudProvider == nil)
+    }
+
+    @Test func storedProviderIsKeptAndUnknownOrNullIsNil() throws {
+        #expect(try decode(#"{"cloudProvider":"claudeCode"}"#).cloudProvider == .claudeCode)
+        #expect(try decode(#"{"cloudProvider":"gemini"}"#).cloudProvider == .gemini)
+        // A present key wins over the legacy migration, even for an acknowledged user.
+        #expect(try decode(#"{"cloudProvider":"other","cloudPrivacyAcknowledgedRevision":1}"#).cloudProvider == nil)
+        #expect(try decode(#"{"cloudProvider":null,"cloudPrivacyAcknowledgedRevision":1}"#).cloudProvider == nil)
+    }
+
+    @Test func savedNilProviderStaysNilEvenWhenAcknowledged() throws {
+        let s = DigestSettings(cloudPrivacyAcknowledgedRevision: 1, cloudProvider: nil)
+        let back = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s))
+        #expect(back.cloudProvider == nil)
+    }
+
+    @Test func noProviderKeepsEverythingLocal() {
+        let s = DigestSettings(cloudDigestEnabled: true, cloudPrivacyAcknowledgedRevision: 1, cloudProvider: nil)
+        #expect(CloudPrivacyPolicy.offReason(settings: s, hasGeminiKey: true, claudeCode: .ready) == .noProvider)
+        var off = s
+        off.cloudDigestEnabled = false
+        #expect(CloudPrivacyPolicy.offReason(settings: off, hasGeminiKey: true, claudeCode: .ready) == .cloudDisabled)
+        #expect(RoutingPresentation.localReasonText(.noProvider) == "No cloud provider is chosen, so it stayed on this Mac.")
+        #expect(RoutingPresentation.LocalBucket.noProvider.label == "no cloud provider chosen")
     }
 
     @Test func roundTrip() throws {

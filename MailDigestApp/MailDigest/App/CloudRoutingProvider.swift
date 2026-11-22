@@ -39,20 +39,24 @@ actor CloudRoutingProvider {
 
     func config() async -> CloudRoutingConfig {
         let settings = await snapshot()
+        // No provider chosen: stay local without touching the Keychain or probing Claude Code.
+        guard let provider = settings.cloudProvider else {
+            return .localOnly(reason: settings.cloudDigestEnabled ? .noProvider : .cloudDisabled)
+        }
         // Only Gemini needs the key; reading it for Claude Code would just risk a Keychain prompt.
-        if settings.cloudProvider == .gemini, !keyLoaded {
+        if provider == .gemini, !keyLoaded {
             // A Keychain failure counts as no credential: fail closed, keep everything local.
             apiKey = (try? credentials.read()) ?? nil
             keyLoaded = true
         }
-        let key = settings.cloudProvider == .gemini ? apiKey : nil
+        let key = provider == .gemini ? apiKey : nil
         // Master switch and acknowledgement first, so Claude Code is never probed while cloud is off.
         if let reason = CloudPrivacyPolicy.offReason(settings: settings, hasGeminiKey: key != nil, claudeCode: .ready) {
             return .localOnly(reason: reason)
         }
         let extractor: any EmailExtractor
         let model: String
-        switch settings.cloudProvider {
+        switch provider {
         case .gemini:
             guard let key else { return .localOnly(reason: .noCredential) }
             model = settings.resolvedGeminiModel
@@ -81,7 +85,7 @@ actor CloudRoutingProvider {
         return CloudRoutingConfig(cloudExtractor: extractor, cloudModel: model, offReason: nil, triage: triage,
                                   triageModel: settings.resolvedTriageModel,
                                   privacyThreshold: settings.resolvedPrivacyThreshold,
-                                  cloudProvider: settings.cloudProvider)
+                                  cloudProvider: provider)
     }
 
     /// One detection per job, shared by every email in it.

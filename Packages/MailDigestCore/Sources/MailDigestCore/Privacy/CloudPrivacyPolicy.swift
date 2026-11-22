@@ -45,7 +45,8 @@ public enum CloudPrivacyPolicy {
     public static func offReason(settings: DigestSettings, hasGeminiKey: Bool,
                                  claudeCode: ClaudeCodeStatus) -> LocalReason? {
         if !settings.cloudDigestEnabled { return .cloudDisabled }
-        return providerReason(provider: settings.cloudProvider, settings: settings,
+        guard let provider = settings.cloudProvider else { return .noProvider }
+        return providerReason(provider: provider, settings: settings,
                               hasGeminiKey: hasGeminiKey, claudeCode: claudeCode)
     }
 

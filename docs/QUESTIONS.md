@@ -497,3 +497,13 @@ Each item says what the spec leaves open and the interim choice the build uses, 
      - Each provider has its own privacy acknowledgement and revision. The Gemini acknowledgement (Q63) and its stored revision stay as they are.
      - Turning Cloud Digest on offers the privacy model download (Q92).
    - **Implementation choices, open to change:** see SPEC "Cloud providers (Q93)".
+
+## Mail Cleanup destinations (2026-11-22)
+
+94. **Where auto-filed mail goes: Mail Digest mailbox or Trash** (decided)
+   - Context: "File Handled Emails" (auto-file, Q42/Q50) moves every fully handled email to the account's Mail Digest mailbox, and the spec said automatic actions never use Trash. Mail Cleanup's manual Move to Trash (Q40) already moves to the account's Trash with `Mail.move`, never `Mail.delete`.
+   - **Decision (approved by Justin, 2026-11-22):** the auto-file setting gets two destination pickers with plain explanations:
+     - **Emails with reminders added or info only** (at least one suggestion added, or no suggestions): Mail Digest mailbox (default) or Trash.
+     - **Emails where every suggestion was dismissed** (no reminder added): Trash (default) or Mail Digest mailbox.
+     - This supersedes "Nothing goes to Trash" for auto-file only. Trash stays a `Mail.move` to the account's Trash mailbox (Q40): reversible with Undo until the app quits, and Mail keeps it until it empties Trash on its own schedule. No Trash target (for example On My Mac) fails safely and is reported, never falls back to another destination.
+   - **Implementation choices, open to change:** the existing "File Handled Emails" toggle stays as the on/off switch (off by default, unchanged); the two pickers appear under it while it is on. Existing users who already turned it on get the Trash default for fully dismissed mail. Blocked/ignored skip-tier mail (Q42) follows the "reminders added or info only" picker, since nothing was dismissed.

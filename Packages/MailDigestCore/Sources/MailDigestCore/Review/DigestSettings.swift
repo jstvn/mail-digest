@@ -43,8 +43,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public var privacyThreshold: Double
     /// The `CloudPrivacyPolicy` revision the user accepted; nil until they accept.
     public var cloudPrivacyAcknowledgedRevision: Int?
-    /// Which cloud provider Cloud Digest uses (Q93).
-    public var cloudProvider: CloudProvider
+    /// Which cloud provider Cloud Digest uses (Q93). Nil until the user chooses one; while nil nothing leaves this Mac.
+    public var cloudProvider: CloudProvider?
     /// Claude Code model alias passed to `--model` (`haiku` or `sonnet`).
     public var claudeCodeModel: String
     /// The Claude Code notice revision the user accepted; nil until they accept (Q93).
@@ -89,7 +89,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 triageModel: String = DigestSettings.defaultTriageModel,
                 privacyThreshold: Double = DigestSettings.defaultPrivacyThreshold,
                 cloudPrivacyAcknowledgedRevision: Int? = nil,
-                cloudProvider: CloudProvider = .gemini,
+                cloudProvider: CloudProvider? = nil,
                 claudeCodeModel: String = DigestSettings.defaultClaudeCodeModel,
                 claudeCodePrivacyAcknowledgedRevision: Int? = nil,
                 triageModelDefaultRevision: Int? = DigestSettings.currentTriageModelDefaultRevision,
@@ -160,6 +160,12 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         if (storedThresholdRevision ?? 0) < Self.currentPrivacyThresholdDefaultRevision, abs(threshold - 0.90) < 1e-9 {
             threshold = Self.defaultPrivacyThreshold
         }
+        // A present key is authoritative: null or an unknown value means no provider. Only a missing key (settings
+        // saved before Q93) migrates, and only for a user who already accepted the Gemini notice.
+        let acknowledged = try c.decodeIfPresent(Int.self, forKey: .cloudPrivacyAcknowledgedRevision)
+        let provider: CloudProvider? = c.contains(.cloudProvider)
+            ? (try? c.decode(CloudProvider?.self, forKey: .cloudProvider)) ?? nil
+            : (acknowledged != nil ? .gemini : nil)
         self.init(runHour: try c.decodeIfPresent(Int.self, forKey: .runHour) ?? d.runHour,
                   runMinute: try c.decodeIfPresent(Int.self, forKey: .runMinute) ?? d.runMinute,
                   lookbackHours: try c.decodeIfPresent(Int.self, forKey: .lookbackHours) ?? d.lookbackHours,
@@ -190,12 +196,48 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   privacyThreshold: threshold,
                   cloudPrivacyAcknowledgedRevision: try c.decodeIfPresent(Int.self,
                                                                           forKey: .cloudPrivacyAcknowledgedRevision),
-                  // An unknown stored provider falls back to Gemini rather than failing the whole decode.
-                  cloudProvider: (try? c.decodeIfPresent(CloudProvider.self, forKey: .cloudProvider)) ?? d.cloudProvider,
+                  cloudProvider: provider,
                   claudeCodeModel: try c.decodeIfPresent(String.self, forKey: .claudeCodeModel) ?? d.claudeCodeModel,
                   claudeCodePrivacyAcknowledgedRevision: try c.decodeIfPresent(
                       Int.self, forKey: .claudeCodePrivacyAcknowledgedRevision),
                   showSenderLogos: try c.decodeIfPresent(Bool.self, forKey: .showSenderLogos) ?? d.showSenderLogos)
+    }
+
+    /// Writes every key, including a nil `cloudProvider` as null: a missing key would be read back as a
+    /// pre-Q93 blob and migrated to Gemini.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(runHour, forKey: .runHour)
+        try c.encode(runMinute, forKey: .runMinute)
+        try c.encode(lookbackHours, forKey: .lookbackHours)
+        try c.encodeIfPresent(maxEmailsPerRun, forKey: .maxEmailsPerRun)
+        try c.encode(ollamaURL, forKey: .ollamaURL)
+        try c.encode(ollamaModel, forKey: .ollamaModel)
+        try c.encode(remindersListName, forKey: .remindersListName)
+        try c.encode(retention, forKey: .retention)
+        try c.encode(vipSenders, forKey: .vipSenders)
+        try c.encode(blockedSenders, forKey: .blockedSenders)
+        try c.encode(ignoredSenders, forKey: .ignoredSenders)
+        try c.encode(trustedNewsletterSenders, forKey: .trustedNewsletterSenders)
+        try c.encode(declinedIgnoreSuggestions, forKey: .declinedIgnoreSuggestions)
+        try c.encode(dailyMailboxes, forKey: .dailyMailboxes)
+        try c.encode(autoFileProcessed, forKey: .autoFileProcessed)
+        try c.encodeIfPresent(autoFileEnabledAt, forKey: .autoFileEnabledAt)
+        try c.encode(pauseBacklogOnBattery, forKey: .pauseBacklogOnBattery)
+        try c.encode(quietHoursEnabled, forKey: .quietHoursEnabled)
+        try c.encode(quietHoursStartMinute, forKey: .quietHoursStartMinute)
+        try c.encode(quietHoursEndMinute, forKey: .quietHoursEndMinute)
+        try c.encode(cloudDigestEnabled, forKey: .cloudDigestEnabled)
+        try c.encode(geminiModel, forKey: .geminiModel)
+        try c.encode(triageModel, forKey: .triageModel)
+        try c.encode(privacyThreshold, forKey: .privacyThreshold)
+        try c.encodeIfPresent(cloudPrivacyAcknowledgedRevision, forKey: .cloudPrivacyAcknowledgedRevision)
+        try c.encodeIfPresent(triageModelDefaultRevision, forKey: .triageModelDefaultRevision)
+        try c.encode(showSenderLogos, forKey: .showSenderLogos)
+        try c.encodeIfPresent(privacyThresholdDefaultRevision, forKey: .privacyThresholdDefaultRevision)
+        try c.encode(cloudProvider, forKey: .cloudProvider)
+        try c.encode(claudeCodeModel, forKey: .claudeCodeModel)
+        try c.encodeIfPresent(claudeCodePrivacyAcknowledgedRevision, forKey: .claudeCodePrivacyAcknowledgedRevision)
     }
 
     /// The Gemini model, or the default when blank.

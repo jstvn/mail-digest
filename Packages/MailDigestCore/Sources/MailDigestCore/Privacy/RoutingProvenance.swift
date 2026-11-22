@@ -95,6 +95,8 @@ public enum LocalReason: String, Codable, Sendable, Equatable {
     case cloudDisabled, acknowledgementRequired, noCredential, contentNotInspected
     /// The selected provider's tool is missing, signed out or too old (Q93).
     case providerUnavailable
+    /// Cloud Digest is on but no cloud provider has been chosen (Q93).
+    case noProvider
     case privateContent, notEligible, triageUnavailable, cloudFailed
 }
 

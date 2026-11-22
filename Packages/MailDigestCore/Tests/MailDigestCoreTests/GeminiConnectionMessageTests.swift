@@ -33,6 +33,8 @@ import Testing
         var s = DigestSettings()
         #expect(text(s).hasPrefix("Cloud processing is currently disabled"))
         s.cloudDigestEnabled = true
+        #expect(text(s) == "Choose a cloud provider. Until then every email stays on this Mac.")
+        s.cloudProvider = .gemini
         #expect(text(s).contains("privacy notice"))
         s.cloudPrivacyAcknowledgedRevision = CloudPrivacyPolicy.currentRevision
         #expect(text(s, key: false).contains("until an API key is saved"))
