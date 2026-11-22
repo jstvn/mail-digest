@@ -469,3 +469,15 @@ Each item says what the spec leaves open and the interim choice the build uses, 
 91. **Default privacy threshold 0.85** (decided)
    - **Evidence (local replay, 2026-11-22):** 136 real emails from the last 14 days, Kev 4B, after the Q89 fixes, every System One call on the local Ollama. Cloud-eligible: 6 at 0.90, 26 at 0.85. All 20 that switch are public newsletters and promotions (tech news, developer events, job alerts, product updates, offers); none is personal correspondence, a bill or an account notice. Still local at 0.85 after System One: 34 below the privacy threshold only, 12 below the public floor only, 38 below both. Median System One latency 28.4 s per call (p95 60.2 s), 222 calls.
    - **Decision (approved by Justin, 2026-11-22):** the default `privacyThreshold` is 0.85. A stored 0.90 written before threshold default revision 2 becomes 0.85 once; any other stored value is kept. The public floor (0.85, fixed) and the 0.80–0.99 range are unchanged. Scores remain uncalibrated model confidences; this rests on one user's real mail, so recheck with the replay tool if routing changes.
+
+## Onboarding for other users (2026-11-22)
+
+92. **First-run setup without Terminal** (to do, open)
+   - Context: the main barrier for a new user is getting Ollama installed, running and stocked with the right models, not how Ollama looks. Llama.app (`ggml-org/Llama-macOS`) and switching to llama.cpp were considered and not pursued for now: it is arm64-only, and `/v1/systemone` triage (Q62), model downloads (Q87) and the health checks rely on the Ollama API.
+   - Today: `OnboardingView` step 2 runs `checkOllama()` and shows one status with Check Again. Its copy tells the user to start Ollama and run `ollama pull qwen3:4b` in Terminal. "Start Ollama" (Q74) and "Download Model" (Q87) exist elsewhere but are not part of onboarding.
+   - Wanted: onboarding walks the user step by step, with no Terminal command:
+     1. Ollama not installed → explain and open the download page.
+     2. Installed but not running → "Start Ollama", then re-check.
+     3. Running but a model is missing (digest model, and the privacy model if Cloud Digest is used) → download it in place with progress and Cancel, reusing the Q87 `/api/pull` flow.
+     4. All ready → continue to Mail access.
+   - To decide before implementing: whether the privacy model is offered during onboarding or only when Cloud Digest is turned on; whether a re-check runs automatically after Start Ollama or the user presses Check Again (Start Ollama currently does not retry by itself); minimum Ollama version check (0.40.4, Q62) and its message; exact copy and HIG layout. Update SPEC "First-run flow" step 2 once decided.
