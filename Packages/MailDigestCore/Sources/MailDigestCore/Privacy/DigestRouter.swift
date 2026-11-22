@@ -3,9 +3,13 @@ import Foundation
 /// Everything the router needs to know about cloud routing for one email. Built by the app
 /// (which owns credentials and caches clients per job); Core never reads credentials.
 public struct CloudRoutingConfig: Sendable {
-    /// The Gemini extractor. `nil` means effective cloud off (toggle off, no acknowledgement or no key).
+    /// The selected provider's extractor. `nil` means effective cloud off (toggle off, no acknowledgement,
+    /// or the provider is not ready).
     public var cloudExtractor: (any EmailExtractor)?
+    /// Fallback model label when the extractor does not report which model answered.
     public var cloudModel: String
+    /// Which provider `cloudExtractor` talks to; recorded so fallback labels name it.
+    public var cloudProvider: CloudProvider
     /// Why cloud is off; used as the local reason. Ignored when `cloudExtractor` is set.
     public var offReason: LocalReason?
     /// System One client; `nil` while cloud is on means triage is unavailable.
@@ -14,7 +18,9 @@ public struct CloudRoutingConfig: Sendable {
     public var privacyThreshold: Double
 
     public init(cloudExtractor: (any EmailExtractor)?, cloudModel: String, offReason: LocalReason?,
-                triage: (any SystemOneClient)?, triageModel: String, privacyThreshold: Double) {
+                triage: (any SystemOneClient)?, triageModel: String, privacyThreshold: Double,
+                cloudProvider: CloudProvider = .gemini) {
+        self.cloudProvider = cloudProvider
         self.cloudExtractor = cloudExtractor
         self.cloudModel = cloudModel
         self.offReason = offReason
@@ -158,15 +164,22 @@ public struct DigestRouter: Sendable {
                     reason = .cloudFailed // only used if the call below fails
                     cloudAttempted = true
                     do {
-                        let result = try await cloud.extract(email, tier: tier, trustedNewsletter: trustedNewsletter,
+                        let result: ExtractionResult
+                        var reported: String?
+                        if let c = cloud as? any ReportedModelExtractor {
+                            (result, reported) = try await c.extractReportingModel(
+                                email, tier: tier, trustedNewsletter: trustedNewsletter, today: today, timeZone: timeZone)
+                        } else {
+                            result = try await cloud.extract(email, tier: tier, trustedNewsletter: trustedNewsletter,
                                                              today: today, timeZone: timeZone)
-                        return (result, ExecutionRecord(provider: .cloud, model: config.cloudModel,
-                                                        cloudAttempted: true, startedAt: started,
-                                                        finishedAt: clock.now()))
+                        }
+                        return (result, ExecutionRecord(provider: .cloud, model: reported ?? config.cloudModel,
+                                                        cloudAttempted: true, cloudProvider: config.cloudProvider,
+                                                        startedAt: started, finishedAt: clock.now()))
                     } catch is CancellationError {
                         throw CancellationError()
                     } catch {
-                        cloudFailure = (error as? GeminiError)?.code ?? "unknown"
+                        cloudFailure = (error as? GeminiError)?.code ?? (error as? ClaudeCodeError)?.code ?? "unknown"
                     }
                 case .private: reason = .privateContent
                 case .uncertain: reason = assessment.triageFailure != nil ? .triageUnavailable : .notEligible
@@ -179,7 +192,8 @@ public struct DigestRouter: Sendable {
 
         func record() -> ExecutionRecord {
             ExecutionRecord(provider: .local, model: localModel, cloudAttempted: cloudAttempted,
-                            localReason: reason, cloudFailure: cloudFailure, startedAt: started,
+                            localReason: reason, cloudFailure: cloudFailure,
+                            cloudProvider: cloudAttempted ? config.cloudProvider : nil, startedAt: started,
                             finishedAt: clock.now())
         }
         do {

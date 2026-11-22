@@ -93,6 +93,8 @@ public enum ExecutionProvider: String, Codable, Sendable, Equatable {
 /// Why an email was processed locally rather than by Gemini.
 public enum LocalReason: String, Codable, Sendable, Equatable {
     case cloudDisabled, acknowledgementRequired, noCredential, contentNotInspected
+    /// The selected provider's tool is missing, signed out or too old (Q93).
+    case providerUnavailable
     case privateContent, notEligible, triageUnavailable, cloudFailed
 }
 
@@ -104,11 +106,15 @@ public struct ExecutionRecord: Codable, Sendable, Equatable {
     public var localReason: LocalReason?
     /// Error class code only (for example `rateLimited`), never message text.
     public var cloudFailure: String?
+    /// The provider that was tried; nil on rows written before Q93, which were always Gemini.
+    public var cloudProvider: CloudProvider?
     public var startedAt: Date
     public var finishedAt: Date
 
     public init(provider: ExecutionProvider, model: String, cloudAttempted: Bool, localReason: LocalReason? = nil,
-                cloudFailure: String? = nil, startedAt: Date, finishedAt: Date) {
+                cloudFailure: String? = nil, cloudProvider: CloudProvider? = nil,
+                startedAt: Date, finishedAt: Date) {
+        self.cloudProvider = cloudProvider
         self.provider = provider
         self.model = model
         self.cloudAttempted = cloudAttempted

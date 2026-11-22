@@ -40,6 +40,8 @@ public struct GeminiConnectionMessage: Sendable, Equatable {
             return "Cloud processing is currently disabled. Emails continue to be processed locally."
         case .acknowledgementRequired?:
             return "Cloud processing is inactive until you accept the privacy notice. Emails are processed locally."
+        case .providerUnavailable?:
+            return "Cloud processing is inactive until the cloud provider is available. Emails are processed locally."
         case .noCredential?:
             return "Cloud processing is inactive until an API key is saved. Emails are processed locally."
         default:

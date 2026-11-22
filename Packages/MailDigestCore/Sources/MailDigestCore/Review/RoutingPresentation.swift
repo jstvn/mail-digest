@@ -62,7 +62,7 @@ public enum RoutingPresentation {
         switch e.provider {
         case .cloud: return RoutingBadge(text: "Cloud · \(model)", tone: .cloud)
         case .local where e.cloudAttempted:
-            return RoutingBadge(text: "Gemini failed → Local \(model)", tone: .fallback)
+            return RoutingBadge(text: "\((e.cloudProvider ?? .gemini).displayName) failed → Local \(model)", tone: .fallback)
         case .local: return RoutingBadge(text: "Local · \(model)", tone: .local)
         }
     }
@@ -80,6 +80,15 @@ public enum RoutingPresentation {
                parts.dropFirst(2).allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isLetter) }) {
                 let rest = parts.dropFirst(2).map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: "-")
                 return rest.isEmpty ? "Gemini \(parts[1])" : "Gemini \(parts[1]) \(rest)"
+            }
+        }
+        if lower.hasPrefix("claude-") {
+            // "claude-haiku-5-5" becomes "Claude Haiku 5.5"; a trailing date stamp or odd shape stays raw.
+            let parts = lower.split(separator: "-").map(String.init)
+            if parts.count >= 3, parts[1].allSatisfy(\.isLetter),
+               parts.dropFirst(2).allSatisfy({ !$0.isEmpty && $0.count <= 2 && $0.allSatisfy(\.isNumber) }) {
+                let family = parts[1].prefix(1).uppercased() + parts[1].dropFirst()
+                return "Claude \(family) \(parts.dropFirst(2).joined(separator: "."))"
             }
         }
         return id
@@ -118,7 +127,8 @@ public enum RoutingPresentation {
         if let e = routing.execution {
             lines.append(RoutingDetailLine(label: "Processed by", value: executionBadge(e).text))
             if let r = e.localReason { lines.append(RoutingDetailLine(label: "Why local", value: localReasonText(r))) }
-            if let c = e.cloudFailure { lines.append(RoutingDetailLine(label: "Gemini error", value: cloudFailureText(c))) }
+            if let c = e.cloudFailure { lines.append(RoutingDetailLine(label: "\((e.cloudProvider ?? .gemini).displayName) error",
+                                                           value: cloudFailureText(c, provider: e.cloudProvider ?? .gemini))) }
         }
         return lines
     }
@@ -193,7 +203,8 @@ public enum RoutingPresentation {
     /// Why an email ran on this Mac, bucketed from persisted provenance only.
     public enum LocalBucket: String, Sendable, Equatable, CaseIterable {
         case contentNotInspected, privateRule, systemOneSensitive, systemOneLowConfidence
-        case cloudDisabled, noCredential, acknowledgementRequired, cloudFailed, triageUnavailable, notRecorded
+        case cloudDisabled, noCredential, providerUnavailable, acknowledgementRequired, cloudFailed, triageUnavailable
+        case notRecorded
 
         public var label: String {
             switch self {
@@ -203,6 +214,7 @@ public enum RoutingPresentation {
             case .systemOneLowConfidence: return "low confidence"
             case .cloudDisabled: return "cloud off"
             case .noCredential: return "no API key"
+            case .providerUnavailable: return "provider unavailable"
             case .acknowledgementRequired: return "notice not accepted"
             case .cloudFailed: return "Gemini failed"
             case .triageUnavailable: return "privacy check unavailable"
@@ -238,6 +250,7 @@ public enum RoutingPresentation {
         case .cloudDisabled: return .cloudDisabled
         case .acknowledgementRequired: return .acknowledgementRequired
         case .noCredential: return .noCredential
+        case .providerUnavailable: return .providerUnavailable
         case .contentNotInspected: return .contentNotInspected
         case .privateContent: return a.method == .systemOne ? .systemOneSensitive : .privateRule
         case .triageUnavailable: return .triageUnavailable
@@ -267,6 +280,7 @@ public enum RoutingPresentation {
         case .cloudDisabled: return "Cloud Digest is off, so it stayed on this Mac."
         case .acknowledgementRequired: return "The Cloud Digest privacy notice has not been accepted, so it stayed on this Mac."
         case .noCredential: return "No Gemini API key is saved, so it stayed on this Mac."
+        case .providerUnavailable: return "The cloud provider was unavailable, so it stayed on this Mac."
         case .contentNotInspected:
             return "Content not fully inspected, so it stayed on this Mac."
         case .privateContent: return "It looks private, so it stayed on this Mac."
@@ -287,6 +301,18 @@ public enum RoutingPresentation {
         case .malformedResponse: return "The triage response could not be read."
         case .unsupportedModel: return "The triage model is not supported."
         case .contentTooLong: return "Too long to assess completely"
+        }
+    }
+
+    public static func cloudFailureText(_ code: String, provider: CloudProvider) -> String {
+        guard provider == .claudeCode else { return cloudFailureText(code) }
+        switch code {
+        case "notSignedIn": return "Claude Code is not signed in."
+        case "timedOut": return "Claude Code timed out."
+        case "malformedResponse": return "Claude Code returned an unreadable response."
+        case "launchFailed": return "Claude Code could not be started."
+        case "processFailed": return "Claude Code reported an error."
+        default: return "Claude Code failed."
         }
     }
 

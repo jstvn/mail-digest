@@ -57,7 +57,7 @@ import Testing
             "maxEmailsPerRun", "autoFileEnabledAt", "runHour", "runMinute", "lookbackHours", "ollamaURL", "ollamaModel", "remindersListName", "retention",
             "vipSenders", "blockedSenders", "ignoredSenders", "trustedNewsletterSenders", "declinedIgnoreSuggestions",
             "dailyMailboxes", "autoFileProcessed", "pauseBacklogOnBattery", "quietHoursEnabled",
-            "quietHoursStartMinute", "quietHoursEndMinute", "cloudDigestEnabled", "geminiModel", "triageModel",
+            "quietHoursStartMinute", "quietHoursEndMinute", "cloudDigestEnabled", "geminiModel", "triageModel", "cloudProvider", "claudeCodeModel",
             "privacyThreshold", "cloudPrivacyAcknowledgedRevision", "triageModelDefaultRevision", "showSenderLogos",
             "privacyThresholdDefaultRevision",
         ])

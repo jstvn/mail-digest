@@ -43,6 +43,12 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public var privacyThreshold: Double
     /// The `CloudPrivacyPolicy` revision the user accepted; nil until they accept.
     public var cloudPrivacyAcknowledgedRevision: Int?
+    /// Which cloud provider Cloud Digest uses (Q93).
+    public var cloudProvider: CloudProvider
+    /// Claude Code model alias passed to `--model` (`haiku` or `sonnet`).
+    public var claudeCodeModel: String
+    /// The Claude Code notice revision the user accepted; nil until they accept (Q93).
+    public var claudeCodePrivacyAcknowledgedRevision: Int?
     /// Fetch sender logos from the sender's own website (BIMI DNS, then apple-touch-icon). Off by default:
     /// the sender can see the user's IP address. Logos from a mail's BIMI header never need this.
     public var showSenderLogos: Bool
@@ -66,6 +72,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     /// Revision 2 lowered the default threshold from 0.90 to 0.85 (Q91).
     public static let defaultPrivacyThreshold = 0.85
     public static let defaultOllamaURL = "http://localhost:11434"
+    public static let defaultClaudeCodeModel = "haiku"
     public static let defaultModel = "qwen3:4b"
     public static let defaultListName = "Mail Digest"
 
@@ -82,6 +89,9 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 triageModel: String = DigestSettings.defaultTriageModel,
                 privacyThreshold: Double = DigestSettings.defaultPrivacyThreshold,
                 cloudPrivacyAcknowledgedRevision: Int? = nil,
+                cloudProvider: CloudProvider = .gemini,
+                claudeCodeModel: String = DigestSettings.defaultClaudeCodeModel,
+                claudeCodePrivacyAcknowledgedRevision: Int? = nil,
                 triageModelDefaultRevision: Int? = DigestSettings.currentTriageModelDefaultRevision,
                 showSenderLogos: Bool = false,
                 privacyThresholdDefaultRevision: Int? = DigestSettings.currentPrivacyThresholdDefaultRevision) {
@@ -93,6 +103,9 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         self.triageModel = triageModel
         self.privacyThreshold = privacyThreshold
         self.cloudPrivacyAcknowledgedRevision = cloudPrivacyAcknowledgedRevision
+        self.cloudProvider = cloudProvider
+        self.claudeCodeModel = claudeCodeModel
+        self.claudeCodePrivacyAcknowledgedRevision = claudeCodePrivacyAcknowledgedRevision
         self.pauseBacklogOnBattery = pauseBacklogOnBattery
         self.quietHoursEnabled = quietHoursEnabled
         self.quietHoursStartMinute = quietHoursStartMinute
@@ -122,6 +135,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         case pauseBacklogOnBattery, quietHoursEnabled, quietHoursStartMinute, quietHoursEndMinute
         case cloudDigestEnabled, geminiModel, triageModel, privacyThreshold, cloudPrivacyAcknowledgedRevision
         case triageModelDefaultRevision, showSenderLogos, privacyThresholdDefaultRevision
+        case cloudProvider, claudeCodeModel, claudeCodePrivacyAcknowledgedRevision
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
@@ -176,6 +190,11 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   privacyThreshold: threshold,
                   cloudPrivacyAcknowledgedRevision: try c.decodeIfPresent(Int.self,
                                                                           forKey: .cloudPrivacyAcknowledgedRevision),
+                  // An unknown stored provider falls back to Gemini rather than failing the whole decode.
+                  cloudProvider: (try? c.decodeIfPresent(CloudProvider.self, forKey: .cloudProvider)) ?? d.cloudProvider,
+                  claudeCodeModel: try c.decodeIfPresent(String.self, forKey: .claudeCodeModel) ?? d.claudeCodeModel,
+                  claudeCodePrivacyAcknowledgedRevision: try c.decodeIfPresent(
+                      Int.self, forKey: .claudeCodePrivacyAcknowledgedRevision),
                   showSenderLogos: try c.decodeIfPresent(Bool.self, forKey: .showSenderLogos) ?? d.showSenderLogos)
     }
 
@@ -183,6 +202,12 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public var resolvedGeminiModel: String {
         let m = geminiModel.trimmingCharacters(in: .whitespacesAndNewlines)
         return m.isEmpty ? GeminiDefaults.model : m
+    }
+
+    /// The Claude Code model alias, or the default when blank.
+    public var resolvedClaudeCodeModel: String {
+        let m = claudeCodeModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        return m.isEmpty ? Self.defaultClaudeCodeModel : m
     }
 
     /// The triage model, or the default when blank.

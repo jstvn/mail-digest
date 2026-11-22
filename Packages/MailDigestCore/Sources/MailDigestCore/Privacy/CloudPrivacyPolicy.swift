@@ -29,13 +29,39 @@ public enum CloudPrivacyPolicy {
         }
     }
 
-    /// Why cloud is effectively off, or nil when it is on. Checked in the order the user would fix them.
+    /// Bump when the Claude Code disclosure changes materially (Q93).
+    public static let currentClaudeCodeRevision = 1
+
+    /// Why cloud is effectively off for Gemini, or nil when it is on. Equivalent to the provider-aware
+    /// overload with Gemini selected.
     public static func offReason(settings: DigestSettings, hasKey: Bool) -> LocalReason? {
         if !settings.cloudDigestEnabled { return .cloudDisabled }
-        guard let revision = settings.cloudPrivacyAcknowledgedRevision, revision >= currentRevision else {
-            return .acknowledgementRequired
+        return providerReason(provider: .gemini, settings: settings, hasGeminiKey: hasKey, claudeCode: .notFound)
+    }
+
+    /// Why cloud is effectively off for the selected provider, or nil when it is on. Checked in the order the
+    /// user would fix them: master switch, acknowledgement, then the provider's own readiness.
+    /// A missing Gemini key matters only while Gemini is selected.
+    public static func offReason(settings: DigestSettings, hasGeminiKey: Bool,
+                                 claudeCode: ClaudeCodeStatus) -> LocalReason? {
+        if !settings.cloudDigestEnabled { return .cloudDisabled }
+        return providerReason(provider: settings.cloudProvider, settings: settings,
+                              hasGeminiKey: hasGeminiKey, claudeCode: claudeCode)
+    }
+
+    private static func providerReason(provider: CloudProvider, settings: DigestSettings, hasGeminiKey: Bool,
+                                       claudeCode: ClaudeCodeStatus) -> LocalReason? {
+        switch provider {
+        case .gemini:
+            guard let r = settings.cloudPrivacyAcknowledgedRevision, r >= currentRevision else {
+                return .acknowledgementRequired
+            }
+            return hasGeminiKey ? nil : .noCredential
+        case .claudeCode:
+            guard let r = settings.claudeCodePrivacyAcknowledgedRevision, r >= currentClaudeCodeRevision else {
+                return .acknowledgementRequired
+            }
+            return claudeCode == .ready ? nil : .providerUnavailable
         }
-        if !hasKey { return .noCredential }
-        return nil
     }
 }
