@@ -33,19 +33,22 @@ public struct GeminiConnectionMessage: Sendable, Equatable {
         self.isSuccess = isSuccess
     }
 
-    /// Caption under the Cloud Digest toggle. Says whether cloud is actually active, independent of any test.
-    public static func cloudStatusText(settings: DigestSettings, hasKey: Bool) -> String {
-        switch CloudPrivacyPolicy.offReason(settings: settings, hasKey: hasKey) {
+    /// Caption under the Cloud Digest toggle (shown while it is on). Says whether cloud is actually active for
+    /// the selected provider, independent of any test.
+    public static func cloudStatusText(settings: DigestSettings, hasGeminiKey: Bool,
+                                       claudeCode: ClaudeCodeStatus) -> String {
+        let provider = settings.cloudProvider
+        switch CloudPrivacyPolicy.offReason(settings: settings, hasGeminiKey: hasGeminiKey, claudeCode: claudeCode) {
         case .cloudDisabled?:
             return "Cloud processing is currently disabled. Emails continue to be processed locally."
         case .acknowledgementRequired?:
             return "Cloud processing is inactive until you accept the privacy notice. Emails are processed locally."
         case .providerUnavailable?:
-            return "Cloud processing is inactive until the cloud provider is available. Emails are processed locally."
+            return "Cloud processing is inactive until Claude Code is installed, up to date and signed in. Emails are processed locally."
         case .noCredential?:
             return "Cloud processing is inactive until an API key is saved. Emails are processed locally."
         default:
-            return "Only emails that pass Mail Digest's privacy checks may be sent to Gemini. Other emails are processed locally on this Mac."
+            return "Only emails that pass Mail Digest's privacy checks may be sent to \(provider.displayName). Other emails are processed locally on this Mac."
         }
     }
 }

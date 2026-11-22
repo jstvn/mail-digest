@@ -85,6 +85,8 @@ final class DigestRunModel {
     @ObservationIgnored private let source = AppleMailSource()
     /// The Gemini API key lives only in the Keychain; Settings saves and removes it here.
     @ObservationIgnored let credentials = KeychainCredentialStore()
+    /// Claude Code detection and Test Connection state for Settings (Q93).
+    let claudeCode = ClaudeCodeModel()
     @ObservationIgnored private(set) lazy var cloudRouting = CloudRoutingProvider(
         credentials: credentials, snapshot: { [settings] in settings.settings })
     /// The SQLite store, opened lazily off the main actor. Nil until opened; there is deliberately no
@@ -1064,6 +1066,9 @@ final class DigestRunModel {
         relevant.triageModel = cloudDefaults.triageModel
         relevant.privacyThreshold = cloudDefaults.privacyThreshold
         relevant.cloudPrivacyAcknowledgedRevision = nil
+        relevant.cloudProvider = cloudDefaults.cloudProvider
+        relevant.claudeCodeModel = cloudDefaults.claudeCodeModel
+        relevant.claudeCodePrivacyAcknowledgedRevision = nil
         let key = RunnerKey(settings: relevant, inboxes: Set(inboxes))
         if let runner, key == runnerKey { return runner }
         progressTask?.cancel()

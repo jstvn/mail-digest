@@ -27,12 +27,21 @@ import Testing
     }
 
     @Test func cloudStatusFollowsEffectiveState() {
+        func text(_ s: DigestSettings, key: Bool = true, cc: ClaudeCodeStatus = .ready) -> String {
+            GeminiConnectionMessage.cloudStatusText(settings: s, hasGeminiKey: key, claudeCode: cc)
+        }
         var s = DigestSettings()
-        #expect(GeminiConnectionMessage.cloudStatusText(settings: s, hasKey: true).hasPrefix("Cloud processing is currently disabled"))
+        #expect(text(s).hasPrefix("Cloud processing is currently disabled"))
         s.cloudDigestEnabled = true
-        #expect(GeminiConnectionMessage.cloudStatusText(settings: s, hasKey: true).contains("privacy notice"))
+        #expect(text(s).contains("privacy notice"))
         s.cloudPrivacyAcknowledgedRevision = CloudPrivacyPolicy.currentRevision
-        #expect(GeminiConnectionMessage.cloudStatusText(settings: s, hasKey: false).contains("until an API key is saved"))
-        #expect(GeminiConnectionMessage.cloudStatusText(settings: s, hasKey: true).hasPrefix("Only emails that pass"))
+        #expect(text(s, key: false).contains("until an API key is saved"))
+        #expect(text(s).hasPrefix("Only emails that pass") && text(s).contains("sent to Gemini"))
+        // Claude Code selected: the Gemini key is irrelevant, its own acknowledgement and status decide.
+        s.cloudProvider = .claudeCode
+        #expect(text(s, key: false).contains("privacy notice"))
+        s.claudeCodePrivacyAcknowledgedRevision = CloudPrivacyPolicy.currentClaudeCodeRevision
+        #expect(text(s, key: false).contains("sent to Claude Code"))
+        #expect(text(s, cc: .notSignedIn).contains("Claude Code is installed"))
     }
 }

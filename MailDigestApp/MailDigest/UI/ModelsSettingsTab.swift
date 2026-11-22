@@ -34,7 +34,8 @@ private struct CloudAcknowledgementSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel, action: cancel)
                     .keyboardShortcut(.cancelAction)
-                Button("I Understand, Enable Cloud Digest", action: accept)
+                Button("I Understand, Use Gemini", action: accept)
+                    .keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
@@ -242,21 +243,20 @@ private struct APIKeySheet: View {
 
 // MARK: Models tab
 
-/// Models: the local Ollama model, and the optional Cloud Digest (Gemini) with its key, privacy check and
-/// disclosure. Rows under the Cloud toggle show only when it is on. Gating is unchanged: cloud turns on only
-/// with a saved key and an accepted disclosure.
+/// Models: the local Ollama model, and the optional Cloud Digest (Q93): a master switch, the privacy check, a
+/// provider picker (Claude Code or Gemini) and that provider's rows. Nothing but the switch shows while it is off.
+/// The switch needs no credential; cloud is effectively on only when the selected provider's notice is accepted
+/// and the provider is ready (Gemini key saved, or Claude Code found and signed in).
 struct ModelsSettingsTab: View {
     let run: DigestRunModel
 
     private enum Sheet: Identifiable {
-        case editURL, apiKey, acknowledgement, whatGetsSent, customModel
+        case editURL, apiKey, acknowledgement, claudeAcknowledgement, whatGetsSent, customModel
         var id: Self { self }
     }
 
     @State private var sheet: Sheet?
-    /// Opened when the current sheet closes, so a flow can chain (key, then acknowledgement).
-    @State private var nextSheet: Sheet?
-    /// The user turned Cloud Digest on and still has to add a key or accept the notice.
+    /// The user just turned Cloud Digest on and still has to accept the notice; declining turns it off again.
     @State private var pendingEnable = false
     @State private var hasKey = false
     @State private var confirmRemove = false
@@ -284,7 +284,7 @@ struct ModelsSettingsTab: View {
                 Text("Changes apply from the next run.")
             }
             Section {
-                SubtitledToggle(title: "Use Gemini for Non-Sensitive Emails",
+                SubtitledToggle(title: "Cloud Digest",
                                 subtitle: "Private, uncertain or not fully checked mail always stays on this Mac.",
                                 isOn: enableBinding)
                 if cloudOn {
@@ -293,28 +293,30 @@ struct ModelsSettingsTab: View {
             } header: {
                 Text("Cloud Digest")
             }
-            Section {
-                billingNote
-                    .listRowBackground(Color.orange.tintedFill(scheme))
-            }
         }
         .formStyle(.grouped)
-        .frame(height: cloudOn ? 720 : 470)
+        .frame(height: cloudOn ? 800 : 430)
         .task { await refreshKey() }
+        // Look for Claude Code whenever it is the selected provider of an active Cloud Digest.
+        .task(id: cloudOn && store.settings.cloudProvider == .claudeCode) {
+            if cloudOn && store.settings.cloudProvider == .claudeCode { await run.claudeCode.refresh() }
+        }
         .task(id: store.settings.resolvedOllamaURL.absoluteString) { await loadInstalledTags() }
         // A finished download changes what is installed.
         .task(id: run.modelDownloads.completedCount) { await loadInstalledTags() }
-        .sheet(item: $sheet, onDismiss: presentNext) { sheet in
+        .sheet(item: $sheet) { sheet in
             switch sheet {
             case .editURL:
                 EditOllamaURLSheet(url: $store.settings.ollamaURL, done: { self.sheet = nil })
             case .apiKey:
                 APIKeySheet(run: run, hasKey: hasKey, modelID: store.settings.resolvedGeminiModel,
                             saved: keySaved, connected: { lastConnected = .now },
-                            cancel: { pendingEnable = false; self.sheet = nil })
+                            cancel: { self.sheet = nil })
             case .acknowledgement:
-                CloudAcknowledgementSheet(accept: acceptAcknowledgement,
-                                          cancel: { pendingEnable = false; self.sheet = nil })
+                CloudAcknowledgementSheet(accept: { acceptAcknowledgement(.gemini) }, cancel: declineAcknowledgement)
+            case .claudeAcknowledgement:
+                ClaudeCodeAcknowledgementSheet(accept: { acceptAcknowledgement(.claudeCode) },
+                                               cancel: declineAcknowledgement)
             case .whatGetsSent:
                 WhatGetsSentSheet(done: { self.sheet = nil })
             case .customModel:
@@ -325,14 +327,8 @@ struct ModelsSettingsTab: View {
             Button("Remove Key", role: .destructive, action: removeKey)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Cloud Digest will be turned off and every email stays on this Mac.")
+            Text("Gemini won't be used until you add a key. Cloud Digest stays on, and emails stay on this Mac meanwhile.")
         }
-    }
-
-    private func presentNext() {
-        guard let next = nextSheet else { return }
-        nextSheet = nil
-        sheet = next
     }
 
     // MARK: On this Mac
@@ -390,14 +386,72 @@ struct ModelsSettingsTab: View {
     // MARK: Cloud rows
 
     @ViewBuilder private var cloudRows: some View {
-        if CloudPrivacyPolicy.offReason(settings: store.settings, hasKey: hasKey) != nil {
-            Text(GeminiConnectionMessage.cloudStatusText(settings: store.settings, hasKey: hasKey))
-                .font(.callout).foregroundStyle(.orange)
-        }
-        cloudModelPicker
-        apiKeyRow
+        statusCaption
         privacyModelPicker
         thresholdRow
+        providerPicker
+        switch store.settings.cloudProvider {
+        case .gemini:
+            cloudModelPicker
+            apiKeyRow
+            billingNote
+                .listRowBackground(Color.orange.tintedFill(scheme))
+        case .claudeCode:
+            ClaudeCodeRows(model: run.claudeCode, claudeModel: claudeModelBinding)
+            claudeDisclosure
+                .listRowBackground(Color.orange.tintedFill(scheme))
+        }
+    }
+
+    private var effectiveOffReason: LocalReason? {
+        CloudPrivacyPolicy.offReason(settings: store.settings, hasGeminiKey: hasKey, claudeCode: claudeStatus)
+    }
+
+    /// Until detection has run, Claude Code counts as ready so the caption doesn't flash a false warning.
+    private var claudeStatus: ClaudeCodeStatus { run.claudeCode.detection?.status ?? .ready }
+
+    /// Whether Cloud Digest is really active, and a way back to the notice if it was declined.
+    @ViewBuilder private var statusCaption: some View {
+        let text = GeminiConnectionMessage.cloudStatusText(settings: store.settings, hasGeminiKey: hasKey,
+                                                           claudeCode: claudeStatus)
+        if effectiveOffReason == nil {
+            Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        } else {
+            LabeledContent {
+                if effectiveOffReason == .acknowledgementRequired {
+                    Button("Review Privacy Notice…") { presentAcknowledgement(for: store.settings.cloudProvider) }
+                }
+            } label: {
+                Text(text).font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var providerPicker: some View {
+        Picker("Cloud Provider", selection: Binding(
+            get: { store.settings.cloudProvider },
+            set: { new in
+                store.settings.cloudProvider = new
+                if needsAcknowledgement(new) { presentAcknowledgement(for: new) }
+            })) {
+            // Claude Code first, Gemini second (display order only; the default stays Gemini).
+            ForEach(CloudProvider.allCases, id: \.self) { Text($0.displayName).tag($0) }
+        }
+    }
+
+    private var claudeModelBinding: Binding<String> {
+        Binding(get: { store.settings.resolvedClaudeCodeModel }, set: { store.settings.claudeCodeModel = $0 })
+    }
+
+    private var claudeDisclosure: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "info.circle").foregroundStyle(.orange).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 8) {
+                ClaudeCodeDisclosureText()
+                ClaudeCodeLinks()
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     private var cloudModelOptions: [String] {
@@ -533,17 +587,15 @@ struct ModelsSettingsTab: View {
 
     private func refreshKey() async {
         hasKey = ((try? run.credentials.read()) ?? nil) != nil
-        // A key removed elsewhere must not leave Cloud Digest looking on.
-        if !hasKey && store.settings.cloudDigestEnabled { store.settings.cloudDigestEnabled = false }
     }
 
+    /// Removing the key keeps Cloud Digest on; Gemini just has no key until one is added again.
     private func removeKey() {
         do {
             try run.credentials.delete()
             keyError = nil
             hasKey = false
             lastConnected = nil
-            store.settings.cloudDigestEnabled = false
             Task { await run.cloudRouting.invalidateCredential() }
         } catch {
             keyError = "The key could not be removed from the Keychain."
@@ -554,40 +606,53 @@ struct ModelsSettingsTab: View {
         hasKey = true
         keyError = nil
         lastConnected = nil
-        if pendingEnable {
-            if needsAcknowledgement {
-                nextSheet = .acknowledgement
-            } else {
-                store.settings.cloudDigestEnabled = true
-                pendingEnable = false
-            }
-        }
         sheet = nil
     }
 
     // MARK: Enable and acknowledgement
 
-    private var needsAcknowledgement: Bool {
-        (store.settings.cloudPrivacyAcknowledgedRevision ?? 0) < CloudPrivacyPolicy.currentRevision
+    /// Whether the provider's privacy notice is missing or older than the current revision.
+    private func needsAcknowledgement(_ provider: CloudProvider) -> Bool {
+        switch provider {
+        case .gemini:
+            return (store.settings.cloudPrivacyAcknowledgedRevision ?? 0) < CloudPrivacyPolicy.currentRevision
+        case .claudeCode:
+            return (store.settings.claudeCodePrivacyAcknowledgedRevision ?? 0) < CloudPrivacyPolicy.currentClaudeCodeRevision
+        }
     }
 
-    /// Turning it on needs a key and an accepted notice, in that order. Each step has its own sheet, and the
-    /// switch only turns on once both are done.
+    private func presentAcknowledgement(for provider: CloudProvider) {
+        sheet = provider == .gemini ? .acknowledgement : .claudeAcknowledgement
+    }
+
+    /// Turning it on needs no credential. The selected provider's notice is shown at once if it is missing; the
+    /// switch goes off again when the user declines it, as before.
     private var enableBinding: Binding<Bool> {
         Binding(
             get: { store.settings.cloudDigestEnabled },
             set: { on in
-                guard on else { store.settings.cloudDigestEnabled = false; pendingEnable = false; return }
-                pendingEnable = true
-                if !hasKey { sheet = .apiKey }
-                else if needsAcknowledgement { sheet = .acknowledgement }
-                else { store.settings.cloudDigestEnabled = true; pendingEnable = false }
+                store.settings.cloudDigestEnabled = on
+                pendingEnable = false
+                guard on else { return }
+                let provider = store.settings.cloudProvider
+                if needsAcknowledgement(provider) { pendingEnable = true; presentAcknowledgement(for: provider) }
             })
     }
 
-    private func acceptAcknowledgement() {
-        store.settings.cloudPrivacyAcknowledgedRevision = CloudPrivacyPolicy.currentRevision
-        store.settings.cloudDigestEnabled = hasKey
+    private func acceptAcknowledgement(_ provider: CloudProvider) {
+        switch provider {
+        case .gemini: store.settings.cloudPrivacyAcknowledgedRevision = CloudPrivacyPolicy.currentRevision
+        case .claudeCode:
+            store.settings.claudeCodePrivacyAcknowledgedRevision = CloudPrivacyPolicy.currentClaudeCodeRevision
+        }
+        pendingEnable = false
+        sheet = nil
+    }
+
+    /// Declining leaves the acknowledgement unset (cloud stays off for this provider). A switch the user has
+    /// just turned on goes back off; a provider change keeps the switch and shows "Review Privacy Notice…".
+    private func declineAcknowledgement() {
+        if pendingEnable { store.settings.cloudDigestEnabled = false }
         pendingEnable = false
         sheet = nil
     }

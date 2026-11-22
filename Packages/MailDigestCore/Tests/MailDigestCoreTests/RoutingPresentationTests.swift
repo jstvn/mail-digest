@@ -295,3 +295,14 @@ import Testing
         #expect(lines.contains(RoutingDetailLine(label: "Text assessed", value: "0 of 9 sections")))
     }
 }
+
+@Suite struct CloudFailedCopyTests {
+    @Test func neutralBucketAndProviderAwareReason() {
+        #expect(RoutingPresentation.LocalBucket.cloudFailed.label == "cloud failed")
+        #expect(RoutingPresentation.localReasonText(.cloudFailed, provider: .claudeCode)
+                == "Claude Code could not process it, so this Mac did.")
+        #expect(RoutingPresentation.localReasonText(.cloudFailed, provider: .gemini)
+                == "Gemini could not process it, so this Mac did.")
+        #expect(RoutingPresentation.localReasonText(.cloudFailed) == "The cloud provider could not process it, so this Mac did.")
+    }
+}

@@ -11,15 +11,22 @@ actor CloudRoutingProvider {
     private var keyLoaded = false
     private var gemini: (key: String, model: String, client: GeminiClient)?
     private var systemOne: (url: URL, client: OllamaSystemOneClient)?
+    private let claudeDetector: ClaudeCodeDetector
+    /// Claude Code readiness, detected once per job (Q93). Cleared when a job starts.
+    private var claudeDetection: Task<ClaudeCodeDetection, Never>?
 
-    init(credentials: any CredentialStore, snapshot: @escaping @Sendable @MainActor () -> DigestSettings) {
+    init(credentials: any CredentialStore, claudeDetector: ClaudeCodeDetector = ClaudeCodeDetector(),
+         snapshot: @escaping @Sendable @MainActor () -> DigestSettings) {
         self.credentials = credentials
+        self.claudeDetector = claudeDetector
         self.snapshot = snapshot
     }
 
     /// Call when a job starts or resumes: drops the System One client and re-reads the key.
     func resetForNewJob() {
         systemOne = nil
+        claudeDetection?.cancel()
+        claudeDetection = nil
         invalidateCredential()
     }
 
@@ -32,21 +39,38 @@ actor CloudRoutingProvider {
 
     func config() async -> CloudRoutingConfig {
         let settings = await snapshot()
-        if !keyLoaded {
+        // Only Gemini needs the key; reading it for Claude Code would just risk a Keychain prompt.
+        if settings.cloudProvider == .gemini, !keyLoaded {
             // A Keychain failure counts as no credential: fail closed, keep everything local.
             apiKey = (try? credentials.read()) ?? nil
             keyLoaded = true
         }
-        let key = apiKey
-        if let reason = CloudPrivacyPolicy.offReason(settings: settings, hasKey: key != nil) {
+        let key = settings.cloudProvider == .gemini ? apiKey : nil
+        // Master switch and acknowledgement first, so Claude Code is never probed while cloud is off.
+        if let reason = CloudPrivacyPolicy.offReason(settings: settings, hasGeminiKey: key != nil, claudeCode: .ready) {
             return .localOnly(reason: reason)
         }
-        guard let key else { return .localOnly(reason: .noCredential) }
-        let model = settings.resolvedGeminiModel
-        let client: GeminiClient
-        if let g = gemini, g.key == key, g.model == model { client = g.client } else {
-            client = GeminiClient(apiKey: key, model: model)
-            gemini = (key, model, client)
+        let extractor: any EmailExtractor
+        let model: String
+        switch settings.cloudProvider {
+        case .gemini:
+            guard let key else { return .localOnly(reason: .noCredential) }
+            model = settings.resolvedGeminiModel
+            let client: GeminiClient
+            if let g = gemini, g.key == key, g.model == model { client = g.client } else {
+                client = GeminiClient(apiKey: key, model: model)
+                gemini = (key, model, client)
+            }
+            extractor = client
+        case .claudeCode:
+            let detection = await detectClaudeCode()
+            if let reason = CloudPrivacyPolicy.offReason(settings: settings, hasGeminiKey: false,
+                                                         claudeCode: detection.status) {
+                return .localOnly(reason: reason)
+            }
+            guard let executable = detection.executable else { return .localOnly(reason: .providerUnavailable) }
+            model = settings.resolvedClaudeCodeModel
+            extractor = ClaudeCodeClient(executable: executable, model: model)
         }
         let url = settings.resolvedOllamaURL
         let triage: OllamaSystemOneClient
@@ -54,8 +78,18 @@ actor CloudRoutingProvider {
             triage = OllamaSystemOneClient(baseURL: url)
             systemOne = (url, triage)
         }
-        return CloudRoutingConfig(cloudExtractor: client, cloudModel: model, offReason: nil, triage: triage,
+        return CloudRoutingConfig(cloudExtractor: extractor, cloudModel: model, offReason: nil, triage: triage,
                                   triageModel: settings.resolvedTriageModel,
-                                  privacyThreshold: settings.resolvedPrivacyThreshold)
+                                  privacyThreshold: settings.resolvedPrivacyThreshold,
+                                  cloudProvider: settings.cloudProvider)
+    }
+
+    /// One detection per job, shared by every email in it.
+    private func detectClaudeCode() async -> ClaudeCodeDetection {
+        if let claudeDetection { return await claudeDetection.value }
+        let detector = claudeDetector
+        let task = Task { await detector.detect() }
+        claudeDetection = task
+        return await task.value
     }
 }

@@ -126,7 +126,7 @@ public enum RoutingPresentation {
         if let f = a.triageFailure { lines.append(RoutingDetailLine(label: "Triage", value: triageFailureText(f))) }
         if let e = routing.execution {
             lines.append(RoutingDetailLine(label: "Processed by", value: executionBadge(e).text))
-            if let r = e.localReason { lines.append(RoutingDetailLine(label: "Why local", value: localReasonText(r))) }
+            if let r = e.localReason { lines.append(RoutingDetailLine(label: "Why local", value: localReasonText(r, provider: e.cloudProvider ?? .gemini))) }
             if let c = e.cloudFailure { lines.append(RoutingDetailLine(label: "\((e.cloudProvider ?? .gemini).displayName) error",
                                                            value: cloudFailureText(c, provider: e.cloudProvider ?? .gemini))) }
         }
@@ -216,7 +216,7 @@ public enum RoutingPresentation {
             case .noCredential: return "no API key"
             case .providerUnavailable: return "provider unavailable"
             case .acknowledgementRequired: return "notice not accepted"
-            case .cloudFailed: return "Gemini failed"
+            case .cloudFailed: return "cloud failed"
             case .triageUnavailable: return "privacy check unavailable"
             case .notRecorded: return "reason not recorded"
             }
@@ -275,7 +275,8 @@ public enum RoutingPresentation {
     /// "97%", rounded to a whole percent.
     public static func percent(_ p: Double) -> String { "\(Int((p * 100).rounded()))%" }
 
-    public static func localReasonText(_ r: LocalReason) -> String {
+    /// `provider` names the cloud service for a failed attempt; rows stored before Q93 have none and were Gemini.
+    public static func localReasonText(_ r: LocalReason, provider: CloudProvider? = nil) -> String {
         switch r {
         case .cloudDisabled: return "Cloud Digest is off, so it stayed on this Mac."
         case .acknowledgementRequired: return "The Cloud Digest privacy notice has not been accepted, so it stayed on this Mac."
@@ -286,7 +287,7 @@ public enum RoutingPresentation {
         case .privateContent: return "It looks private, so it stayed on this Mac."
         case .notEligible: return "It was not confidently public, so it stayed on this Mac."
         case .triageUnavailable: return "The privacy check was unavailable, so it stayed on this Mac."
-        case .cloudFailed: return "Gemini could not process it, so this Mac did."
+        case .cloudFailed: return "\(provider?.displayName ?? "The cloud provider") could not process it, so this Mac did."
         }
     }
 
