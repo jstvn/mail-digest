@@ -60,7 +60,7 @@ import Testing
             "dailyMailboxes", "autoFileProcessed", "pauseBacklogOnBattery", "quietHoursEnabled",
             "quietHoursStartMinute", "quietHoursEndMinute", "cloudDigestEnabled", "geminiModel", "triageModel", "cloudProvider", "claudeCodeModel",
             "privacyThreshold", "cloudPrivacyAcknowledgedRevision", "triageModelDefaultRevision", "showSenderLogos",
-            "privacyThresholdDefaultRevision",
+            "privacyThresholdDefaultRevision", "autoFileHandledDestination", "autoFileDismissedDestination",
         ])
     }
 

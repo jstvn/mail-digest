@@ -105,6 +105,29 @@ public struct ProcessedEmailSelector: Sendable {
         return autoFileIDs(processed).filter { id in finishedAt[id].map { $0 >= enabledAt } ?? false }
     }
 
+    /// Q94: where auto-file puts an email that qualifies. At least one suggestion and every one dismissed
+    /// goes to `dismissed`; anything else (a reminder added, no suggestions, blocked/ignored sender) goes to
+    /// `handled`. Callers only pass ids `autoFileIDs` returned, so nothing pending or failed gets here.
+    public func autoFileDestination(emailID: String, digest: Digest,
+                                    handled: AutoFileDestination,
+                                    dismissed: AutoFileDestination) -> AutoFileDestination {
+        let sugs = digest.suggestions.filter { $0.emailID == emailID }
+        let allDismissed = !sugs.isEmpty && sugs.allSatisfy { $0.status == .dismissed }
+        return allDismissed ? dismissed : handled
+    }
+
+    /// Q94: the single cleanup action for an auto-file pass over `ids`, routing each email by
+    /// `autoFileDestination`. One action means one Undo batch, even when the destinations are mixed.
+    public func autoFileAction(ids: [String], digest: Digest, handled: AutoFileDestination,
+                               dismissed: AutoFileDestination) -> CleanupAction {
+        let trashIDs = Set(ids.filter {
+            autoFileDestination(emailID: $0, digest: digest, handled: handled, dismissed: dismissed) == .trash
+        })
+        if trashIDs.isEmpty { return .moveToFolder(MailCleanup.digestFolderName) }
+        if trashIDs.count == ids.count { return .trash }
+        return .split(folder: MailCleanup.digestFolderName, trashIDs: trashIDs)
+    }
+
     /// Ids for the "Select all newsletters" shortcut.
     public func newsletterIDs(_ entries: [ProcessedEntry]) -> Set<String> {
         Set(entries.filter { $0.category == .newsletters }.map(\.id))

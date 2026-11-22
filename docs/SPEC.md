@@ -781,6 +781,13 @@ The review panel gets a **Processed** tab listing emails that are fully handled,
 
 Both options use the same Mail actions adapter. Neither permanently deletes anything: Trash keeps the email until Mail empties it on its normal schedule.
 
+**Auto-file destinations (Q94).** While auto-file is on, Settings › Mail shows two pickers under the toggle, each with a one-line explanation:
+
+- **Emails with reminders added or info only** (at least one suggestion approved, or no suggestions; also blocked/ignored skip-tier mail): Mail Digest mailbox (default) or Trash.
+- **Emails where every suggestion was dismissed** (at least one suggestion, all dismissed): Trash (default) or Mail Digest mailbox.
+
+Trash is `MailActions.moveToTrash` (Q40: `Mail.move` to the account's Trash, original mailbox kept for Undo); the toast names the destination ("Moved 1 email to Trash"). No Trash target fails safely and is reported; there is no fallback to another destination. Settings: `autoFileHandledDestination` (`mailDigest` | `trash`, default `mailDigest`) and `autoFileDismissedDestination` (default `trash`); missing keys decode to these defaults.
+
 **When an email counts as processed**
 
 - Extraction succeeded (not in Skipped as failed), and

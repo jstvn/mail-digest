@@ -12,7 +12,7 @@ struct CleanupFailure: Identifiable, Equatable {
 
 /// The Processed tab's state: which rows are ticked, what has been moved or kept, the Undo history and
 /// auto-file. Mail work goes through `MailCleanup` / `MailActions`; nothing here touches mail except from
-/// a click (or, when the user turned it on, auto-file, which only moves into the "Mail Digest" folder).
+/// a click (or, when the user turned it on, auto-file, which moves to the Mail Digest folder or Trash per Q94).
 ///
 /// Successful moves and Keeps are persisted per digest (Q39), so those rows stay hidden after a relaunch;
 /// the Undo history itself lasts for the app session, as the spec says.
@@ -171,11 +171,11 @@ final class ProcessedMailModel {
         await refreshLedger()
     }
 
-    /// Auto-file (a setting, off by default, Q42): files each email of the shown digest into "Mail Digest" in
-    /// its own account as soon as its result is persisted and it is fully processed, including while the
+    /// Auto-file (a setting, off by default, Q42): files each email of the shown digest into "Mail Digest" or
+    /// Trash (Q94, per the two destination settings) in its own account as soon as its result is persisted and it is fully processed, including while the
     /// job still runs. Only results finished after the setting was switched on qualify, so older mail is
     /// never swept. Each email is tried once: the attempt is stored before the move, so a relaunch or a
-    /// failure never repeats it. Never trashes, never touches kept, moved or undone emails.
+    /// failure never repeats it. A failed move is never retried or redirected. Never touches kept, moved or undone emails.
     func autoFileIfEnabled() async {
         guard !autoFileRunning, !isWorking else { autoFilePending = true; return }
         autoFileRunning = true
@@ -214,7 +214,9 @@ final class ProcessedMailModel {
         // Persist the attempt first: if this can't be stored, don't move anything, or a relaunch could repeat it.
         guard await record(.autoFileAttempted, ids: ids, digestID: digest.id) else { isWorking = false; return }
         Self.log.notice("auto-file starting: candidates=\(ids.count, privacy: .public)")
-        await performLocked(.moveToFolder(MailCleanup.digestFolderName), ids: ids)
+        let action = selector.autoFileAction(ids: ids, digest: digest, handled: s.autoFileHandledDestination,
+                                             dismissed: s.autoFileDismissedDestination)
+        await performLocked(action, ids: ids)
     }
 
     func dismissFailures() { failures = [] }
@@ -291,6 +293,7 @@ final class ProcessedMailModel {
         switch action {
         case .trash: return "Trash"
         case .moveToFolder(let name): return "\(name) folder"
+        case .split(let folder, _): return "Trash or \(folder) folder"
         }
     }
 }

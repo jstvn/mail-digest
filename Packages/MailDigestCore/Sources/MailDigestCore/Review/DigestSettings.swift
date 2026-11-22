@@ -1,5 +1,13 @@
 import Foundation
 
+/// Where auto-file moves an email (Q94). Both are `Mail.move`s that Undo can reverse; nothing is deleted.
+public enum AutoFileDestination: String, Codable, Sendable, Equatable, CaseIterable {
+    /// The "Mail Digest" mailbox in the message's own account.
+    case mailDigest
+    /// The account's Trash mailbox (`MailActions.moveToTrash`, Q40).
+    case trash
+}
+
 /// The user's settings that exist today. Stored as one JSON blob by the app; every field has the spec's
 /// default, and missing keys in older blobs fall back to it.
 public struct DigestSettings: Codable, Sendable, Equatable {
@@ -27,6 +35,10 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     /// When auto-file was last switched on. Only results finished after it are auto-filed, so switching it
     /// on never sweeps older mail (Q42). Nil while auto-file is off.
     public var autoFileEnabledAt: Date?
+    /// Q94: where auto-file puts emails with a reminder added, no suggestions, or blocked/ignored senders.
+    public var autoFileHandledDestination: AutoFileDestination
+    /// Q94: where auto-file puts emails whose suggestions were all dismissed.
+    public var autoFileDismissedDestination: AutoFileDestination
     /// Backlog jobs pause on battery power and resume when plugged in (default on).
     public var pauseBacklogOnBattery: Bool
     /// Backlog jobs only run inside the quiet-hours window (default off).
@@ -82,7 +94,9 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 retention: HistoryRetention = .default, vipSenders: [String] = [], blockedSenders: [String] = [],
                 ignoredSenders: [String] = [], trustedNewsletterSenders: [String] = [],
                 declinedIgnoreSuggestions: [String] = [], dailyMailboxes: [MailboxRef] = [],
-                autoFileProcessed: Bool = false, autoFileEnabledAt: Date? = nil, pauseBacklogOnBattery: Bool = true,
+                autoFileProcessed: Bool = false, autoFileEnabledAt: Date? = nil,
+                autoFileHandledDestination: AutoFileDestination = .mailDigest,
+                autoFileDismissedDestination: AutoFileDestination = .trash, pauseBacklogOnBattery: Bool = true,
                 quietHoursEnabled: Bool = false, quietHoursStartMinute: Int = 22 * 60,
                 quietHoursEndMinute: Int = 7 * 60,
                 cloudDigestEnabled: Bool = false, geminiModel: String = GeminiDefaults.model,
@@ -111,6 +125,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         self.quietHoursStartMinute = quietHoursStartMinute
         self.quietHoursEndMinute = quietHoursEndMinute
         self.autoFileProcessed = autoFileProcessed
+        self.autoFileHandledDestination = autoFileHandledDestination
+        self.autoFileDismissedDestination = autoFileDismissedDestination
         self.autoFileEnabledAt = autoFileProcessed ? autoFileEnabledAt : nil
         self.runHour = runHour
         self.runMinute = runMinute
@@ -132,6 +148,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         case runHour, runMinute, lookbackHours, maxEmailsPerRun, ollamaURL, ollamaModel, remindersListName
         case retention, vipSenders, blockedSenders, ignoredSenders, trustedNewsletterSenders, declinedIgnoreSuggestions
         case dailyMailboxes, autoFileProcessed, autoFileEnabledAt
+        case autoFileHandledDestination, autoFileDismissedDestination
         case pauseBacklogOnBattery, quietHoursEnabled, quietHoursStartMinute, quietHoursEndMinute
         case cloudDigestEnabled, geminiModel, triageModel, privacyThreshold, cloudPrivacyAcknowledgedRevision
         case triageModelDefaultRevision, showSenderLogos, privacyThresholdDefaultRevision
@@ -182,6 +199,13 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   dailyMailboxes: try c.decodeIfPresent([MailboxRef].self, forKey: .dailyMailboxes) ?? [],
                   autoFileProcessed: try c.decodeIfPresent(Bool.self, forKey: .autoFileProcessed) ?? d.autoFileProcessed,
                   autoFileEnabledAt: try c.decodeIfPresent(Date.self, forKey: .autoFileEnabledAt),
+                  // An unknown stored value falls back to the default rather than failing the whole blob.
+                  autoFileHandledDestination: (try? c.decodeIfPresent(AutoFileDestination.self,
+                                                                      forKey: .autoFileHandledDestination))
+                      ?? d.autoFileHandledDestination,
+                  autoFileDismissedDestination: (try? c.decodeIfPresent(AutoFileDestination.self,
+                                                                        forKey: .autoFileDismissedDestination))
+                      ?? d.autoFileDismissedDestination,
                   pauseBacklogOnBattery: try c.decodeIfPresent(Bool.self, forKey: .pauseBacklogOnBattery)
                       ?? d.pauseBacklogOnBattery,
                   quietHoursEnabled: try c.decodeIfPresent(Bool.self, forKey: .quietHoursEnabled) ?? d.quietHoursEnabled,
@@ -223,6 +247,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         try c.encode(dailyMailboxes, forKey: .dailyMailboxes)
         try c.encode(autoFileProcessed, forKey: .autoFileProcessed)
         try c.encodeIfPresent(autoFileEnabledAt, forKey: .autoFileEnabledAt)
+        try c.encode(autoFileHandledDestination, forKey: .autoFileHandledDestination)
+        try c.encode(autoFileDismissedDestination, forKey: .autoFileDismissedDestination)
         try c.encode(pauseBacklogOnBattery, forKey: .pauseBacklogOnBattery)
         try c.encode(quietHoursEnabled, forKey: .quietHoursEnabled)
         try c.encode(quietHoursStartMinute, forKey: .quietHoursStartMinute)

@@ -273,19 +273,40 @@ private struct MailSettingsTab: View {
             Section {
                 SubtitledToggle(
                     title: "File Handled Emails",
-                    subtitle: "Once every suggestion from an email is added or dismissed, it moves to a Mail Digest mailbox in the same account.",
+                    subtitle: "Once every suggestion from an email is added or dismissed, it moves to the Mail Digest mailbox or Trash in the same account.",
                     isOn: $store.settings.autoFileProcessed)
+                if store.settings.autoFileProcessed {
+                    destinationPicker(
+                        "Reminders Added or Info Only",
+                        subtitle: "Emails with at least one reminder added, or with nothing to act on.",
+                        selection: $store.settings.autoFileHandledDestination)
+                    destinationPicker(
+                        "All Suggestions Dismissed",
+                        subtitle: "Emails where you dismissed every suggestion.",
+                        selection: $store.settings.autoFileDismissedDestination)
+                }
             } header: {
                 Text("Mail Cleanup")
             } footer: {
-                Text("Only mail handled after you turn this on is moved. Nothing goes to Trash or gets deleted. You can undo from Mail Cleanup until you quit.")
+                Text("Only mail handled after you turn this on is moved. Nothing is deleted: Trash keeps mail until Mail empties it. You can undo from Mail Cleanup until you quit.")
             }
         }
         .formStyle(.grouped)
-        .frame(height: 400)
+        .frame(height: store.settings.autoFileProcessed ? 540 : 400)
         .task {
             await access.refresh()
             if canLoadMailboxes, run.mailboxes.isEmpty { await run.loadMailboxes() }
+        }
+    }
+
+    private func destinationPicker(_ title: String, subtitle: String,
+                                   selection: Binding<AutoFileDestination>) -> some View {
+        Picker(selection: selection) {
+            Text("Mail Digest Mailbox").tag(AutoFileDestination.mailDigest)
+            Text("Trash").tag(AutoFileDestination.trash)
+        } label: {
+            Text(title)
+            Text(subtitle)
         }
     }
 

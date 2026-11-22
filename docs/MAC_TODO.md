@@ -771,3 +771,14 @@ Core tests and the xcodebuild build pass. None of this has been seen in the runn
 - Privacy Check Model not installed: the Download Model row (Q87) appears under it as soon as Cloud Digest is on.
 - Old Activity rows that used Gemini still read "Gemini failed → Local ..." and "Gemini could not process it, so this Mac did."; the local-reasons summary now says "cloud failed".
 - No provider by default: with fresh settings, Settings > Models > Cloud Provider shows "Choose…" (no provider selected), turning Cloud Digest on shows no notice sheet and the caption says to choose a provider, and a run stays local (reason "no cloud provider chosen") until one is picked; picking one shows its notice if needed. An existing Gemini user (notice accepted before Q93) still sees Gemini selected.
+
+## Auto-file destinations (Q94)
+
+Core tests and the xcodebuild build pass. Nothing here has been checked in the running app or against real mail.
+
+- Settings > Mail: the two pickers ("Reminders Added or Info Only", "All Suggestions Dismissed") appear only while "File Handled Emails" is on, with their secondary explanations. Check light and dark, that the tab height (400 off, 540 on) fits without clipping, and that VoiceOver reads each picker with its explanation. The footer reads "Nothing is deleted: Trash keeps mail until Mail empties it."
+- Defaults: a fresh setup shows Mail Digest Mailbox for the first picker and Trash for the second. A user who already had File Handled Emails on sees Trash for dismissed mail.
+- Dismiss every suggestion of an email (with the toggle on, finished after enabling): it lands in that account's Trash, the Mail Cleanup toast reads "Moved 1 email to Trash.", and Undo puts it back in its original mailbox. It is not auto-filed again after Undo.
+- An email with an approved reminder goes to the account's Mail Digest mailbox ("Moved 1 email to Mail Digest."). A batch with both shows "Moved 3 emails: 2 to Mail Digest, 1 to Trash." and one Undo restores all of them.
+- On My Mac mail with a Trash destination reports a failure (no Trash target), is not moved anywhere else and is not retried.
+- Switch both pickers (reminders to Trash, dismissed to Mail Digest) and confirm routing swaps; blocked/ignored senders follow the first picker.

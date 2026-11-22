@@ -4,6 +4,8 @@ import Foundation
 public enum CleanupAction: Sendable, Equatable {
     case trash
     case moveToFolder(String)
+    /// Auto-file with two destinations (Q94): `trashIDs` go to Trash, every other id to the named folder.
+    case split(folder: String, trashIDs: Set<String>)
 }
 
 /// The results of one cleanup, kept so it can be undone.
@@ -29,6 +31,15 @@ extension CleanupBatch {
         switch action {
         case .trash: place = "Trash"
         case .moveToFolder(let name): place = name
+        case .split(let folder, let trashIDs):
+            let trashed = results.filter { $0.succeeded && trashIDs.contains($0.messageID) }.count
+            if trashed == 0 { place = folder }
+            else if trashed == done { place = "Trash" }
+            else {
+                var text = "Moved \(done) emails: \(done - trashed) to \(folder), \(trashed) to Trash."
+                if failed > 0 { text += " \(failed) couldn't be moved." }
+                return text
+            }
         }
         var text = "Moved \(done) \(noun) to \(place)."
         if failed > 0 { text += " \(failed) couldn't be moved." }
@@ -92,6 +103,13 @@ public struct MailCleanup: Sendable {
                 results += try await actions.moveToTrash(messageIDs: chunk)
             case .moveToFolder(let name):
                 results += try await actions.move(messageIDs: chunk, toMailboxNamed: name, createIfMissing: true)
+            case .split(let folder, let trashIDs):
+                let toTrash = chunk.filter(trashIDs.contains)
+                let toFolder = chunk.filter { !trashIDs.contains($0) }
+                if !toFolder.isEmpty {
+                    results += try await actions.move(messageIDs: toFolder, toMailboxNamed: folder, createIfMissing: true)
+                }
+                if !toTrash.isEmpty { results += try await actions.moveToTrash(messageIDs: toTrash) }
             }
         }
         return CleanupBatch(id: makeID(), action: action, results: results)
