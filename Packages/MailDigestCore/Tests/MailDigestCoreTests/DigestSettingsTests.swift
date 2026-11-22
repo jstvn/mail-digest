@@ -139,7 +139,23 @@ import Testing
         let old = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"runHour":8}"#.utf8))
         #expect(old.runHour == 8 && !old.cloudDigestEnabled)
         #expect(old.geminiModel == GeminiDefaults.model && old.triageModel == "kev:4b-q4_K_M")
-        #expect(old.privacyThreshold == 0.90 && old.cloudPrivacyAcknowledgedRevision == nil)
+        #expect(old.privacyThreshold == 0.85 && old.cloudPrivacyAcknowledgedRevision == nil)
+    }
+
+    @Test func privacyThresholdDefaultMigration() throws {
+        func decode(_ json: String) throws -> DigestSettings {
+            try JSONDecoder().decode(DigestSettings.self, from: Data(json.utf8))
+        }
+        #expect(DigestSettings().privacyThreshold == 0.85)
+        #expect(try decode(#"{"privacyThreshold":0.9}"#).privacyThreshold == 0.85)
+        #expect(try decode(#"{"privacyThreshold":0.9,"privacyThresholdDefaultRevision":1}"#).privacyThreshold == 0.85)
+        #expect(try decode(#"{"privacyThreshold":0.9,"privacyThresholdDefaultRevision":2}"#).privacyThreshold == 0.9)
+        #expect(try decode(#"{"privacyThreshold":0.93}"#).privacyThreshold == 0.93)
+        #expect(try decode(#"{"runHour":7}"#).privacyThreshold == 0.85)
+        let migrated = try decode(#"{"privacyThreshold":0.9}"#)
+        #expect(migrated.privacyThresholdDefaultRevision == 2)
+        let again = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(migrated))
+        #expect(again == migrated && again.privacyThresholdDefaultRevision == 2)
     }
 
     @Test func cloudSettingsRoundTrip() throws {
@@ -158,7 +174,7 @@ import Testing
         #expect(s.resolvedGeminiModel == GeminiDefaults.model && s.resolvedTriageModel == "kev:4b-q4_K_M")
         #expect(s.resolvedPrivacyThreshold == 0.80)
         s.privacyThreshold = .nan
-        #expect(s.resolvedPrivacyThreshold == 0.90)
+        #expect(s.resolvedPrivacyThreshold == 0.85)
     }
 
     @Test func offReasonOrder() {

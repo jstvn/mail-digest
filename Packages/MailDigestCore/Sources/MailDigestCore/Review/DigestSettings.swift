@@ -52,12 +52,19 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     /// Kev 0.8B in favour of Tev1 0.8B. Values stored at revision 3 or later are never migrated.
     public var triageModelDefaultRevision: Int?
 
+    /// Which privacy-threshold default generation the stored value was written under. Revision 2 lowered the
+    /// default from 0.90 to 0.85 (Q91); a stored 0.90 below revision 2 only reflected the old default, so it
+    /// migrates once. Any other value, and anything stored at revision 2 or later, is left alone.
+    public var privacyThresholdDefaultRevision: Int?
+
     public static let currentTriageModelDefaultRevision = 3
+    public static let currentPrivacyThresholdDefaultRevision = 2
     /// The retired Kev 0.8B tag; only used to migrate stored settings.
     static let retiredTriageModel = "kev:0.8b-q8_0"
     static let lowMemoryTriageModel = "tev1:0.8b-q8_0"
     public static let defaultTriageModel = "kev:4b-q4_K_M"
-    public static let defaultPrivacyThreshold = 0.90
+    /// Revision 2 lowered the default threshold from 0.90 to 0.85 (Q91).
+    public static let defaultPrivacyThreshold = 0.85
     public static let defaultOllamaURL = "http://localhost:11434"
     public static let defaultModel = "qwen3:4b"
     public static let defaultListName = "Mail Digest"
@@ -76,7 +83,9 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 privacyThreshold: Double = DigestSettings.defaultPrivacyThreshold,
                 cloudPrivacyAcknowledgedRevision: Int? = nil,
                 triageModelDefaultRevision: Int? = DigestSettings.currentTriageModelDefaultRevision,
-                showSenderLogos: Bool = false) {
+                showSenderLogos: Bool = false,
+                privacyThresholdDefaultRevision: Int? = DigestSettings.currentPrivacyThresholdDefaultRevision) {
+        self.privacyThresholdDefaultRevision = privacyThresholdDefaultRevision
         self.showSenderLogos = showSenderLogos
         self.triageModelDefaultRevision = triageModelDefaultRevision
         self.cloudDigestEnabled = cloudDigestEnabled
@@ -112,7 +121,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         case dailyMailboxes, autoFileProcessed, autoFileEnabledAt
         case pauseBacklogOnBattery, quietHoursEnabled, quietHoursStartMinute, quietHoursEndMinute
         case cloudDigestEnabled, geminiModel, triageModel, privacyThreshold, cloudPrivacyAcknowledgedRevision
-        case triageModelDefaultRevision, showSenderLogos
+        case triageModelDefaultRevision, showSenderLogos, privacyThresholdDefaultRevision
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
@@ -130,6 +139,12 @@ public struct DigestSettings: Codable, Sendable, Equatable {
             case 2: triage = Self.lowMemoryTriageModel
             default: break
             }
+        }
+        // A stored 0.90 below revision 2 was the old default, so it becomes 0.85. Other values are the user's choice.
+        var threshold = try c.decodeIfPresent(Double.self, forKey: .privacyThreshold) ?? d.privacyThreshold
+        let storedThresholdRevision = try c.decodeIfPresent(Int.self, forKey: .privacyThresholdDefaultRevision)
+        if (storedThresholdRevision ?? 0) < Self.currentPrivacyThresholdDefaultRevision, abs(threshold - 0.90) < 1e-9 {
+            threshold = Self.defaultPrivacyThreshold
         }
         self.init(runHour: try c.decodeIfPresent(Int.self, forKey: .runHour) ?? d.runHour,
                   runMinute: try c.decodeIfPresent(Int.self, forKey: .runMinute) ?? d.runMinute,
@@ -158,8 +173,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                       ?? d.cloudDigestEnabled,
                   geminiModel: try c.decodeIfPresent(String.self, forKey: .geminiModel) ?? d.geminiModel,
                   triageModel: triage,
-                  privacyThreshold: try c.decodeIfPresent(Double.self, forKey: .privacyThreshold)
-                      ?? d.privacyThreshold,
+                  privacyThreshold: threshold,
                   cloudPrivacyAcknowledgedRevision: try c.decodeIfPresent(Int.self,
                                                                           forKey: .cloudPrivacyAcknowledgedRevision),
                   showSenderLogos: try c.decodeIfPresent(Bool.self, forKey: .showSenderLogos) ?? d.showSenderLogos)

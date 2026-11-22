@@ -59,6 +59,7 @@ import Testing
             "dailyMailboxes", "autoFileProcessed", "pauseBacklogOnBattery", "quietHoursEnabled",
             "quietHoursStartMinute", "quietHoursEndMinute", "cloudDigestEnabled", "geminiModel", "triageModel",
             "privacyThreshold", "cloudPrivacyAcknowledgedRevision", "triageModelDefaultRevision", "showSenderLogos",
+            "privacyThresholdDefaultRevision",
         ])
     }
 

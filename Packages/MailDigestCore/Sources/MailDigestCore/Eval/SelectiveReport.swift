@@ -234,7 +234,7 @@ public enum SelectiveReport {
 
     public static func markdown(_ s: SelectiveSummary) -> String {
         var o = "# Selective-routing evaluation\n\n"
-        o += "Real `DigestRouter.assess` (cloud on, threshold 0.90, floor 0.85) over synthetic fixtures. "
+        o += "Real `DigestRouter.assess` (cloud on, threshold 0.85, floor 0.85) over synthetic fixtures. "
         o += "False-cloud counts `ambiguous` as non-public; false-local excludes ambiguous, inspection-only, over-budget "
         o += "and evaluation-failure items (those are reported separately).\n\n"
         for m in s.models {

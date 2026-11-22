@@ -180,8 +180,8 @@ public struct RoutingThresholds: Codable, Sendable, Equatable, Hashable {
     public var threshold: Double
     public var publicFloor: Double
     public init(threshold: Double, publicFloor: Double) { self.threshold = threshold; self.publicFloor = publicFloor }
-    /// Defaults shipped in production: threshold 0.90, floor 0.85.
-    public static let production = RoutingThresholds(threshold: 0.90, publicFloor: SystemOneSpec.publicFloor)
+    /// Defaults shipped in production: threshold 0.85, floor 0.85.
+    public static let production = RoutingThresholds(threshold: DigestSettings.defaultPrivacyThreshold, publicFloor: SystemOneSpec.publicFloor)
 }
 
 /// One (fixture, model) result. `route` is the production route at the production thresholds.
@@ -242,7 +242,7 @@ public enum BenchmarkRouting {
         func now() -> Date { Date(timeIntervalSince1970: 0) }
     }
 
-    /// The route `DigestRouter.assess` decides with cloud ON, a valid config, threshold 0.90 and floor 0.85.
+    /// The route `DigestRouter.assess` decides with cloud ON, a valid config, threshold 0.85 and floor 0.85.
     /// Runs the real router, so the pre-filter, inspection check and evaluator are production code.
     /// Pass `failure` when the triage call failed; `scores` when it succeeded.
     public static func productionRoute(email: EmailMessage, model: String, scores: SystemOneScores?,
