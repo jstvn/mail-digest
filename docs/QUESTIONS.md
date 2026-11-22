@@ -485,3 +485,15 @@ Each item says what the spec leaves open and the interim choice the build uses, 
      - After "Start Ollama" the step re-checks by itself until Ollama answers or a short timeout passes; Check Again stays available.
      - Ollama older than 0.40.4 (Q62) counts as not ready: the step says the installed version is too old, asks the user to update Ollama to the latest version and offers the download page.
      - Exact copy and layout follow the HIG and are settled in review.
+
+## Cloud Digest providers (2026-11-22)
+
+93. **Cloud Digest master switch and a Claude Code provider** (decided)
+   - Evidence (2026-11-22, this Mac, synthetic email only): Claude Code 2.1.323 answered `claude -p --output-format json --json-schema …` with `--tools ""`, `--strict-mcp-config`, `--setting-sources ""`, `--disable-slash-commands` and `--no-session-persistence` in about 4 s, run from an empty directory. `--bare` can't be used: it reads only `ANTHROPIC_API_KEY`, never the subscription sign-in. `claude auth status` prints JSON (`loggedIn`, `authMethod`, `subscriptionType`). **Unverified:** whether a process launched by the app (launchd environment, not a terminal) sees the Keychain sign-in. In a reduced environment `auth status` reported `loggedIn: false` depending on which variables were set, so this must be checked from the real app (MAC_TODO).
+   - Terms (code.claude.com legal and compliance page, read 2026-11-22): an end user may sign in to the unmodified Claude Code binary with their own subscription; developers may not route requests through Free/Pro/Max/Ultra credentials on behalf of their users, and should use API keys for products. Subscription limits assume ordinary individual use. Using the user's own installed Claude Code for their own mail is close to that line when the app is shared with others. **Flagged, not decided (no compliance claim is made):** Justin to judge before distributing to other users.
+   - **Decision (approved by Justin, 2026-11-22):**
+     - Cloud Digest becomes a provider-independent master switch. When it's off, nothing below it is shown. When it's on, Settings shows the routing controls first (privacy check model, privacy threshold), then the cloud provider choice, then that provider's settings.
+     - Providers: Gemini (unchanged API-key flow) and Claude Code, which runs the user's own installed, unmodified `claude` CLI signed in with the user's own Claude account. The app never reads, stores or passes Claude credentials and never signs in for the user. Calling the Claude API directly with an Anthropic API key is not part of this decision.
+     - Each provider has its own privacy acknowledgement and revision. The Gemini acknowledgement (Q63) and its stored revision stay as they are.
+     - Turning Cloud Digest on offers the privacy model download (Q92).
+   - **Implementation choices, open to change:** see SPEC "Cloud providers (Q93)".
