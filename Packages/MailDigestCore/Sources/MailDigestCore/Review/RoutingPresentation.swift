@@ -117,7 +117,8 @@ public enum RoutingPresentation {
                 lines.append(RoutingDetailLine(label: "Public confidence", value: percent(p)))
             }
             lines.append(RoutingDetailLine(label: "Threshold", value: percent(t.threshold)))
-            lines.append(RoutingDetailLine(label: "Public floor", value: percent(t.publicFloor)))
+            lines.append(RoutingDetailLine(label: "Public floor",
+                                           value: t.publicFloorWaived ? "Waived (List-Unsubscribe)" : percent(t.publicFloor)))
         }
         if let c = a.triageCoverage, c.totalChunks > 1 {
             lines.append(RoutingDetailLine(label: "Text assessed",

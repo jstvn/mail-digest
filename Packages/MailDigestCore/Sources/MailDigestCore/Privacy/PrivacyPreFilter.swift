@@ -57,9 +57,16 @@ public struct PrivacyPreFilter: Sendable {
         ("bupa.com.au", "domain.health"), ("medibank.com.au", "domain.health"),
     ]
 
-    /// Public senders: exact hosts only, no subdomain wildcard (Q61).
+    /// Public senders (Q61, Q95): exact hosts or exact full addresses (lowercase), no wildcard and no
+    /// subdomain matching. Plain `linkedin.com` is deliberately absent: only the bulk senders below match.
     static let publicHosts: [(host: String, ruleID: String)] = [
         ("substack.com", "allowlist.substack"), ("medium.com", "allowlist.medium"),
+        ("glassdoor.com", "allowlist.glassdoor"), ("letterboxd.com", "allowlist.letterboxd"),
+        ("em.linkedin.com", "allowlist.linkedin.em"), ("email.seek.com.au", "allowlist.seek"),
+        ("jora.com", "allowlist.jora"),
+        ("jobs-noreply@linkedin.com", "allowlist.linkedin.jobs"),
+        ("jobalerts-noreply@linkedin.com", "allowlist.linkedin.jobalerts"),
+        ("newsletters-noreply@linkedin.com", "allowlist.linkedin.newsletters"),
     ]
 
     /// Unconditional private rules: word-boundary token sequences (lowercase).
@@ -141,6 +148,7 @@ public struct PrivacyPreFilter: Sendable {
         let relayOriginal = RelaySender.originalSender(from: input.sender, headers: input.headers)
         let fromHost = Self.host(of: input.sender)
         let host = relayOriginal.flatMap(Self.host(of:)) ?? fromHost
+        let address = relayOriginal.flatMap(Self.address(of:)) ?? Self.address(of: input.sender)
         // Fail closed: the sensitive-domain check also looks at every host that could name the sender,
         // including an unverified `s=` claim (it can only make mail more local).
         let sensitiveHosts = [fromHost, host, RelaySender.claimedSender(headers: input.headers).flatMap(Self.host(of:))]
@@ -156,7 +164,7 @@ public struct PrivacyPreFilter: Sendable {
         if let strong { return .private(strong) }
         let signal = riskSignal(for: input)
         if input.inspection == .complete, hasUnsub, let host,
-           let entry = Self.publicHosts.first(where: { $0.host == host }) {
+           let entry = Self.publicHosts.first(where: { $0.host == host || $0.host == address }) {
             if let signal { return .needsTriage(.trustedSenderRisk, signal: signal) }
             return .public(entry.ruleID)
         }
@@ -191,7 +199,8 @@ public struct PrivacyPreFilter: Sendable {
         sensitiveDomains.first { host == $0.suffix || host.hasSuffix("." + $0.suffix) }?.ruleID
     }
 
-    private static func hasValidUnsubscribe(_ headers: [String: String]) -> Bool {
+    /// A usable `List-Unsubscribe` target (https or mailto).
+    static func hasValidUnsubscribe(_ headers: [String: String]) -> Bool {
         let unsub = headers.first { $0.key.lowercased() == "list-unsubscribe" }?.value.lowercased() ?? ""
         return unsub.contains("<https:") || unsub.contains("<mailto:")
     }
@@ -285,6 +294,16 @@ public struct PrivacyPreFilter: Sendable {
         var host = addr[addr.index(after: at)...].trimmingCharacters(in: .whitespaces).lowercased()
         while host.hasSuffix(".") { host.removeLast() }
         return host.isEmpty ? nil : host
+    }
+
+    /// Lowercased address of "Name <a@b>" or "a@b".
+    static func address(of sender: String) -> String? {
+        var addr = Substring(sender)
+        if let open = sender.lastIndex(of: "<"), let close = sender[open...].firstIndex(of: ">") {
+            addr = sender[sender.index(after: open)..<close]
+        }
+        let a = addr.trimmingCharacters(in: .whitespaces).lowercased()
+        return a.contains("@") ? a : nil
     }
 
     /// Lowercase alphanumeric runs; punctuation and HTML tags just act as separators.

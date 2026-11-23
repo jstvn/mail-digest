@@ -163,7 +163,8 @@ public struct TriageEvaluator: Sendable {
     private static let epsilon = 1e-9
 
     public func evaluate(_ scores: SystemOneScores, model: String, threshold: Double,
-                         publicFloor: Double = SystemOneSpec.publicFloor, assessedAt: Date) -> PrivacyAssessment {
+                         publicFloor: Double = SystemOneSpec.publicFloor, waivePublicFloor: Bool = false,
+                         assessedAt: Date) -> PrivacyAssessment {
         let t = threshold.isFinite
             ? min(max(threshold, SystemOneSpec.thresholdRange.lowerBound), SystemOneSpec.thresholdRange.upperBound)
             : SystemOneSpec.thresholdRange.upperBound
@@ -180,12 +181,14 @@ public struct TriageEvaluator: Sendable {
         if pPublic == nil { failed = true }
         let pNon = pSensitive.map { 1 - $0 }
         let triage = TriageScores(model: model, pSensitive: pSensitive, pNonSensitive: pNon,
-                                  categoryProbabilities: cats, threshold: t, publicFloor: publicFloor)
+                                  categoryProbabilities: cats, threshold: t, publicFloor: publicFloor,
+                                  publicFloorWaived: waivePublicFloor)
         if failed {
             return PrivacyAssessment(verdict: .uncertain, method: .systemOne, triage: triage,
                                      triageFailure: .malformedResponse, assessedAt: assessedAt)
         }
-        let eligible = pNon! + Self.epsilon >= t && pPublic! + Self.epsilon >= publicFloor
+        // Q95: a bulk message (List-Unsubscribe, no risk signal) needs only the non-sensitive score.
+        let eligible = pNon! + Self.epsilon >= t && (waivePublicFloor || pPublic! + Self.epsilon >= publicFloor)
         // Confidently sensitive is a decision of its own, distinct from merely not confident enough.
         let verdict: PrivacyVerdict = eligible ? .public : (pSensitive! >= 0.5 ? .private : .uncertain)
         return PrivacyAssessment(verdict: verdict, method: .systemOne, triage: triage, assessedAt: assessedAt)

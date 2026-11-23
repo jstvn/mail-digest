@@ -27,15 +27,34 @@ public struct TriageScores: Codable, Sendable, Equatable {
     public var categoryProbabilities: [String: Double]
     public var threshold: Double
     public var publicFloor: Double
+    /// True when the public-category floor was waived (Q95: bulk mail with List-Unsubscribe). Absent decodes as false.
+    public var publicFloorWaived: Bool
 
     public init(model: String, pSensitive: Double?, pNonSensitive: Double?,
-                categoryProbabilities: [String: Double], threshold: Double, publicFloor: Double) {
+                categoryProbabilities: [String: Double], threshold: Double, publicFloor: Double,
+                publicFloorWaived: Bool = false) {
+        self.publicFloorWaived = publicFloorWaived
         self.model = model
         self.pSensitive = pSensitive
         self.pNonSensitive = pNonSensitive
         self.categoryProbabilities = categoryProbabilities
         self.threshold = threshold
         self.publicFloor = publicFloor
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case model, pSensitive, pNonSensitive, categoryProbabilities, threshold, publicFloor, publicFloorWaived
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        model = try c.decode(String.self, forKey: .model)
+        pSensitive = try c.decodeIfPresent(Double.self, forKey: .pSensitive)
+        pNonSensitive = try c.decodeIfPresent(Double.self, forKey: .pNonSensitive)
+        categoryProbabilities = try c.decode([String: Double].self, forKey: .categoryProbabilities)
+        threshold = try c.decode(Double.self, forKey: .threshold)
+        publicFloor = try c.decode(Double.self, forKey: .publicFloor)
+        publicFloorWaived = try c.decodeIfPresent(Bool.self, forKey: .publicFloorWaived) ?? false
     }
 }
 
