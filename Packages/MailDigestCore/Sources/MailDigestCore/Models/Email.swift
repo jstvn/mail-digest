@@ -41,7 +41,7 @@ public struct EmailMessage: Codable, Sendable, Equatable, Identifiable {
     public var subject: String
     public var receivedAt: Date
     public var body: String            // plain text as Mail renders it
-    public var headers: [String: String] // only List-Unsubscribe, Precedence, Auto-Submitted
+    public var headers: [String: String] // filter headers only (see MailJSONDecoder.filterHeaders)
     public var sourceReference: MailMessageReference
     /// Defaults to `.unknown` so fixtures and older callers fail closed.
     public var contentInspection: ContentInspection

@@ -62,10 +62,12 @@ public enum ReplayRouting {
 
     /// Re-derives the route under `threshold` from recorded scores, so System One is called once per chunk.
     /// The router is run at the lowest threshold; a chunk that is not public there is not public at a higher
-    /// one, so the recorded chunks always suffice. Fails closed on any missing chunk or failure.
+    /// one, so the recorded chunks always suffice. `publicFloorWaived` (Q95/Q96) is decided by the router from the
+    /// message itself, so it does not depend on the threshold. Fails closed on any missing chunk or failure.
     public static func route(method: AssessmentMethod, chunks: [ReplayChunk], totalChunks: Int,
                              failure: TriageFailure?, threshold: Double,
-                             publicFloor: Double = SystemOneSpec.publicFloor) -> ReplayRoute {
+                             publicFloor: Double = SystemOneSpec.publicFloor,
+                             publicFloorWaived: Bool = false) -> ReplayRoute {
         switch method {
         case .trustedSender: return .cloud
         case .rule, .inspection, .cloudOff: return .local
@@ -74,6 +76,7 @@ public enum ReplayRouting {
             let evaluator = TriageEvaluator()
             for c in chunks {
                 let a = evaluator.evaluate(c.scores, model: "replay", threshold: threshold, publicFloor: publicFloor,
+                                           publicFloorWaiver: publicFloorWaived ? .listUnsubscribe : nil,
                                            assessedAt: Date(timeIntervalSince1970: 0))
                 if a.verdict != .public { return .local }
             }

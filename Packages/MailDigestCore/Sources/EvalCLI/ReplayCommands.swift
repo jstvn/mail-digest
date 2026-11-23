@@ -139,7 +139,8 @@ func replayCommand(_ opts: [String: [String]]) async {
         var routes: [String: ReplayRoute] = [:]
         for t in thresholds {
             routes[ReplayRouting.key(for: t)] = ReplayRouting.route(
-                method: assessment.method, chunks: chunks, totalChunks: total, failure: assessment.triageFailure, threshold: t)
+                method: assessment.method, chunks: chunks, totalChunks: total, failure: assessment.triageFailure, threshold: t,
+                publicFloorWaived: assessment.triage?.publicFloorWaived == true)
         }
         let record = ReplayRecord(
             hash: ReplayRouting.stableHash(messageID), senderName: ReplayRouting.displayName(from: email.sender),

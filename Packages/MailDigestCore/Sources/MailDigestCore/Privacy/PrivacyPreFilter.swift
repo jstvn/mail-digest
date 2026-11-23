@@ -63,7 +63,7 @@ public struct PrivacyPreFilter: Sendable {
         ("substack.com", "allowlist.substack"), ("medium.com", "allowlist.medium"),
         ("glassdoor.com", "allowlist.glassdoor"), ("letterboxd.com", "allowlist.letterboxd"),
         ("em.linkedin.com", "allowlist.linkedin.em"), ("email.seek.com.au", "allowlist.seek"),
-        ("jora.com", "allowlist.jora"),
+        ("jora.com", "allowlist.jora"), ("email.openai.com", "allowlist.openai.marketing"),
         ("jobs-noreply@linkedin.com", "allowlist.linkedin.jobs"),
         ("jobalerts-noreply@linkedin.com", "allowlist.linkedin.jobalerts"),
         ("newsletters-noreply@linkedin.com", "allowlist.linkedin.newsletters"),
@@ -75,7 +75,10 @@ public struct PrivacyPreFilter: Sendable {
                     ["one", "time", "password"], ["sign", "in", "code"], ["signin", "code"],
                     ["security", "code"], ["login", "code"], ["passcode"]]),
         ("kw.credentials", [["password", "reset"], ["reset", "your", "password"], ["credentials"],
-                            ["login", "link"], ["magic", "link"]]),
+                            ["login", "link"], ["magic", "link"],
+                            // Account verification (Q97): confirmation links grant access to an account.
+                            ["confirm", "your", "email"], ["verify", "your", "email"], ["verify", "your", "account"],
+                            ["confirm", "your", "account"], ["activate", "your", "account"], ["email", "verification"]]),
     ]
 
     /// Strong record phrases. `plain` matches alone; `gated` matches only when a token containing a digit
@@ -163,7 +166,8 @@ public struct PrivacyPreFilter: Sendable {
         }
         if let strong { return .private(strong) }
         let signal = riskSignal(for: input)
-        if input.inspection == .complete, hasUnsub, let host,
+        if input.inspection == .complete, let host,
+           Self.bulkEvidence(sender: input.sender, subject: input.subject, headers: input.headers) != nil,
            let entry = Self.publicHosts.first(where: { $0.host == host || $0.host == address }) {
             if let signal { return .needsTriage(.trustedSenderRisk, signal: signal) }
             return .public(entry.ruleID)
@@ -204,6 +208,29 @@ public struct PrivacyPreFilter: Sendable {
         let unsub = headers.first { $0.key.lowercased() == "list-unsubscribe" }?.value.lowercased() ?? ""
         return unsub.contains("<https:") || unsub.contains("<mailto:")
     }
+
+    /// Q96: why a message counts as bulk mail, or nil. A valid List-Unsubscribe wins; otherwise a verified
+    /// Hide My Email relay (Apple strips List-Unsubscribe from relayed mail) that is not a reply or forward.
+    static func bulkEvidence(sender: String, subject: String, headers: [String: String]) -> PublicFloorWaiver? {
+        if hasValidUnsubscribe(headers) { return .listUnsubscribe }
+        guard RelaySender.originalSender(from: sender, headers: headers) != nil,
+              !isReplyOrForward(subject: subject, headers: headers) else { return nil }
+        return .hideMyEmail
+    }
+
+    /// True for an `In-Reply-To` or `References` header, or a subject that starts with a reply or forward
+    /// prefix (optionally repeated, optionally with a bracketed count) followed by ":" or "：".
+    static func isReplyOrForward(subject: String, headers: [String: String]) -> Bool {
+        for (key, value) in headers where ["in-reply-to", "references"].contains(key.lowercased()) {
+            if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        }
+        let s = subject.trimmingCharacters(in: .whitespacesAndNewlines)
+        return matches(replyPrefixRegex, in: s)
+    }
+
+    private static let replyPrefixRegex = try? NSRegularExpression(
+        pattern: #"^(?:re|fw|fwd|aw|wg|sv|vs|antw|tr|rif|回复|答复|转发|回覆|轉寄)\s*(?:[\[(]\d+[\])])?\s*[:：]"#,
+        options: [.caseInsensitive])
 
     // MARK: Risk signals
 

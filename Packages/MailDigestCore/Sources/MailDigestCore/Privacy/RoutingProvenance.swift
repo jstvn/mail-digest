@@ -19,6 +19,11 @@ public enum TriageFailure: String, Codable, Sendable, Equatable, Error {
     case contentTooLong
 }
 
+/// What waived the System One public-category floor (Q95/Q96): the bulk evidence found on the message.
+public enum PublicFloorWaiver: String, Codable, Sendable, Equatable {
+    case listUnsubscribe, hideMyEmail
+}
+
 /// Raw System One scores plus the thresholds in force at decision time.
 public struct TriageScores: Codable, Sendable, Equatable {
     public var model: String
@@ -27,13 +32,15 @@ public struct TriageScores: Codable, Sendable, Equatable {
     public var categoryProbabilities: [String: Double]
     public var threshold: Double
     public var publicFloor: Double
-    /// True when the public-category floor was waived (Q95: bulk mail with List-Unsubscribe). Absent decodes as false.
-    public var publicFloorWaived: Bool
+    /// Why the public-category floor was waived (bulk evidence), or nil when it applied.
+    public var publicFloorWaiver: PublicFloorWaiver?
+    /// True when the public-category floor was waived.
+    public var publicFloorWaived: Bool { publicFloorWaiver != nil }
 
     public init(model: String, pSensitive: Double?, pNonSensitive: Double?,
                 categoryProbabilities: [String: Double], threshold: Double, publicFloor: Double,
-                publicFloorWaived: Bool = false) {
-        self.publicFloorWaived = publicFloorWaived
+                publicFloorWaiver: PublicFloorWaiver? = nil) {
+        self.publicFloorWaiver = publicFloorWaiver
         self.model = model
         self.pSensitive = pSensitive
         self.pNonSensitive = pNonSensitive
@@ -43,7 +50,7 @@ public struct TriageScores: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case model, pSensitive, pNonSensitive, categoryProbabilities, threshold, publicFloor, publicFloorWaived
+        case model, pSensitive, pNonSensitive, categoryProbabilities, threshold, publicFloor, publicFloorWaived, publicFloorWaiver
     }
 
     public init(from decoder: Decoder) throws {
@@ -54,7 +61,25 @@ public struct TriageScores: Codable, Sendable, Equatable {
         categoryProbabilities = try c.decode([String: Double].self, forKey: .categoryProbabilities)
         threshold = try c.decode(Double.self, forKey: .threshold)
         publicFloor = try c.decode(Double.self, forKey: .publicFloor)
-        publicFloorWaived = try c.decodeIfPresent(Bool.self, forKey: .publicFloorWaived) ?? false
+        // Old records (Q95) only have the Bool: true meant List-Unsubscribe.
+        if let w = try c.decodeIfPresent(PublicFloorWaiver.self, forKey: .publicFloorWaiver) {
+            publicFloorWaiver = w
+        } else if try c.decodeIfPresent(Bool.self, forKey: .publicFloorWaived) == true {
+            publicFloorWaiver = .listUnsubscribe
+        } else {
+            publicFloorWaiver = nil
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(model, forKey: .model)
+        try c.encodeIfPresent(pSensitive, forKey: .pSensitive)
+        try c.encodeIfPresent(pNonSensitive, forKey: .pNonSensitive)
+        try c.encode(categoryProbabilities, forKey: .categoryProbabilities)
+        try c.encode(threshold, forKey: .threshold)
+        try c.encode(publicFloor, forKey: .publicFloor)
+        try c.encodeIfPresent(publicFloorWaiver, forKey: .publicFloorWaiver)
     }
 }
 

@@ -163,7 +163,7 @@ public struct TriageEvaluator: Sendable {
     private static let epsilon = 1e-9
 
     public func evaluate(_ scores: SystemOneScores, model: String, threshold: Double,
-                         publicFloor: Double = SystemOneSpec.publicFloor, waivePublicFloor: Bool = false,
+                         publicFloor: Double = SystemOneSpec.publicFloor, publicFloorWaiver: PublicFloorWaiver? = nil,
                          assessedAt: Date) -> PrivacyAssessment {
         let t = threshold.isFinite
             ? min(max(threshold, SystemOneSpec.thresholdRange.lowerBound), SystemOneSpec.thresholdRange.upperBound)
@@ -182,13 +182,13 @@ public struct TriageEvaluator: Sendable {
         let pNon = pSensitive.map { 1 - $0 }
         let triage = TriageScores(model: model, pSensitive: pSensitive, pNonSensitive: pNon,
                                   categoryProbabilities: cats, threshold: t, publicFloor: publicFloor,
-                                  publicFloorWaived: waivePublicFloor)
+                                  publicFloorWaiver: publicFloorWaiver)
         if failed {
             return PrivacyAssessment(verdict: .uncertain, method: .systemOne, triage: triage,
                                      triageFailure: .malformedResponse, assessedAt: assessedAt)
         }
-        // Q95: a bulk message (List-Unsubscribe, no risk signal) needs only the non-sensitive score.
-        let eligible = pNon! + Self.epsilon >= t && (waivePublicFloor || pPublic! + Self.epsilon >= publicFloor)
+        // Q95/Q96: a bulk message (bulk evidence, no risk signal) needs only the non-sensitive score.
+        let eligible = pNon! + Self.epsilon >= t && (publicFloorWaiver != nil || pPublic! + Self.epsilon >= publicFloor)
         // Confidently sensitive is a decision of its own, distinct from merely not confident enough.
         let verdict: PrivacyVerdict = eligible ? .public : (pSensitive! >= 0.5 ? .private : .uncertain)
         return PrivacyAssessment(verdict: verdict, method: .systemOne, triage: triage, assessedAt: assessedAt)

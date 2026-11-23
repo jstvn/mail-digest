@@ -161,14 +161,18 @@ public struct BenchmarkRoute: Codable, Sendable, Equatable {
     public var method: AssessmentMethod
     public var ruleID: String?
     public var triageFailure: TriageFailure?
+    /// True when the router waived the public floor (Q95/Q96). Absent in old results.
+    public var publicFloorWaived: Bool?
 
     public init(verdict: PrivacyVerdict, method: AssessmentMethod, ruleID: String? = nil,
-                triageFailure: TriageFailure? = nil) {
+                triageFailure: TriageFailure? = nil, publicFloorWaived: Bool? = nil) {
         self.verdict = verdict; self.method = method; self.ruleID = ruleID; self.triageFailure = triageFailure
+        self.publicFloorWaived = publicFloorWaived
     }
 
     init(_ a: PrivacyAssessment) {
-        self.init(verdict: a.verdict, method: a.method, ruleID: a.ruleID, triageFailure: a.triageFailure)
+        self.init(verdict: a.verdict, method: a.method, ruleID: a.ruleID, triageFailure: a.triageFailure,
+                  publicFloorWaived: a.triage?.publicFloorWaived == true ? true : nil)
     }
 
     /// Cloud-eligible means the router would send this email to Gemini: verdict `.public`.
@@ -265,7 +269,9 @@ public enum BenchmarkRouting {
     public static func route(for record: BenchmarkRecord, thresholds: RoutingThresholds?) -> BenchmarkRoute {
         guard let t = thresholds, record.route.method == .systemOne, record.error == nil else { return record.route }
         let a = TriageEvaluator().evaluate(record.scores, model: record.model, threshold: t.threshold,
-                                           publicFloor: t.publicFloor, assessedAt: Date(timeIntervalSince1970: 0))
+                                           publicFloor: t.publicFloor,
+                                           publicFloorWaiver: record.route.publicFloorWaived == true ? .listUnsubscribe : nil,
+                                           assessedAt: Date(timeIntervalSince1970: 0))
         return BenchmarkRoute(a)
     }
 

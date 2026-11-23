@@ -7,6 +7,15 @@ private let unsub = ["List-Unsubscribe": "<https://example.com/u?id=1>"]
 private let amb = PreFilterVerdict.needsTriage(.ambiguousSender, signal: nil)
 private let today = FixtureLoader.today
 
+/// A Hide My Email relayed message as Apple delivers it: no List-Unsubscribe.
+private func relay(original: String) -> (from: String, headers: [String: String]) {
+    let flat = original.replacingOccurrences(of: "@", with: "_at_").replacingOccurrences(of: ".", with: "_")
+    return ("Sender <\(flat)_abc123def456_0a1b2c3d@icloud.com>",
+            ["X-ICLOUD-HME": "p=alias@icloud.com; d=login.example.org; f=me@icloud.com; r=to; s=\(original)"])
+}
+private let relayFrom = relay(original: "noreply@glassdoor.com").from
+private let relayHeaders = relay(original: "noreply@glassdoor.com").headers
+
 private func input(_ sender: String, body: String = "Just saying hi.", headers: [String: String] = unsub,
                    subject: String = "Hello") -> PrivacyInput {
     PrivacyInput(sender: sender, subject: subject, body: body, headers: headers, inspection: .complete)
@@ -62,12 +71,8 @@ Glassdoor, Inc., 100 Sample Street, Testville
     }
 
     @Test func hideMyEmailRelayUsesVerifiedOriginal() {
-        let original = "noreply@glassdoor.com"
-        let flat = original.replacingOccurrences(of: "@", with: "_at_").replacingOccurrences(of: ".", with: "_")
-        let from = "Glassdoor <\(flat)_abc123def456_0a1b2c3d@icloud.com>"
-        var headers = unsub
-        headers["X-ICLOUD-HME"] = "p=alias@icloud.com; d=login.example.org; f=me@icloud.com; r=to; s=\(original)"
-        #expect(filter.classify(input(from, headers: headers)) == .public("allowlist.glassdoor"))
+        // Real relayed mail has no List-Unsubscribe (Q96): the verified relay is the bulk evidence.
+        #expect(filter.classify(input(relayFrom, headers: relayHeaders)) == .public("allowlist.glassdoor"))
     }
 
     @Test func glassdoorJobAlertFixtureStaysPublic() {
@@ -79,7 +84,7 @@ Glassdoor, Inc., 100 Sample Street, Testville
 @Suite struct Q95EvaluatorTests {
     private func verdict(_ sens: Double, _ pub: Double, waive: Bool) -> PrivacyVerdict {
         let s = SystemOneScores(noul: sens, categoryProbabilities: [SystemOneSpec.publicCategory: pub])
-        return TriageEvaluator().evaluate(s, model: "m", threshold: 0.85, waivePublicFloor: waive, assessedAt: today).verdict
+        return TriageEvaluator().evaluate(s, model: "m", threshold: 0.85, publicFloorWaiver: waive ? .listUnsubscribe : nil, assessedAt: today).verdict
     }
 
     @Test func waiverOn() {
@@ -97,7 +102,7 @@ Glassdoor, Inc., 100 Sample Street, Testville
 
     @Test func waiverStillFailsClosedOnMissingPublicScore() {
         let s = SystemOneScores(noul: 0.05, categoryProbabilities: [:])
-        let a = TriageEvaluator().evaluate(s, model: "m", threshold: 0.85, waivePublicFloor: true, assessedAt: today)
+        let a = TriageEvaluator().evaluate(s, model: "m", threshold: 0.85, publicFloorWaiver: .listUnsubscribe, assessedAt: today)
         #expect(a.verdict == .uncertain && a.triageFailure == .malformedResponse)
     }
 
@@ -107,7 +112,7 @@ Glassdoor, Inc., 100 Sample Street, Testville
         #expect(t.publicFloorWaived == false)
         let round = try JSONDecoder().decode(TriageScores.self, from: JSONEncoder().encode(
             TriageScores(model: "m", pSensitive: 0.1, pNonSensitive: 0.9, categoryProbabilities: [:],
-                         threshold: 0.85, publicFloor: 0.85, publicFloorWaived: true)))
+                         threshold: 0.85, publicFloor: 0.85, publicFloorWaiver: .listUnsubscribe)))
         #expect(round.publicFloorWaived)
     }
 }

@@ -117,8 +117,13 @@ public enum RoutingPresentation {
                 lines.append(RoutingDetailLine(label: "Public confidence", value: percent(p)))
             }
             lines.append(RoutingDetailLine(label: "Threshold", value: percent(t.threshold)))
-            lines.append(RoutingDetailLine(label: "Public floor",
-                                           value: t.publicFloorWaived ? "Waived (List-Unsubscribe)" : percent(t.publicFloor)))
+            let floor: String
+            switch t.publicFloorWaiver {
+            case .listUnsubscribe?: floor = "Waived (List-Unsubscribe)"
+            case .hideMyEmail?: floor = "Waived (Hide My Email)"
+            case nil: floor = percent(t.publicFloor)
+            }
+            lines.append(RoutingDetailLine(label: "Public floor", value: floor))
         }
         if let c = a.triageCoverage, c.totalChunks > 1 {
             lines.append(RoutingDetailLine(label: "Text assessed",

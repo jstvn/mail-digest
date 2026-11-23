@@ -114,15 +114,17 @@ public struct DigestRouter: Sendable {
                 return uncertain(failure, coverage: TriageCoverage(assessedChunks: 0, totalChunks: total))
             }
             let evaluator = TriageEvaluator()
-            // Q95: only an unknown sender with no risk signal and a valid List-Unsubscribe is bulk mail.
-            let waive = trigger == .ambiguousSender && signal == nil
-                && PrivacyPreFilter.hasValidUnsubscribe(email.headers)
+            // Q95/Q96: only an unknown sender with no risk signal and bulk evidence (List-Unsubscribe, or a
+            // verified Hide My Email relay that is not a reply) is bulk mail.
+            let waiver: PublicFloorWaiver? = trigger == .ambiguousSender && signal == nil
+                ? PrivacyPreFilter.bulkEvidence(sender: email.sender, subject: email.subject, headers: email.headers)
+                : nil
             var worst: PrivacyAssessment?
             for input in plan.inputs {
                 try Task.checkCancellation()
                 let scores = try await triage.assess(input, model: config.triageModel)
                 var result = evaluator.evaluate(scores, model: config.triageModel,
-                                                threshold: config.privacyThreshold, waivePublicFloor: waive,
+                                                threshold: config.privacyThreshold, publicFloorWaiver: waiver,
                                                 assessedAt: clock.now())
                 finished += 1
                 result.triageTrigger = trigger
