@@ -389,6 +389,7 @@ public struct EmlxParser: Sendable {
         "lsquo": "\u{2018}", "rsquo": "\u{2019}", "ldquo": "\u{201C}", "rdquo": "\u{201D}", "bull": "\u{2022}",
         "middot": "\u{B7}", "euro": "\u{20AC}", "pound": "\u{A3}", "yen": "\u{A5}", "cent": "\u{A2}",
         "laquo": "\u{AB}", "raquo": "\u{BB}", "times": "\u{D7}", "deg": "\u{B0}", "eacute": "\u{E9}",
+        "zwnj": "\u{200C}", "zwj": "\u{200D}", "shy": "\u{AD}",
     ]
 
     static func decodeEntities(_ s: String) -> String {
@@ -443,6 +444,8 @@ public struct EmlxParser: Sendable {
             let skip = href.isEmpty || href.hasPrefix("#") || href.lowercased().hasPrefix("javascript:")
             if skip || text == href { out += text.isEmpty ? href : text }
             else if text.isEmpty { out += href }
+            // Q98: a phrase label stands alone; the href is long tracking noise for the model.
+            else if !looksLikeURLOrDomain(text) { out += text }
             else { out += "\(text) (\(href))" }
         }
 
@@ -495,7 +498,29 @@ public struct EmlxParser: Sendable {
             }
         }
         finishAnchor()
-        return tidy(out)
+        return tidy(stripLeftoverTags(out))
+    }
+
+    private static let bareDomainRegex = try? NSRegularExpression(
+        pattern: #"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}([/?#].*)?$"#)
+    private static let leftoverTagRegex = try? NSRegularExpression(
+        pattern: #"</?[A-Za-z][A-Za-z0-9]*(\s[^<>]*)?/?>"#)
+
+    /// True when a link label is itself a URL or bare domain, so the href adds nothing but is worth keeping.
+    private static func looksLikeURLOrDomain(_ text: String) -> Bool {
+        guard !text.contains(where: { $0.isWhitespace }) else { return false }
+        let lower = text.lowercased()
+        if lower.hasPrefix("http://") || lower.hasPrefix("https://") || lower.hasPrefix("www.")
+            || lower.hasPrefix("mailto:") { return true }
+        guard let regex = bareDomainRegex else { return false }
+        return regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+    }
+
+    /// Entity-decoded markup such as "&lt;div&gt;" would otherwise survive as tags. "<https://x>" and
+    /// "<name@host>" do not match because a tag name must be followed by whitespace, "/" or ">".
+    private static func stripLeftoverTags(_ text: String) -> String {
+        guard text.contains("<"), let regex = leftoverTagRegex else { return text }
+        return regex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
     }
 
     private static func attribute(_ name: String, in tag: String) -> String? {

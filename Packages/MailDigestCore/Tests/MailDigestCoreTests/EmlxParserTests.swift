@@ -59,11 +59,37 @@ private func reason(_ data: Data) -> EmlxUnusableReason? {
         """
         let p = try usable(emlx("\(baseHeaders)\nContent-Type: text/html; charset=utf-8\n\n\(html)"))
         #expect(p.body.contains("Tom & Jerry \u{2013} caf\u{E9}"))
-        #expect(p.body.contains("our site (https://example.org/x)"))
+        // Q98: a phrase label no longer repeats its href.
+        #expect(p.body.contains("Visit our site or"))
+        #expect(!p.body.contains("example.org/x"))
         #expect(p.body.contains("or https://example.org."))
         #expect(!p.body.contains("(https://example.org)"))
         #expect(p.body.contains("Line\nbreak"))
         for bad in ["alert", "color", "<", "T\n"] { #expect(!p.body.contains(bad)) }
+    }
+
+    // Q98 link labels
+    @Test func linkLabelRules() {
+        let h = EmlxParser.htmlToText
+        #expect(h(#"<a href="https://x.com/t?u=1">Read more</a>"#) == "Read more")
+        #expect(h(#"<a href="https://x.com/t">https://x.com</a>"#) == "https://x.com (https://x.com/t)")
+        #expect(h(#"<a href="https://x.com/t">example.com</a>"#) == "example.com (https://x.com/t)")
+        #expect(h(#"<a href="https://x.com/t"> </a>"#) == "https://x.com/t")
+        #expect(h(#"<a href="https://x.com/t">https://x.com/t</a>"#) == "https://x.com/t")
+    }
+
+    @Test func namedEntitiesAndLeftoverTags() {
+        #expect(EmlxParser.decodeEntities("a&ndash;b &lsquo;x&rsquo; &hellip; &copy; &euro;5 &zwnj;&zwj;&shy;")
+            == "a\u{2013}b \u{2018}x\u{2019} \u{2026} \u{A9} \u{20AC}5 \u{200C}\u{200D}\u{AD}")
+        // Entity-decoded markup is stripped for HTML-derived text only.
+        #expect(EmlxParser.htmlToText("<p>a &lt;div class=\"x\"&gt;b&lt;/div&gt; c</p>") == "a b c")
+        #expect(EmlxParser.htmlToText("<p>mail &lt;sam@example.com&gt; &lt;https://x.com&gt;</p>")
+            == "mail <sam@example.com> <https://x.com>")
+    }
+
+    @Test func plainTextKeepsAngleTags() throws {
+        let p = try usable(emlx("\(baseHeaders)\nContent-Type: text/plain; charset=utf-8\n\nWrite <b>bold</b> and <div> here\n"))
+        #expect(p.body.contains("<b>bold</b>") && p.body.contains("<div>"))
     }
 
     @Test func foldedHeadersAndEncodedWords() throws {
