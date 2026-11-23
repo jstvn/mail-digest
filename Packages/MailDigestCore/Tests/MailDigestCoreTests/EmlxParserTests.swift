@@ -78,6 +78,52 @@ private func reason(_ data: Data) -> EmlxUnusableReason? {
         #expect(h(#"<a href="https://x.com/t">https://x.com/t</a>"#) == "https://x.com/t")
     }
 
+    // Q99: DOM-based conversion
+    @Test func anchorWrappingBlocksKeepsStructure() {
+        let h = EmlxParser.htmlToText
+        let table = #"<a href="https://x.com/t?u=1"><table><tr><td>Open</td></tr><tr><td>your account</td></tr></table></a>"#
+        #expect(h(table) == "Open\n\nyour account")
+        #expect(!h(table).contains("x.com"))
+        #expect(h(#"<a href="https://x.com/t"><span>Read <b>more</b></span></a>"#) == "Read more")
+        #expect(h(#"<a href="https://x.com/t"><span>https://x.com</span></a>"#) == "https://x.com (https://x.com/t)")
+        #expect(h(#"<a href="https://x.com/t"><img src="a.png"></a>"#) == "https://x.com/t")
+        #expect(h(##"<a href="#top"><span>Back</span></a>"##) == "Back")
+        #expect(h(#"<a href="javascript:void(0)"> </a>"#) == "")
+    }
+
+    @Test func nestedAnchorsAreReadable() {
+        let out = EmlxParser.htmlToText(#"<a href="https://a.com/1">One <a href="https://b.com/2">Two</a></a>"#)
+        #expect(out.contains("One") && out.contains("Two") && !out.contains("a.com") && !out.contains("b.com"))
+    }
+
+    @Test func commentsTitleAndStyleAreDropped() {
+        let h = EmlxParser.htmlToText
+        #expect(h("<!--[if mso]><table><tr><td>MSO</td></tr></table><![endif]--><p>Hello</p>") == "Hello")
+        #expect(h("<html><head><title>Subject line</title></head><body><p>Body</p></body></html>") == "Body")
+        #expect(h("<p>a</p><style>p { color: red }</style><p>b</p><script>var x = 1;</script>") == "a\n\nb")
+    }
+
+    @Test func malformedMarkupIsReadable() {
+        let h = EmlxParser.htmlToText
+        #expect(h("<p>a<p>b") == "a\n\nb")
+        #expect(h("<div><span>x</div>y") == "x\ny")
+        #expect(h("<P>Up</P><DIV>Per</DIV>") == "Up\n\nPer")
+        #expect(h("a<br/>b<BR>c") == "a\nb\nc")
+        #expect(h(#"<p title="a > b">text</p>"#) == "text")
+    }
+
+    @Test func htmlEntitiesDecode() {
+        let h = EmlxParser.htmlToText
+        #expect(h("<p>a&nbsp;&nbsp;b &amp; c &#169; &#x20AC;</p>") == "a b & c \u{A9} \u{20AC}")
+        #expect(h("<p>x&zwnj;y</p>") == "x\u{200C}y")
+    }
+
+    @Test func soupFailureFallsBackToLegacyScanner() {
+        struct Boom: Error {}
+        let out = EmlxParser.htmlToTextOrFallback("<p>Hi &amp; bye</p>", using: { _ in throw Boom() })
+        #expect(out == "Hi & bye")
+    }
+
     @Test func namedEntitiesAndLeftoverTags() {
         #expect(EmlxParser.decodeEntities("a&ndash;b &lsquo;x&rsquo; &hellip; &copy; &euro;5 &zwnj;&zwj;&shy;")
             == "a\u{2013}b \u{2018}x\u{2019} \u{2026} \u{A9} \u{20AC}5 \u{200C}\u{200D}\u{AD}")

@@ -12,7 +12,7 @@ Native macOS menu bar app (Swift 6, SwiftUI) that reads new mail from Mail.app e
 
 | Part | Where | Builds on Linux? | How to verify |
 | --- | --- | --- | --- |
-| `MailDigestCore` | Swift package, Foundation only | Yes | `swift build`, `swift test` |
+| `MailDigestCore` | Swift package, Foundation plus SwiftSoup (Q99) | Yes | `swift build`, `swift test` |
 | `MailDigestApp` | Xcode macOS app (SwiftUI, EventKit, JXA scripts) | No (Mac only) | `xcodebuild ... build` on Mac |
 
 If running in a Linux container without `swift`, install a Swift 6 toolchain first (for example via `swiftly`). On macOS, Xcode 26.6+ and native frameworks are available.

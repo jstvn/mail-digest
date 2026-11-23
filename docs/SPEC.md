@@ -112,7 +112,7 @@ ReviewPanel (app, SwiftUI) reads Digest from DigestStore
 - Linux and Mac: `cd Packages/MailDigestCore && swift build && swift test`
 - Mac only: `xcodebuild -project MailDigestApp/MailDigest.xcodeproj -scheme MailDigest build`
 
-GRDB is a dependency of the app target only, so the core package stays Foundation-only.
+GRDB is a dependency of the app target only. The core package stays Foundation-only apart from SwiftSoup, which is used for HTML-to-text conversion (Q99).
 
 ## Data model
 
@@ -291,7 +291,7 @@ The current product model assumes that an RFC Message-ID is available. If a mess
 
 ### SQLite metadata reader
 
-Implement `EnvelopeIndexReader` in the macOS App target. GRDB remains an App-target dependency; `MailDigestCore` remains Foundation-only.
+Implement `EnvelopeIndexReader` in the macOS App target. GRDB remains an App-target dependency; `MailDigestCore` remains Foundation-only apart from SwiftSoup (Q99).
 
 - Open Apple Mail's `Envelope Index` database strictly read-only (`Configuration.readonly = true` or an equivalent SQLite read-only open). Never run migrations, writes, checkpoints, vacuum, schema repair, or cleanup against Apple Mail's database.
 - Discover the active Mail data directory instead of hard-coding `V10`. Probe supported `~/Library/Mail/V*/MailData/Envelope Index` candidates and select the active, readable store using validated database contents. Treat paths and schema as version-dependent implementation details.
@@ -306,7 +306,7 @@ Implement `EnvelopeIndexReader` in the macOS App target. GRDB remains an App-tar
 
 ### EMLX and MIME body reader
 
-Implement a Foundation-only `EmlxParser` in `MailDigestCore` and an App-target `EmlxStoreReader` that securely resolves the `.emlx` file for a `MailMessageReference`.
+Implement an `EmlxParser` (Foundation, plus SwiftSoup for HTML-to-text, Q99) in `MailDigestCore` and an App-target `EmlxStoreReader` that securely resolves the `.emlx` file for a `MailMessageReference`.
 
 - Parse the leading byte-count/length prefix correctly, then isolate the RFC 822 message bytes and trailing Apple Mail plist metadata. Byte offsets must be calculated against `Data` indices correctly; do not assume a character count equals a byte count.
 - Parse RFC 5322 headers (including folded headers) and MIME structure. Prefer `text/plain`; if only HTML is available, convert it to readable text while preserving meaningful links and text. A link whose visible text is a non-URL phrase is rendered as that text alone; empty or URL-like link text keeps the address (Q98). Handle quoted-printable, base64 transfer encoding and declared character sets.

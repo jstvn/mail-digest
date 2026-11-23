@@ -1,4 +1,5 @@
 import Foundation
+import SwiftSoup
 
 /// Where a message body came from; the app records this as body provenance.
 public enum EmlxSource: String, Codable, Sendable, Equatable {
@@ -420,7 +421,63 @@ public struct EmlxParser: Sendable {
     private static let singleBreakTags: Set<String> = ["br", "div", "li", "tr", "hr", "section", "article", "header", "footer", "pre"]
     private static let skippedTags: Set<String> = ["script", "style", "head"]
 
-    static func htmlToText(_ html: String) -> String {
+    /// Converts an HTML part to readable text (Q99): SwiftSoup's HTML5 DOM drives the block/newline mapping and
+    /// the Q98 link rules. If SwiftSoup throws, the older hand-written scanner is used so output is never worse.
+    /// - Parameter soupConvert: injectable so tests can force the fallback path.
+    static func htmlToText(_ html: String) -> String { htmlToTextOrFallback(html, using: soupHTMLToText) }
+
+    static func htmlToTextOrFallback(_ html: String, using soupConvert: (String) throws -> String) -> String {
+        do { return try soupConvert(html) } catch { return legacyHTMLToText(html) }
+    }
+
+    /// Pure DOM walk; the parsed document never escapes this function (no shared mutable state).
+    static func soupHTMLToText(_ html: String) throws -> String {
+        let doc = try SwiftSoup.parse(html)
+        var out = ""
+        for child in doc.getChildNodes() { try walk(child, &out, depth: 0) }
+        return tidy(stripLeftoverTags(out))
+    }
+
+    /// Guards the recursive walk against pathological nesting; exceeding it triggers the legacy fallback.
+    private static let maxDOMDepth = 400
+
+    private struct DOMTooDeep: Error {}
+
+    private static func walk(_ node: Node, _ out: inout String, depth: Int) throws {
+        guard depth <= maxDOMDepth else { throw DOMTooDeep() }
+        if let text = node as? TextNode { out += text.getWholeText(); return }
+        // Comments (including mso conditional comments), data nodes and doctype carry no readable text.
+        guard let element = node as? Element else { return }
+        let name = element.tagName().lowercased()
+        if skippedTags.contains(name) { return }
+
+        if name == "a" {
+            let href = try element.attr("href")
+            var inner = ""
+            for child in element.getChildNodes() { try walk(child, &inner, depth: depth + 1) }
+            // Q98 with nested content: children keep their block handling; the label is their collapsed text.
+            let label = collapse(inner)
+            let skip = href.isEmpty || href.hasPrefix("#") || href.lowercased().hasPrefix("javascript:")
+            if label.isEmpty {
+                out += skip ? inner : href
+            } else if skip || label == href || !looksLikeURLOrDomain(label) {
+                out += inner
+            } else {
+                // Keep trailing breaks after the "(href)" suffix so a wrapped block does not swallow it.
+                let body = inner.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trailing = String(inner.reversed().prefix(while: { $0.isNewline }))
+                out += "\(body) (\(href))\(trailing)"
+            }
+            return
+        }
+        let brk = doubleBreakTags.contains(name) ? "\n\n" : singleBreakTags.contains(name) ? "\n" : ""
+        out += brk
+        for child in element.getChildNodes() { try walk(child, &out, depth: depth + 1) }
+        if name != "br" { out += brk }
+    }
+
+    /// The pre-Q99 scanner, kept only as a fallback when SwiftSoup cannot parse.
+    static func legacyHTMLToText(_ html: String) -> String {
         let s = Array(html.unicodeScalars)
         var out = ""
         var anchorHref: String?
