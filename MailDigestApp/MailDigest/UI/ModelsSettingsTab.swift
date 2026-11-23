@@ -1,3 +1,4 @@
+import AppKit
 import MailDigestCore
 import SwiftUI
 
@@ -276,8 +277,14 @@ struct ModelsSettingsTab: View {
         @Bindable var store = store
         Form {
             Section {
-                ollamaRow
-                digestModelPicker
+                if showsProviderPicker { localProviderPicker }
+                if usesOllamaForDigest || cloudOn { ollamaRow }
+                if usesOllamaForDigest {
+                    digestModelPicker
+                } else {
+                    Text("Long emails are shortened for Apple Intelligence, which has a smaller context window than Ollama.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
             } header: {
                 Text("On This Mac")
             } footer: {
@@ -295,8 +302,13 @@ struct ModelsSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: cloudOn ? 800 : 430)
+        .frame(height: (cloudOn ? 800 : 430) + (showsProviderPicker ? 70 : 0))
         .task { await refreshKey() }
+        // Apple Intelligence can be switched on in System Settings while the app runs.
+        .onAppear { run.refreshPlatform() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            run.refreshPlatform()
+        }
         // Look for Claude Code whenever it is the selected provider of an active Cloud Digest.
         .task(id: cloudOn && store.settings.cloudProvider == .claudeCode) {
             if cloudOn && store.settings.cloudProvider == .claudeCode { await run.claudeCode.refresh() }
@@ -339,6 +351,29 @@ struct ModelsSettingsTab: View {
         return url.port.map { "\(host):\($0)" } ?? host
     }
 
+    private var platform: HostPlatform { run.platform }
+    private var usesOllamaForDigest: Bool { store.settings.localProvider == .ollama }
+    /// Hidden on Intel and ineligible Macs, except when a stored Apple Intelligence choice needs a way back.
+    private var showsProviderPicker: Bool {
+        platform.showsFoundationModelsChoice || store.settings.localProvider == .appleFoundationModels
+    }
+
+    /// "Local Model": Ollama or Apple Intelligence. The Apple Intelligence item is disabled, with the reason
+    /// below, when the system can't run it right now.
+    private var localProviderPicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Picker("Local Model", selection: Binding(get: { store.settings.localProvider },
+                                                     set: { store.settings.localProvider = $0 })) {
+                Text("Ollama").tag(LocalProvider.ollama)
+                Text("Apple Intelligence").tag(LocalProvider.appleFoundationModels)
+                    .disabled(!platform.canUseFoundationModels)
+            }
+            if let reason = platform.unavailableExplanation {
+                Text(reason).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var ollamaRow: some View {
         LabeledContent {
             HStack(spacing: 10) {
@@ -362,8 +397,10 @@ struct ModelsSettingsTab: View {
     /// Installed models, with the one in use always present so an existing choice is never lost.
     private var digestModelOptions: [String] {
         let current = store.settings.resolvedModel
-        let triage = Set(CloudPrivacyPolicy.triageModels.map(\.tag))
+        let triage = Set(CloudPrivacyPolicy.triageModels(for: platform).map(\.tag))
         var tags = (installedTags ?? []).filter { !triage.contains($0) || $0 == current }
+        // Suggested models show even when not installed, with a Download Model row once chosen.
+        tags.formUnion(DigestSettings.suggestedDigestModels(for: platform))
         tags.insert(current)
         return tags.sorted { RoutingPresentation.modelDisplayName($0).localizedStandardCompare(RoutingPresentation.modelDisplayName($1)) == .orderedAscending }
     }
@@ -509,12 +546,14 @@ struct ModelsSettingsTab: View {
         Binding(get: { store.settings.resolvedTriageModel }, set: { store.settings.triageModel = $0 })
     }
 
+    private var triageChoices: [CloudPrivacyPolicy.TriageModel] { CloudPrivacyPolicy.triageModels(for: platform) }
+
     private var privacyModelPicker: some View {
         let tag = store.settings.resolvedTriageModel
         return LabeledContent {
             Picker("Privacy Check Model", selection: triageSelection) {
-                ForEach(CloudPrivacyPolicy.triageModels) { Text($0.displayName).tag($0.tag) }
-                if !CloudPrivacyPolicy.triageModels.contains(where: { $0.tag == tag }) { Text(tag).tag(tag) }
+                ForEach(triageChoices) { Text($0.displayName).tag($0.tag) }
+                if !triageChoices.contains(where: { $0.tag == tag }) { Text(tag).tag(tag) }
             }
             .labelsHidden()
         } label: {
@@ -757,5 +796,24 @@ private struct TrailingIconLabelStyle: LabelStyle {
 
 #Preview("Models, cloud off") {
     ModelsSettingsTab(run: PreviewSupport.run())
+}
+#endif
+
+#if DEBUG
+#Preview("Models · Apple silicon, Apple Intelligence ready") {
+    ModelsSettingsTab(run: PreviewSupport.run(platform: .appleSiliconReady))
+}
+
+#Preview("Models · Apple silicon, Apple Intelligence off") {
+    ModelsSettingsTab(run: PreviewSupport.run(
+        platform: HostPlatform(isAppleSilicon: true, foundationModels: .unavailable(.appleIntelligenceNotEnabled))))
+}
+
+#Preview("Models · Apple Intelligence selected") {
+    ModelsSettingsTab(run: PreviewSupport.run(platform: .appleSiliconReady, localProvider: .appleFoundationModels))
+}
+
+#Preview("Models · Intel") {
+    ModelsSettingsTab(run: PreviewSupport.run(platform: .intel))
 }
 #endif

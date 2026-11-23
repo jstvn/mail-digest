@@ -16,13 +16,17 @@ enum PreviewSupport {
                     failedJobID: UUID? = nil, foundNothing: Bool = false, jobs: [Job] = [],
                     scheduledRunWaiting: Bool = false, bannerKind: JobFailureKind? = nil,
                     dailyStartFailedAt: Date? = nil, mailboxes: [MailboxInfo] = [],
-                    clock: any Clock = SystemClock()) -> DigestRunModel {
-        DigestRunModel(preview: SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
+                    clock: any Clock = SystemClock(), platform: HostPlatform = .appleSiliconReady,
+                    localProvider: LocalProvider = .ollama) -> DigestRunModel {
+        let model = DigestRunModel(preview: SettingsStore(defaults: UserDefaults(suiteName: "preview") ?? .standard),
                        review: review, coordinator: coordinator, reminders: RemindersAccessModel(preview: reminders), progress: progress, banner: banner, failedJobID: failedJobID,
                        lastRunAt: PreviewFixtures.now, lastRunFoundNothing: foundNothing,
                        lastRunSummary: "Last run 6:45 AM · 4 suggestions · 23 emails",
                        jobs: jobs, scheduledRunWaiting: scheduledRunWaiting,
-                       bannerKind: bannerKind, dailyStartFailedAt: dailyStartFailedAt, mailboxes: mailboxes, clock: clock)
+                       bannerKind: bannerKind, dailyStartFailedAt: dailyStartFailedAt, mailboxes: mailboxes, clock: clock,
+                       platform: platform)
+        model.settings.settings.localProvider = localProvider
+        return model
     }
 
     /// A persisted job for the menu's Daily action previews (Q52); `PreviewFixtures.jobID` by default, the
@@ -192,7 +196,7 @@ enum PreviewSupport {
 #Preview("Window · paused job") { window(progress: PreviewFixtures.pausedProgress) }
 
 #Preview("Window · Ollama down") {
-    window(banner: "Ollama isn't running. Start Ollama, or run `ollama pull qwen3:4b`.", failedJobID: PreviewFixtures.jobID)
+    window(banner: "Ollama isn't running. Start Ollama, then try again.", failedJobID: PreviewFixtures.jobID)
 }
 
 #Preview("Window · Full Disk Access unavailable") { window(status: PreviewSupport.fallback) }
@@ -252,17 +256,17 @@ enum PreviewSupport {
 #Preview("Menu · Daily stopped") { menu(menuRun(jobs: [PreviewSupport.job(.stopped)])) }
 
 #Preview("Menu · Ollama isn't running") {
-    menu(menuRun(jobs: [PreviewSupport.job(.failed, lastError: "Ollama is not reachable. Start Ollama and try again.",
+    menu(menuRun(jobs: [PreviewSupport.job(.failed, lastError: "Ollama isn't running. Start Ollama, then try again.",
                                            failureKind: .ollamaUnreachable, startedAt: PreviewFixtures.now.addingTimeInterval(-300))]))
 }
 
 #Preview("Menu · Ollama down at Daily start") {
-    menu(menuRun(banner: "Ollama is not reachable. Start Ollama and try again.", bannerKind: .ollamaUnreachable,
+    menu(menuRun(banner: "Ollama isn't running. Start Ollama, then try again.", bannerKind: .ollamaUnreachable,
                  dailyStartFailedAt: PreviewFixtures.now.addingTimeInterval(-300)))
 }
 
 #Preview("Menu · Model isn't installed") {
-    menu(menuRun(jobs: [PreviewSupport.job(.failed, lastError: "The model qwen3:4b is not installed. Run: ollama pull qwen3:4b",
+    menu(menuRun(jobs: [PreviewSupport.job(.failed, lastError: "The model qwen3:4b isn\u{2019}t installed. Download it in Settings \u{203A} Models.",
                                            failureKind: .modelMissing)]))
 }
 

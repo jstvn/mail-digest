@@ -157,7 +157,7 @@ Please check on the Mac:
 
 **Manual checks (Mac, signed app):**
 
-1. **Onboarding on first launch** (reset with `defaults delete dev.pages.justinwang.maildigest didCompleteOnboarding`): the "Welcome to Mail Digest" window opens once. Check each step: Ollama check (stopped, model missing, ready, Check Again); Allow Mail Access shows the Automation prompt with the Info.plist text; Mail Access Options opens the existing window; Allow Reminders Access and Allow Notifications show their system prompts; list name and run time save; Done and Run Now (Run Now opens the review panel and starts a run). Closing the window by any route means it does not return. Existing users who already saw Mail Access also see onboarding once.
+1. **Onboarding on first launch** (reset with `defaults delete dev.pages.justinwang.maildigest didCompleteOnboarding`): the "Welcome to Mail Digest" window opens once. Check each step: the Ollama step (Q92, header "Summaries"): Not installed (Download Ollama opens https://ollama.com/download); Not running (Start Ollama, then re-checks every 2 s for up to 30 s with "Waiting for Ollama to start…"); Version too old (below 0.40.4: update message and download page); Model missing (Download Model with progress, Cancel, Try Again; flips to Ready when done); Ready. Check Again is always available, and no Terminal command appears anywhere in the step. Allow Mail Access shows the Automation prompt with the Info.plist text; Mail Access Options opens the existing window; Allow Reminders Access and Allow Notifications show their system prompts; list name and run time save; Done and Run Now (Run Now opens the review panel and starts a run). Closing the window by any route means it does not return. Existing users who already saw Mail Access also see onboarding once.
 2. **Notification:** after a run with suggestions, a banner shows "N suggestions ready" (also while the app is frontmost); clicking it opens the review panel. No email text appears in it. If notifications were skipped in onboarding, the first post asks for permission.
 3. **Morning run fires once:** set the run time a few minutes ahead, wait (up to about 15 to 20 minutes with the scheduler tolerance); the Daily job starts by itself.
 4. **No repeat the same day,** including an empty run (no new mail, no digest): leave the app running past two more checks and confirm no second job (Past jobs are not in the UI yet; watch Console, subsystem `dev.pages.justinwang.maildigest`, "daily run starting").
@@ -729,6 +729,7 @@ Core tests and the xcodebuild build pass. Nothing below has been run against a r
 - Banner: stop a run whose configured digest model isn't installed; the run-problem banner shows "Download Model" beside Retry. It starts the download and opens Settings on the Models tab. Check the banner clears on Retry after the download finishes.
 - VoiceOver reads the progress with its label and value, and the Download Model, Cancel and Try Again buttons by name.
 - Network monitor: during a download the only traffic is to the configured Ollama URL.
+- **Menu bar (Q87, Q100):** with the digest model missing, the "Model Isn't Installed" attention card shows Download Model next to Retry. Clicking it shows inline progress; on failure the card shows the error with Try Again, and after success the card clears on Try Again.
 
 ## Today follow-ups (2026-11-10)
 
@@ -790,3 +791,29 @@ Core tests and the xcodebuild build pass. Nothing here has been checked in the r
 - An account-verification email ("Confirm your email address…") shows `Private · Rule` with rule `kw.credentials`.
 - `messages-noreply@`, `messaging-digest-noreply@` and `invitations@linkedin.com` are not `Public · Trusted Sender`.
 - Older Activity rows from before Q96 still open their popover without errors.
+
+## Apple silicon (Q100) — needs an Apple silicon Mac
+
+Nothing here has been run: development is on an Intel Mac. Run the MLX and benchmark checks before any default changes.
+
+- Settings › Models shows the "Local Model" picker (Ollama / Apple Intelligence) only on Apple silicon. Confirm the Intel layout is unchanged (no picker).
+- Apple Intelligence off: the option is disabled with its caption. Turn it on in System Settings and return to the app: it is enabled without a relaunch. Check whether SwiftUI honours `.disabled` on a menu-style Picker item; if it does not, fix it.
+- Look for a documented System Settings URL for Apple Intelligence. If one exists, add an "Open Settings" button; if not, record that none was found.
+- Real extraction through `FoundationModelsClient`:
+  - guided generation decodes into `ExtractionResult`;
+  - category and priority `.anyOf` and importance and confidence `.range` are honoured;
+  - an empty `due` maps to nil;
+  - output quality is compared with qwen3:4b on the synthetic A/B fixtures (`eval/systemone/fixtures.json`, 39-id sample).
+- The 4,000-character body budget (`FoundationModelsBudget`) fits the 4,096-token context with instructions and schema. A long email that overflows retries once at half the budget, then fails only that email.
+- A guardrail refusal on sensitive mail fails that one email and the run continues.
+- Run-level card "Apple Intelligence Isn't Available" appears when the provider is Apple Intelligence and it is off. There is no silent switch to Ollama.
+- Cloud Digest with Apple Intelligence selected: System One triage still uses Ollama, and the Ollama row stays visible in Settings.
+- Onboarding: "Use Apple Intelligence Instead" and "Use Ollama Instead" switch the provider and the step state.
+- MLX tags via Ollama:
+  - `qwen3.5:4b-mlx` and `kev:4b-mlx-bf16` appear in the pickers with Download Model.
+  - Check `/api/tags` `details.format` for the MLX models.
+  - Verify MLX models accept the JSON-schema `format` and `think: false`: extraction decodes and no thinking text appears.
+  - Verify `/v1/systemone` works with `kev:4b-mlx-bf16`, then rerun the routing benchmark (`eval/systemone` README) before any threshold or default change.
+  - Measure memory with Kev MLX bf16 plus the digest model loaded.
+- Only after these pass: decide whether Apple silicon defaults change. Q100 keeps defaults unchanged by chip until then.
+- The app launches on a macOS 15 machine. FoundationModels is weak-linked; `LC_LOAD_WEAK_DYLIB` is confirmed in the binary, but the launch itself is unverified.

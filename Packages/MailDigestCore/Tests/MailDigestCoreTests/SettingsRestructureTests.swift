@@ -57,7 +57,7 @@ import Testing
         #expect(Set(keys?.keys ?? [:].keys) == [
             "maxEmailsPerRun", "autoFileEnabledAt", "runHour", "runMinute", "lookbackHours", "ollamaURL", "ollamaModel", "remindersListName", "retention",
             "vipSenders", "blockedSenders", "ignoredSenders", "trustedNewsletterSenders", "declinedIgnoreSuggestions",
-            "dailyMailboxes", "autoFileProcessed", "pauseBacklogOnBattery", "quietHoursEnabled",
+            "dailyMailboxes", "autoFileProcessed", "pauseBacklogOnBattery", "quietHoursEnabled", "localProvider",
             "quietHoursStartMinute", "quietHoursEndMinute", "cloudDigestEnabled", "geminiModel", "triageModel", "cloudProvider", "claudeCodeModel",
             "privacyThreshold", "cloudPrivacyAcknowledgedRevision", "triageModelDefaultRevision", "showSenderLogos",
             "privacyThresholdDefaultRevision", "autoFileHandledDestination", "autoFileDismissedDestination",

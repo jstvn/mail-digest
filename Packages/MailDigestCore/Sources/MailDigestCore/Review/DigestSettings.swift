@@ -64,6 +64,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     /// Fetch sender logos from the sender's own website (BIMI DNS, then apple-touch-icon). Off by default:
     /// the sender can see the user's IP address. Logos from a mail's BIMI header never need this.
     public var showSenderLogos: Bool
+    /// Which engine runs the local digest model (Q100). Ollama unless the user chooses otherwise.
+    public var localProvider: LocalProvider
 
     /// Which triage-model strategy generation the stored value was written under.
     /// Revision 2 made Kev 4B the default (Kev 0.8B stayed as the low-memory option); revision 3 retired
@@ -107,10 +109,11 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 claudeCodeModel: String = DigestSettings.defaultClaudeCodeModel,
                 claudeCodePrivacyAcknowledgedRevision: Int? = nil,
                 triageModelDefaultRevision: Int? = DigestSettings.currentTriageModelDefaultRevision,
-                showSenderLogos: Bool = false,
+                showSenderLogos: Bool = false, localProvider: LocalProvider = .ollama,
                 privacyThresholdDefaultRevision: Int? = DigestSettings.currentPrivacyThresholdDefaultRevision) {
         self.privacyThresholdDefaultRevision = privacyThresholdDefaultRevision
         self.showSenderLogos = showSenderLogos
+        self.localProvider = localProvider
         self.triageModelDefaultRevision = triageModelDefaultRevision
         self.cloudDigestEnabled = cloudDigestEnabled
         self.geminiModel = geminiModel
@@ -152,7 +155,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         case pauseBacklogOnBattery, quietHoursEnabled, quietHoursStartMinute, quietHoursEndMinute
         case cloudDigestEnabled, geminiModel, triageModel, privacyThreshold, cloudPrivacyAcknowledgedRevision
         case triageModelDefaultRevision, showSenderLogos, privacyThresholdDefaultRevision
-        case cloudProvider, claudeCodeModel, claudeCodePrivacyAcknowledgedRevision
+        case cloudProvider, claudeCodeModel, claudeCodePrivacyAcknowledgedRevision, localProvider
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
@@ -224,7 +227,8 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   claudeCodeModel: try c.decodeIfPresent(String.self, forKey: .claudeCodeModel) ?? d.claudeCodeModel,
                   claudeCodePrivacyAcknowledgedRevision: try c.decodeIfPresent(
                       Int.self, forKey: .claudeCodePrivacyAcknowledgedRevision),
-                  showSenderLogos: try c.decodeIfPresent(Bool.self, forKey: .showSenderLogos) ?? d.showSenderLogos)
+                  showSenderLogos: try c.decodeIfPresent(Bool.self, forKey: .showSenderLogos) ?? d.showSenderLogos,
+                  localProvider: (try? c.decodeIfPresent(LocalProvider.self, forKey: .localProvider)) ?? d.localProvider)
     }
 
     /// Writes every key, including a nil `cloudProvider` as null: a missing key would be read back as a
@@ -263,6 +267,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         try c.encodeIfPresent(privacyThresholdDefaultRevision, forKey: .privacyThresholdDefaultRevision)
         try c.encode(cloudProvider, forKey: .cloudProvider)
         try c.encode(claudeCodeModel, forKey: .claudeCodeModel)
+        try c.encode(localProvider, forKey: .localProvider)
         try c.encodeIfPresent(claudeCodePrivacyAcknowledgedRevision, forKey: .claudeCodePrivacyAcknowledgedRevision)
     }
 

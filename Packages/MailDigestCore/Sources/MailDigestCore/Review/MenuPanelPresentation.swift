@@ -14,6 +14,8 @@ public struct MenuAttentionCard: Sendable, Equatable {
     public var message: String
     /// Whether the card offers "Start Ollama" next to Retry.
     public var offersStartOllama: Bool
+    /// Whether the card offers "Download Model" (Q87).
+    public var offersDownloadModel: Bool = false
 }
 
 /// Wording for the menu bar panel: job titles, the last-run row and the attention state. Pure; the calendar
@@ -126,8 +128,13 @@ public enum MenuPanelPresentation {
                 offersStartOllama: true)
         case .modelMissing:
             return MenuAttentionCard(title: "Model Isn\u{2019}t Installed",
-                                     message: "Run `ollama pull \(model)` in Terminal, then try again.",
-                                     offersStartOllama: false)
+                                     message: "Download \(model) to continue, then try again.",
+                                     offersStartOllama: false, offersDownloadModel: true)
+        case .localModelUnavailable:
+            return MenuAttentionCard(
+                title: "Apple Intelligence Isn\u{2019}t Available",
+                message: "Turn on Apple Intelligence in System Settings, or choose Ollama in Settings \u{203A} Models, then try again.",
+                offersStartOllama: false)
         case .other, .none:
             return MenuAttentionCard(title: jobTitle.map { "\($0) Couldn\u{2019}t Finish" } ?? "Needs Attention",
                                      message: message, offersStartOllama: false)

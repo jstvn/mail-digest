@@ -13,9 +13,6 @@ struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
 
-    @State private var ollamaProblem: String?
-    @State private var ollamaChecked = false
-    @State private var isCheckingOllama = false
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
 
     var body: some View {
@@ -28,7 +25,7 @@ struct OnboardingView: View {
                 } header: {
                     Text("Welcome")
                 }
-                ollamaSection
+                OllamaSetupSection(run: run)
                 mailSection
                 remindersSection
                 notificationsSection
@@ -55,7 +52,6 @@ struct OnboardingView: View {
             await access.refresh()
             run.reminders.refresh()
             notificationStatus = await UserNotifier.authorizationStatus()
-            await checkOllama()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task {
@@ -69,26 +65,6 @@ struct OnboardingView: View {
     }
 
     // MARK: Steps
-
-    private var ollamaSection: some View {
-        Section {
-            if isCheckingOllama {
-                ProgressView("Checking Ollama…")
-            } else if ollamaChecked {
-                if let problem = ollamaProblem {
-                    status("exclamationmark.triangle.fill", .yellow, "Needs attention", problem)
-                } else {
-                    status("checkmark.circle.fill", .green, "Ready", "Ollama and the model are ready.")
-                }
-            }
-            Button("Check Again") { Task { await checkOllama() } }
-                .disabled(isCheckingOllama)
-        } header: {
-            Text("Ollama")
-        } footer: {
-            Text("Summaries come from a local model. Start Ollama and run `ollama pull qwen3:4b` if it is missing.")
-        }
-    }
 
     private var mailSection: some View {
         Section {
@@ -168,13 +144,6 @@ struct OnboardingView: View {
         } icon: {
             Image(systemName: symbol).foregroundStyle(color).accessibilityLabel(label)
         }
-    }
-
-    private func checkOllama() async {
-        isCheckingOllama = true
-        ollamaProblem = await run.checkOllama()
-        ollamaChecked = true
-        isCheckingOllama = false
     }
 
     private func open(_ url: String) {

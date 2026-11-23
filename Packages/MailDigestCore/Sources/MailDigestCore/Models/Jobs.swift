@@ -54,6 +54,8 @@ public enum JobFailureKind: String, Codable, Sendable, Equatable {
     case ollamaUnreachable
     /// Ollama runs but the configured model is not installed.
     case modelMissing
+    /// The selected local provider (Apple Intelligence) can't run; Ollama is not involved (Q100).
+    case localModelUnavailable
     /// Anything else: Mail, the store, a timeout or an unexpected model reply.
     case other
 
@@ -62,6 +64,7 @@ public enum JobFailureKind: String, Codable, Sendable, Equatable {
         switch error as? LLMError {
         case .unreachable: self = .ollamaUnreachable
         case .modelMissing: self = .modelMissing
+        case .providerUnavailable: self = .localModelUnavailable
         default: self = .other
         }
     }
@@ -177,7 +180,8 @@ public struct Job: Codable, Sendable, Equatable, Identifiable {
                   pauseReason: try c.decodeIfPresent(PauseReason.self, forKey: .pauseReason),
                   startedAt: try c.decodeIfPresent(Date.self, forKey: .startedAt),
                   endedAt: try c.decodeIfPresent(Date.self, forKey: .endedAt),
-                  failureKind: try c.decodeIfPresent(JobFailureKind.self, forKey: .failureKind),
+                  // An unknown stored kind (from a newer build) reads as nil rather than losing the job.
+                  failureKind: (try? c.decodeIfPresent(JobFailureKind.self, forKey: .failureKind)) ?? nil,
                   name: try c.decodeIfPresent(String.self, forKey: .name),
                   overnightOnly: try c.decodeIfPresent(Bool.self, forKey: .overnightOnly) ?? false)
     }

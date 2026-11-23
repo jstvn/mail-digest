@@ -222,6 +222,10 @@ struct MenuBarView: View {
                     if card.offersStartOllama {
                         Button("Start Ollama") { OllamaLauncher.start() }
                     }
+                    if card.offersDownloadModel, downloadState == nil {
+                        Button("Download Model") { startDownload() }
+                            .accessibilityLabel("Download model \(modelTag)")
+                    }
                     if attention.showsRetry {
                         Button("Retry") { Task { await run.retryAttention() } }
                             .disabled(!run.isAttentionRetryEnabled || access.status?.mode == .unavailable)
@@ -230,6 +234,7 @@ struct MenuBarView: View {
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.capsule)
                 .controlSize(.small)
+                if card.offersDownloadModel { downloadStatus }
             }
             Spacer(minLength: 0)
         }
@@ -242,6 +247,42 @@ struct MenuBarView: View {
         // Read as one alert-like group, led by the problem.
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Needs attention. \(card.title)")
+    }
+
+    // MARK: Model download
+
+    private var modelTag: String { run.settings.settings.resolvedModel }
+    private var downloadState: ModelDownloadModel.State? { run.modelDownloads.state(for: modelTag) }
+
+    private func startDownload() {
+        run.modelDownloads.start(tag: modelTag, baseURL: run.settings.settings.resolvedOllamaURL)
+    }
+
+    /// Progress or failure of the download started from the card; Settings › Models shows the same download.
+    @ViewBuilder private var downloadStatus: some View {
+        switch downloadState {
+        case .downloading(let progress)?:
+            VStack(alignment: .leading, spacing: 4) {
+                if let fraction = progress.fraction {
+                    ProgressView(value: fraction) { Text("Downloading \(modelTag)") }.labelsHidden()
+                } else {
+                    ProgressView { Text("Downloading \(modelTag)") }.progressViewStyle(.linear).labelsHidden()
+                }
+                Text(progress.text).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    .accessibilityLabel("Download progress")
+                    .accessibilityValue(progress.text)
+            }
+        case .failed(let message)?:
+            VStack(alignment: .leading, spacing: 6) {
+                Text(verbatim: message).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Try Again") { startDownload() }
+                    .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.small)
+                    .accessibilityLabel("Try downloading \(modelTag) again")
+            }
+        case nil:
+            EmptyView()
+        }
     }
 
     // MARK: Rows

@@ -7,10 +7,16 @@ enum OllamaLauncher {
     private static let bundleID = "com.electron.ollama"
     private static let downloadURL = URL(string: "https://ollama.com/download")!
 
+    /// Whether the Ollama app is installed on this Mac.
+    static var isInstalled: Bool { NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil }
+
+    /// Opens ollama.com/download in the browser.
+    static func openDownloadPage() { NSWorkspace.shared.open(downloadURL) }
+
     static func start() {
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             // Not installed: send the user to the download page.
-            NSWorkspace.shared.open(downloadURL)
+            openDownloadPage()
             return
         }
         let configuration = NSWorkspace.OpenConfiguration()

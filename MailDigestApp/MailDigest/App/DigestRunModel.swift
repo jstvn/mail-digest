@@ -136,7 +136,8 @@ final class DigestRunModel {
          lastRunAt: Date? = nil, lastRunFoundNothing: Bool = false, lastRunSummary: String? = nil,
          jobs: [Job] = [], scheduledRunWaiting: Bool = false,
          bannerKind: JobFailureKind? = nil, dailyStartFailedAt: Date? = nil, mailboxes: [MailboxInfo] = [],
-         clock: any Clock = SystemClock()) {
+         clock: any Clock = SystemClock(), platform: HostPlatform = .appleSiliconReady) {
+        self.platform = platform
         self.clock = clock
         self.mailboxes = mailboxes
         self.settings = preview
@@ -393,7 +394,7 @@ final class DigestRunModel {
 
     /// "Local · Qwen3 4B".
     var menuModelLabel: String {
-        "Local · " + RoutingPresentation.modelDisplayName(settings.settings.resolvedModel)
+        "Local · " + RoutingPresentation.modelDisplayName(settings.settings.resolvedLocalModel)
     }
 
     /// The latest Daily digest as a one-line row; follows approvals and dismissals through the archive.
@@ -414,20 +415,27 @@ final class DigestRunModel {
         showBanner(Self.message(for: error), kind: kind)
     }
 
-    private var llm: OllamaClient {
+    private var ollama: OllamaClient {
         OllamaClient(baseURL: settings.settings.resolvedOllamaURL, model: settings.settings.resolvedModel)
     }
 
-    /// Onboarding's Ollama step: nil when the server and model answer, otherwise a message saying how to fix it.
-    func checkOllama() async -> String? {
-        do {
-            try await llm.healthCheck()
-            return nil
-        } catch let error as LLMError {
-            return error.userMessage
-        } catch {
-            return "Ollama is not reachable. Start Ollama, or run `ollama pull qwen3:4b`."
+    /// The local digest model's client, chosen by the Local Model setting (Q100). A stored Apple Intelligence
+    /// choice that can't run fails the run with its reason; it never falls back to Ollama.
+    private var llm: any LLMClient {
+        switch settings.settings.localProvider {
+        case .ollama: ollama
+        case .appleFoundationModels: FoundationModelsClientFactory.make()
         }
+    }
+
+    /// What this Mac can do. Re-read by `refreshPlatform()` because Apple Intelligence can be switched on while
+    /// the app runs.
+    private(set) var platform = HostPlatformDetector.current()
+
+    /// Re-evaluates the chip and Apple Intelligence; called when Settings appears and before each run.
+    func refreshPlatform() {
+        let current = HostPlatformDetector.current()
+        if current != platform { platform = current }
     }
 
     /// Daily runs read every inbox.
@@ -560,13 +568,14 @@ final class DigestRunModel {
 
         // Check Ollama first so a down server doesn't cost a mail listing (Q25).
         let checkedAt = clock.now()
+        refreshPlatform()
         do {
             try await llm.healthCheck()
         } catch let error as LLMError {
             showBanner(error.userMessage, kind: JobFailureKind(error), dailyStartFailedAt: checkedAt)
             return
         } catch {
-            showBanner("Ollama is not reachable. Start Ollama, or run `ollama pull qwen3:4b`.", kind: .ollamaUnreachable,
+            showBanner("Ollama isn\u{2019}t running. Start Ollama, then try again.", kind: .ollamaUnreachable,
                        dailyStartFailedAt: checkedAt)
             return
         }
@@ -626,9 +635,10 @@ final class DigestRunModel {
         }
         if preempting {
             // Don't pause the Backlog job for a resume that would fail on a down Ollama anyway (Q25).
+            refreshPlatform()
             do { try await llm.healthCheck() } catch {
                 showBanner((error as? LLMError)?.userMessage
-                           ?? "Ollama is not reachable. Start Ollama, or run `ollama pull qwen3:4b`.",
+                           ?? "Ollama isn\u{2019}t running. Start Ollama, then try again.",
                            kind: (error as? LLMError).map { JobFailureKind($0) } ?? .ollamaUnreachable)
                 return
             }
@@ -1075,7 +1085,7 @@ final class DigestRunModel {
         let provider = cloudRouting
         let new = JobRunner(source: source, llm: llm, store: store, notifier: notifier, clock: clock,
                             settings: settings.settings.runnerSettings(inboxes: inboxes),
-                            localModel: settings.settings.resolvedModel,
+                            localModel: settings.settings.resolvedLocalModel,
                             routingConfig: { await provider.config() },
                             logoRecorder: logoService)
         runner = new

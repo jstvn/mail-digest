@@ -63,6 +63,19 @@ public enum Prompts {
         return "Subject: \(email.subject)\nFrom: \(email.sender)\nReceived: \(received)\n<email>\n\(email.body)\n</email>"
     }
 
+    /// Both messages for one extraction call, for providers that don't build an HTTP request.
+    public static func extraction(_ email: EmailMessage, tier: MailTier, trustedNewsletter: Bool = false,
+                                  today: Date, timeZone: TimeZone) -> PromptPair {
+        PromptPair(system: extractionSystem(today: today, timeZone: timeZone, tier: tier,
+                                            trustedNewsletter: trustedNewsletter),
+                   user: extractionUser(email, timeZone: timeZone))
+    }
+
+    /// Both messages for the headline call.
+    public static func headline(info: [InfoItem], suggestionCount: Int) -> PromptPair {
+        PromptPair(system: headlineSystem, user: headlineUser(info: info, suggestionCount: suggestionCount))
+    }
+
     public static let headlineSystem = """
         You write the headline of a morning email digest. \
         You get a JSON array of emails, each with category, importance (1 to 5) and summary. \

@@ -461,7 +461,7 @@ private struct ReadyStep: View {
             LabeledContent("Date Range", value: model.rangeText)
             LabeledContent("Emails") { emails(confirmed) }
             LabeledContent("Processing") {
-                Label("Local · " + RoutingPresentation.modelDisplayName(run.settings.settings.resolvedModel), systemImage: "lock.fill")
+                Label("Local · " + RoutingPresentation.modelDisplayName(run.settings.settings.resolvedLocalModel), systemImage: "lock.fill")
                     .font(.caption)
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(.quaternary.opacity(0.7), in: Capsule())

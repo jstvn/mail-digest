@@ -5,6 +5,8 @@ import Foundation
 public struct EmailCleaner: Sendable {
     /// Longest cleaned body, in Characters, that is passed on.
     public static let maxCharacters = 24_000
+    /// Appended after a truncated body.
+    public static let truncationMarker = "[truncated]"
 
     public init() {}
 
@@ -42,7 +44,7 @@ public struct EmailCleaner: Sendable {
         result = Self.removingFooter(from: result)
 
         if result.count > Self.maxCharacters {
-            return String(result.prefix(Self.maxCharacters)) + "\n[truncated]"
+            return String(result.prefix(Self.maxCharacters)) + "\n" + Self.truncationMarker
         }
         return result
     }

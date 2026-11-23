@@ -409,7 +409,8 @@ Cheap rules tier each email first, then one model call per email returns an info
 - Ollama remains the required v1 inference backend and `qwen3:4b` remains the default model. T11 must not change the LLM provider architecture or add a cloud fallback.
 - Keep `qwen3:1.7b` as an evaluation candidate for Intel CPU Backlog throughput, not as an automatic silent model switch. Compare task precision/recall, evidence validity, date accuracy and per-email latency using `EvalCLI` before recommending it as a default for any workload.
 - Do not infer performance from parameter count alone. Record actual CPU, RAM, macOS version, quantisation, model load time, prompt-evaluation time, generation time, temperature and battery/thermal state during evaluation.
-- Apple Foundation Models may be considered later as a separate macOS 26+ Apple Silicon provider behind the existing `LLMClient` abstraction. It is not part of T11 or the v1 acceptance criteria; Intel Macs and users preferring Ollama must continue to work without it.
+- Apple Foundation Models is an optional macOS 26+ Apple silicon provider behind the existing `LLMClient` abstraction (Q100): `DigestSettings.localProvider` is `ollama` (default on every Mac) or `appleFoundationModels`, shown in Settings only on Apple silicon and detected by capability (`HostPlatform`), not by chip name. It handles extraction and the headline only; System One triage always uses Ollama. It truncates the cleaned body to a Core budget for its small context (an exception to Q35 for this provider only). Intel Macs and users preferring Ollama work without it.
+- On Apple silicon the model pickers also suggest Ollama MLX tags (`qwen3.5:4b-mlx` for the digest, `kev:4b-mlx-bf16` for the privacy check). Defaults do not change by chip until the Apple silicon checks in MAC_TODO pass (Q100).
 - Keep thermal/battery-aware Backlog throttling in T19. Do not add automatic model switching or a bundled `llama.cpp` runtime during T11.
 
 **Tiering (`MailFilter`, no model)**
@@ -710,7 +711,8 @@ The review window is a two-column `NavigationSplitView` (Q54): a sidebar for nav
 | --- | --- |
 | Running | Progress strip: "Reading 12 of 23 emails · about 4 min left" with Pause and Stop; finished results already visible |
 | Paused | Strip shows "Paused · 412 of 2,960" with Resume and Stop, plus the reason if auto-paused (battery, Low Power Mode, heat, quiet hours, Daily job) |
-| Ollama down or model missing | Banner with the fix ("Start Ollama" or `ollama pull qwen3:4b`) and Retry |
+| Ollama down or model missing | Banner and menu card with the fix ("Start Ollama", or "Download Model" via `/api/pull`, Q87) and Retry; no Terminal command is required (Q92) |
+| Apple Foundation Models selected but unavailable | Card explaining why (for example Apple Intelligence is off) and pointing to Settings › Models; no silent switch to Ollama (Q100) |
 | Full Disk Access unavailable | Show that Mail automation fallback is active, explain that FDA enables fast local reads, and provide a button to open System Settings > Privacy & Security > Full Disk Access |
 | Mail Automation permission denied | Banner with a button to open System Settings > Privacy & Security > Automation and enable Mail access for Mail Digest |
 | Reminders permission denied | Add button disabled, banner with Settings link |

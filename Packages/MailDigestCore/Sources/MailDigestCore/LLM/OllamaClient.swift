@@ -11,14 +11,17 @@ public enum LLMError: Error, Equatable, Sendable {
     case modelMissing(String)
     case http(status: Int)
     case malformedResponse(String)
+    /// The selected local provider can't run (for example Apple Intelligence is off); the text is the reason.
+    case providerUnavailable(String)
 
     /// Short text for the UI, including the fix.
     public var userMessage: String {
         switch self {
-        case .unreachable: return "Ollama is not reachable. Start Ollama and try again."
+        case .unreachable: return "Ollama isn\u{2019}t running. Start Ollama, then try again."
         case .timedOut: return "Ollama did not answer in time."
-        case .modelMissing(let m): return "The model \(m) is not installed. Run: ollama pull \(m)"
+        case .modelMissing(let m): return "The model \(m) isn\u{2019}t installed. Download it in Settings \u{203A} Models."
         case .http(let s): return "Ollama returned HTTP \(s)."
+        case .providerUnavailable(let reason): return reason
         case .malformedResponse(let r): return "The model gave an unusable answer (\(r))."
         }
     }
@@ -56,16 +59,16 @@ public struct OllamaClient: LLMClient {
     /// Builds the `/api/chat` request for an extraction call.
     public func makeExtractionRequest(_ email: EmailMessage, tier: MailTier, trustedNewsletter: Bool = false,
                                       today: Date, timeZone: TimeZone) throws -> URLRequest {
-        try chatRequest(system: Prompts.extractionSystem(today: today, timeZone: timeZone, tier: tier,
-                                                         trustedNewsletter: trustedNewsletter),
-                        user: Prompts.extractionUser(email, timeZone: timeZone),
+        let p = Prompts.extraction(email, tier: tier, trustedNewsletter: trustedNewsletter,
+                                   today: today, timeZone: timeZone)
+        return try chatRequest(system: p.system, user: p.user,
                         format: ExtractionSchema.json, timeout: extractTimeout)
     }
 
     /// Builds the `/api/chat` request for the headline call (no `format`).
     public func makeHeadlineRequest(info: [InfoItem], suggestionCount: Int) throws -> URLRequest {
-        try chatRequest(system: Prompts.headlineSystem,
-                        user: Prompts.headlineUser(info: info, suggestionCount: suggestionCount),
+        let p = Prompts.headline(info: info, suggestionCount: suggestionCount)
+        return try chatRequest(system: p.system, user: p.user,
                         format: nil, timeout: headlineTimeout)
     }
 
@@ -101,20 +104,23 @@ public struct OllamaClient: LLMClient {
         guard let tags = try? JSONDecoder().decode(Tags.self, from: data) else {
             throw LLMError.malformedResponse("tags list not readable")
         }
-        // Ollama lists untagged names as "name:latest".
-        let wanted: Set<String> = model.contains(":") ? [model] : [model, model + ":latest"]
-        guard tags.models.contains(where: { wanted.contains($0.name) }) else {
+        guard Self.isInstalled(model, in: tags.models.map(\.name)) else {
             throw LLMError.modelMissing(model)
         }
+    }
+
+    /// Whether `model` is among the installed tags. Ollama lists untagged names as "name:latest".
+    public static func isInstalled(_ model: String, in tags: [String]) -> Bool {
+        let wanted: Set<String> = model.contains(":") ? [model] : [model, model + ":latest"]
+        return tags.contains(where: { wanted.contains($0) })
     }
 
     public func extract(_ email: EmailMessage, tier: MailTier, trustedNewsletter: Bool,
                         today: Date, timeZone: TimeZone) async throws -> ExtractionResult {
         let request = try makeExtractionRequest(email, tier: tier, trustedNewsletter: trustedNewsletter,
                                                 today: today, timeZone: timeZone)
-        var result = try await withRetry { try Self.decodeExtraction(try await send(request)) }
-        if tier == .infoOnly { result.tasks = [] }
-        return result
+        let result = try await withRetry { try Self.decodeExtraction(try await send(request)) }
+        return result.applyingTierRules(tier: tier)
     }
 
     public func headline(for info: [InfoItem], suggestionCount: Int) async throws -> String {

@@ -18,6 +18,14 @@ public enum CloudPrivacyPolicy {
         TriageModel(tag: "tev1:0.8b-q8_0", displayName: "Tev1 0.8B (Q8, low memory)"),
     ]
 
+    /// MLX build of Kev 4B (bf16), offered on Apple silicon only (Q100).
+    public static let mlxTriageModel = TriageModel(tag: "kev:4b-mlx-bf16", displayName: "Kev 4B (MLX, Apple silicon)")
+
+    /// The triage models for this Mac; Intel gets the same list as `triageModels`.
+    public static func triageModels(for platform: HostPlatform) -> [TriageModel] {
+        platform.isAppleSilicon ? triageModels + [mlxTriageModel] : triageModels
+    }
+
     /// A short caption for the model picker; nil for an unknown tag.
     public static func triageModelNote(for tag: String) -> String? {
         switch tag {
@@ -25,6 +33,8 @@ public enum CloudPrivacyPolicy {
             return "Uses about 8.5 GB of memory while loaded, on top of the digest model. On a Mac with 16 GB, choose Tev1 0.8B if the system starts swapping."
         case "tev1:0.8b-q8_0":
             return "Uses much less memory than Kev 4B, but keeps more public emails on this Mac."
+        case "kev:4b-mlx-bf16":
+            return "Full-precision (bf16) build, an 8.4 GB download that needs more memory than Kev 4B Q4. A Mac with 24 GB or more is suggested."
         default: return nil
         }
     }

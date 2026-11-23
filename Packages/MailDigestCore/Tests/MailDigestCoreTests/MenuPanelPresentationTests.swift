@@ -107,7 +107,12 @@ import Testing
         let missing = MenuPanelPresentation.attentionCard(kind: .modelMissing, jobTitle: "Daily Digest",
                                                           message: "x", model: "qwen3:4b")
         #expect(missing.title == "Model Isn\u{2019}t Installed" && !missing.offersStartOllama)
-        #expect(missing.message == "Run `ollama pull qwen3:4b` in Terminal, then try again.")
+        #expect(missing.offersDownloadModel && !down.offersDownloadModel)
+        #expect(missing.message == "Download qwen3:4b to continue, then try again.")
+        let fm = MenuPanelPresentation.attentionCard(kind: .localModelUnavailable, jobTitle: "Daily Digest",
+                                                     message: "x", model: "qwen3:4b")
+        #expect(fm.title == "Apple Intelligence Isn\u{2019}t Available")
+        #expect(!fm.offersStartOllama && !fm.offersDownloadModel)
         for kind in [JobFailureKind.other, nil] {
             let other = MenuPanelPresentation.attentionCard(kind: kind, jobTitle: "Daily Digest", message: "Mail failed.",
                                                             model: "qwen3:4b")
@@ -123,6 +128,7 @@ import Testing
     @Test func failureKindMapsFromLLMErrors() {
         #expect(JobFailureKind(LLMError.unreachable("down")) == .ollamaUnreachable)
         #expect(JobFailureKind(LLMError.modelMissing("qwen3:4b")) == .modelMissing)
+        #expect(JobFailureKind(LLMError.providerUnavailable("off")) == .localModelUnavailable)
         #expect(JobFailureKind(LLMError.timedOut) == .other)
         #expect(JobFailureKind(LLMError.http(status: 500)) == .other)
         #expect(JobFailureKind(CancellationError()) == .other)

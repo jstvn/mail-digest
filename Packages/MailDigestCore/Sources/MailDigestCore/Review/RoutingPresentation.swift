@@ -70,10 +70,20 @@ public enum RoutingPresentation {
     /// "qwen3:4b" becomes "Qwen3 4B", "gemini-3.5-flash-lite" becomes "Gemini 3.5 Flash-Lite"; anything else is the raw id.
     public static func modelDisplayName(_ id: String) -> String {
         let lower = id.lowercased()
+        if lower == DigestSettings.appleFoundationModelID { return "Apple Foundation Model" }
         if lower.hasPrefix("qwen3:") {
             let tag = String(lower.dropFirst(6))
             if tag.count >= 2, tag.hasSuffix("b"), Double(tag.dropLast()) != nil { return "Qwen3 \(tag.uppercased())" }
         }
+        if lower.hasPrefix("qwen3.5:") {
+            // "qwen3.5:4b-mlx" becomes "Qwen3.5 4B MLX".
+            let parts = lower.dropFirst(8).split(separator: "-").map(String.init)
+            if let size = parts.first, size.count >= 2, size.hasSuffix("b"), Double(size.dropLast()) != nil,
+               parts.dropFirst().allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isLetter) }) {
+                return (["Qwen3.5", size.uppercased()] + parts.dropFirst().map { $0.uppercased() }).joined(separator: " ")
+            }
+        }
+        if lower == "kev:4b-mlx-bf16" { return "Kev 4B MLX" }
         if lower.hasPrefix("gemini-") {
             let parts = lower.split(separator: "-").map(String.init)
             if parts.count >= 2, Double(parts[1]) != nil,
