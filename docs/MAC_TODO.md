@@ -782,3 +782,11 @@ Core tests and the xcodebuild build pass. Nothing here has been checked in the r
 - An email with an approved reminder goes to the account's Mail Digest mailbox ("Moved 1 email to Mail Digest."). A batch with both shows "Moved 3 emails: 2 to Mail Digest, 1 to Trash." and one Undo restores all of them.
 - On My Mac mail with a Trash destination reports a failure (no Trash target), is not moved anywhere else and is not retried.
 - Switch both pickers (reminders to Trash, dismissed to Mail Digest) and confirm routing swaps; blocked/ignored senders follow the first picker.
+
+## Bulk notification routing (Q95–Q97)
+
+- Run the rebuilt app on new mail with Cloud Digest on. Relayed (Hide My Email) Glassdoor, Letterboxd, LinkedIn job/newsletter and `email.openai.com` mail shows `Public · Trusted Sender`. Other relayed promotions (DoorDash, YHA) with non-sensitive ≥ 0.85 show `Public · System One`, and the info popover reads "Public floor: Waived (Hide My Email)".
+- A relayed reply (subject "Re: …", e.g. a Nike support thread) gets no waiver: the popover shows the 85% public floor.
+- An account-verification email ("Confirm your email address…") shows `Private · Rule` with rule `kw.credentials`.
+- `messages-noreply@`, `messaging-digest-noreply@` and `invitations@linkedin.com` are not `Public · Trusted Sender`.
+- Older Activity rows from before Q96 still open their popover without errors.
