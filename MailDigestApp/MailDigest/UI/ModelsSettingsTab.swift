@@ -302,7 +302,9 @@ struct ModelsSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: (cloudOn ? 800 : 430) + (showsProviderPicker ? 70 : 0))
+        // 814 with Cloud Digest on ends the window just below "Usage counts toward your Claude plan's limits.",
+        // before the next disclosure line starts, so a screenshot shows no half-cut text.
+        .frame(height: (cloudOn ? 814 : 430) + (showsProviderPicker ? 70 : 0))
         .task { await refreshKey() }
         // Apple Intelligence can be switched on in System Settings while the app runs.
         .onAppear { run.refreshPlatform() }
