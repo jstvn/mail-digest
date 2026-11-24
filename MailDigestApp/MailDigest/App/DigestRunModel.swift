@@ -817,6 +817,10 @@ final class DigestRunModel {
         failedJobID = nil
         await summariseLastRun(store)
         await review.reload()
+        // Q101: a finished Daily job's preselected suggestions go straight to Reminders when the user opted in.
+        if let job, job.state == .finished, job.kind == .daily {
+            await coordinator.autoAddSuggestedReminders(jobID: job.id)
+        }
         // A finished job with no digest newer than its start found nothing (Q24).
         if let startedAt, job?.state == .finished {
             let latest = review.digest?.createdAt

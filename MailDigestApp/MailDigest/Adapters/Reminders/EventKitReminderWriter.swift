@@ -102,10 +102,11 @@ actor EventKitReminderWriter: ReminderWriter {
     }
 
     func write(_ suggestion: Suggestion, category: Category, email: EmailContext?,
-               toList listID: String) async throws -> String {
+               toList listID: String, datePolicy: ReminderDatePolicy, now: Date) async throws -> String {
         try requireAccess()
         guard let list = store.calendar(withIdentifier: listID) else { throw RemindersError.listMissing }
-        let draft = ReminderDraft(suggestion, category: category, email: email, timeZone: timeZone)
+        let draft = ReminderDraft(suggestion, category: category, email: email, policy: datePolicy, now: now,
+                                  timeZone: timeZone)
 
         let reminder = EKReminder(eventStore: store)
         reminder.calendar = list

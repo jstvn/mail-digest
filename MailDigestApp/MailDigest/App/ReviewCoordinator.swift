@@ -201,12 +201,41 @@ final class ReviewCoordinator {
         defer { isWorking = false }
         let outcome = await ReviewActions.approve(
             toAdd, writer: writer, store: store, listName: review?.listName() ?? DigestSettings.defaultListName,
-            storedListID: UserDefaults.standard.string(forKey: ReviewViewModel.listIDKey), clock: clock)
+            storedListID: UserDefaults.standard.string(forKey: ReviewViewModel.listIDKey), clock: clock,
+            datePolicy: review?.settingsStore?.settings.reminderDatePolicy ?? ReminderDatePolicy())
         if let id = outcome.listID { UserDefaults.standard.set(id, forKey: ReviewViewModel.listIDKey) }
         session.apply(outcome.results)
         patchAll(outcome.results)
         let failed = outcome.results.filter { $0.status == .failed }.count
         message = failed == 0 ? nil : "\(failed) \(failed == 1 ? "reminder" : "reminders") couldn't be added. They stay selected so you can try again."
+        await settled()
+    }
+
+    /// Q101: approves the preselected suggestions of the Daily job that just finished, when the setting is on.
+    /// Uses the same approval path as "Add to Reminders" (decision recorded, failures stay `failed` and show
+    /// inline). Does nothing without a writer, for Backlog jobs, or for a digest with nothing preselected.
+    func autoAddSuggestedReminders(jobID: UUID) async {
+        guard let store, let writer = reminderWriter, !isWorking,
+              let settings = review?.settingsStore?.settings, settings.autoAddSuggestedReminders,
+              let job = try? await store.jobs().first(where: { $0.id == jobID }), job.kind == .daily,
+              let digest = try? await store.digest(id: jobID),
+              let items = try? await store.items(job: jobID) else { return }
+        let records = AutoAddSelection.candidates(digest: digest, jobKind: job.kind, items: items)
+        guard !records.isEmpty else { return }
+        isWorking = true
+        defer { isWorking = false }
+        let outcome = await ReviewActions.approve(
+            records, writer: writer, store: store, listName: settings.resolvedListName,
+            storedListID: UserDefaults.standard.string(forKey: ReviewViewModel.listIDKey), clock: clock,
+            datePolicy: settings.reminderDatePolicy)
+        if let id = outcome.listID { UserDefaults.standard.set(id, forKey: ReviewViewModel.listIDKey) }
+        session.apply(outcome.results)
+        patchAll(outcome.results)
+        let failed = outcome.results.filter { $0.status == .failed }.count
+        if failed > 0 {
+            message = "\(failed) \(failed == 1 ? "reminder" : "reminders") couldn't be added automatically. Try again from the review panel."
+        }
+        Self.log.notice("auto-added \(outcome.results.count - failed, privacy: .public) reminders, failed \(failed, privacy: .public)")
         await settled()
     }
 

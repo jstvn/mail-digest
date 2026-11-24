@@ -227,17 +227,19 @@ public enum ReviewActions {
     /// Writes the given suggestions to Reminders. Never touches anything outside `suggestions`.
     public static func approve(_ suggestions: [Suggestion], state: ReviewState, emails: [String: EmailContext],
                                writer: ReminderWriter, store: DigestStore, listName: String,
-                               storedListID: String?, clock: Clock) async -> ApprovalOutcome {
+                               storedListID: String?, clock: Clock,
+                               datePolicy: ReminderDatePolicy = ReminderDatePolicy()) async -> ApprovalOutcome {
         await approve(suggestions.map { Entry(suggestion: $0, category: category(for: $0, in: state), email: emails[$0.emailID]) },
-                      writer: writer, store: store, listName: listName, storedListID: storedListID, clock: clock)
+                      writer: writer, store: store, listName: listName, storedListID: storedListID, clock: clock, datePolicy: datePolicy)
     }
 
     /// Cross-digest approve: each record is written with its own category and email, and persisted
     /// against its own digest. Behaves exactly like the per-digest overload.
     public static func approve(_ records: [SuggestionRecord], writer: ReminderWriter, store: DigestStore,
-                               listName: String, storedListID: String?, clock: Clock) async -> ApprovalOutcome {
+                               listName: String, storedListID: String?, clock: Clock,
+                               datePolicy: ReminderDatePolicy = ReminderDatePolicy()) async -> ApprovalOutcome {
         await approve(records.map { Entry(suggestion: $0.suggestion, category: $0.category, email: $0.email) },
-                      writer: writer, store: store, listName: listName, storedListID: storedListID, clock: clock)
+                      writer: writer, store: store, listName: listName, storedListID: storedListID, clock: clock, datePolicy: datePolicy)
     }
 
     /// Marks suggestions dismissed and records a `.dismissed` decision for each.
@@ -261,7 +263,8 @@ public enum ReviewActions {
     }
 
     private static func approve(_ entries: [Entry], writer: ReminderWriter, store: DigestStore, listName: String,
-                                storedListID: String?, clock: Clock) async -> ApprovalOutcome {
+                                storedListID: String?, clock: Clock,
+                                datePolicy: ReminderDatePolicy) async -> ApprovalOutcome {
         guard !entries.isEmpty else { return ApprovalOutcome(listID: storedListID, results: [], decisions: []) }
 
         let listID: String
@@ -279,6 +282,8 @@ public enum ReviewActions {
             return ApprovalOutcome(listID: nil, results: failed, decisions: [])
         }
 
+        // One writer time for the whole batch, so every reminder in it targets the same plan moment.
+        let writeTime = clock.now()
         var results: [Suggestion] = []
         var decisions: [Decision] = []
         for entry in entries {
@@ -287,7 +292,8 @@ public enum ReviewActions {
                 // A list chosen in the inspector wins, unless it was deleted since: then the default list is used.
                 var target = listID
                 if let chosen = s.reminderListID, chosen != listID, await writer.listExists(id: chosen) { target = chosen }
-                s.reminderID = try await writer.write(s, category: entry.category, email: entry.email, toList: target)
+                s.reminderID = try await writer.write(s, category: entry.category, email: entry.email, toList: target,
+                                                datePolicy: datePolicy, now: writeTime)
                 s.status = .approved
                 s.decidedAt = clock.now()
                 if let email = entry.email {

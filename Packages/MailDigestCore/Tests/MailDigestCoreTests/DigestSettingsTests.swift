@@ -236,4 +236,21 @@ import Testing
         let again = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s))
         #expect(again == s && again.triageModel == "tev1:0.8b-q8_0" && again.triageModelDefaultRevision == 3)
     }
+
+    @Test func reminderDateSettingsDefaultAndDecodeTolerantly() throws {
+        let d = DigestSettings()
+        #expect(d.reminderDateMode == .planToday && d.reminderPlanHour == 20 && d.reminderPlanMinute == 0)
+        #expect(d.autoAddSuggestedReminders == false)
+        #expect(d.reminderDatePolicy == ReminderDatePolicy())
+        let old = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"runHour":8}"#.utf8))
+        #expect(old.reminderDateMode == .planToday && old.reminderPlanHour == 20 && !old.autoAddSuggestedReminders)
+        let unknown = try JSONDecoder().decode(DigestSettings.self, from: Data(#"{"reminderDateMode":"nope"}"#.utf8))
+        #expect(unknown.reminderDateMode == .planToday)
+        var s = DigestSettings()
+        s.reminderDateMode = .emailDeadline; s.reminderPlanHour = 7; s.reminderPlanMinute = 15
+        s.autoAddSuggestedReminders = true
+        let round = try JSONDecoder().decode(DigestSettings.self, from: JSONEncoder().encode(s))
+        #expect(round == s)
+        #expect(round.reminderDatePolicy == ReminderDatePolicy(mode: .emailDeadline, planHour: 7, planMinute: 15))
+    }
 }

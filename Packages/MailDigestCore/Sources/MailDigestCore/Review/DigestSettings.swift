@@ -66,6 +66,12 @@ public struct DigestSettings: Codable, Sendable, Equatable {
     public var showSenderLogos: Bool
     /// Which engine runs the local digest model (Q100). Ollama unless the user chooses otherwise.
     public var localProvider: LocalProvider
+    /// Q101: which date a written reminder gets, and the plan time (hour and minute, app time zone).
+    public var reminderDateMode: ReminderDateMode
+    public var reminderPlanHour: Int
+    public var reminderPlanMinute: Int
+    /// Q101: approve the preselected suggestions of each finished Daily job automatically. Off by default.
+    public var autoAddSuggestedReminders: Bool
 
     /// Which triage-model strategy generation the stored value was written under.
     /// Revision 2 made Kev 4B the default (Kev 0.8B stayed as the low-memory option); revision 3 retired
@@ -110,7 +116,15 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                 claudeCodePrivacyAcknowledgedRevision: Int? = nil,
                 triageModelDefaultRevision: Int? = DigestSettings.currentTriageModelDefaultRevision,
                 showSenderLogos: Bool = false, localProvider: LocalProvider = .ollama,
-                privacyThresholdDefaultRevision: Int? = DigestSettings.currentPrivacyThresholdDefaultRevision) {
+                privacyThresholdDefaultRevision: Int? = DigestSettings.currentPrivacyThresholdDefaultRevision,
+                reminderDateMode: ReminderDateMode = .planToday,
+                reminderPlanHour: Int = ReminderDatePolicy.defaultPlanHour,
+                reminderPlanMinute: Int = ReminderDatePolicy.defaultPlanMinute,
+                autoAddSuggestedReminders: Bool = false) {
+        self.reminderDateMode = reminderDateMode
+        self.reminderPlanHour = reminderPlanHour
+        self.reminderPlanMinute = reminderPlanMinute
+        self.autoAddSuggestedReminders = autoAddSuggestedReminders
         self.privacyThresholdDefaultRevision = privacyThresholdDefaultRevision
         self.showSenderLogos = showSenderLogos
         self.localProvider = localProvider
@@ -156,6 +170,7 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         case cloudDigestEnabled, geminiModel, triageModel, privacyThreshold, cloudPrivacyAcknowledgedRevision
         case triageModelDefaultRevision, showSenderLogos, privacyThresholdDefaultRevision
         case cloudProvider, claudeCodeModel, claudeCodePrivacyAcknowledgedRevision, localProvider
+        case reminderDateMode, reminderPlanHour, reminderPlanMinute, autoAddSuggestedReminders
     }
 
     /// Tolerant decoding: unknown or missing keys keep their defaults, so adding a setting never loses the rest.
@@ -228,7 +243,14 @@ public struct DigestSettings: Codable, Sendable, Equatable {
                   claudeCodePrivacyAcknowledgedRevision: try c.decodeIfPresent(
                       Int.self, forKey: .claudeCodePrivacyAcknowledgedRevision),
                   showSenderLogos: try c.decodeIfPresent(Bool.self, forKey: .showSenderLogos) ?? d.showSenderLogos,
-                  localProvider: (try? c.decodeIfPresent(LocalProvider.self, forKey: .localProvider)) ?? d.localProvider)
+                  localProvider: (try? c.decodeIfPresent(LocalProvider.self, forKey: .localProvider)) ?? d.localProvider,
+                  reminderDateMode: (try? c.decodeIfPresent(ReminderDateMode.self, forKey: .reminderDateMode))
+                      ?? d.reminderDateMode,
+                  reminderPlanHour: try c.decodeIfPresent(Int.self, forKey: .reminderPlanHour) ?? d.reminderPlanHour,
+                  reminderPlanMinute: try c.decodeIfPresent(Int.self, forKey: .reminderPlanMinute)
+                      ?? d.reminderPlanMinute,
+                  autoAddSuggestedReminders: try c.decodeIfPresent(Bool.self, forKey: .autoAddSuggestedReminders)
+                      ?? d.autoAddSuggestedReminders)
     }
 
     /// Writes every key, including a nil `cloudProvider` as null: a missing key would be read back as a
@@ -268,6 +290,10 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         try c.encode(cloudProvider, forKey: .cloudProvider)
         try c.encode(claudeCodeModel, forKey: .claudeCodeModel)
         try c.encode(localProvider, forKey: .localProvider)
+        try c.encode(reminderDateMode, forKey: .reminderDateMode)
+        try c.encode(reminderPlanHour, forKey: .reminderPlanHour)
+        try c.encode(reminderPlanMinute, forKey: .reminderPlanMinute)
+        try c.encode(autoAddSuggestedReminders, forKey: .autoAddSuggestedReminders)
         try c.encodeIfPresent(claudeCodePrivacyAcknowledgedRevision, forKey: .claudeCodePrivacyAcknowledgedRevision)
     }
 
@@ -331,6 +357,11 @@ public struct DigestSettings: Codable, Sendable, Equatable {
         } else if previous?.autoFileProcessed != true || autoFileEnabledAt == nil {
             autoFileEnabledAt = now
         }
+    }
+
+    /// The Q101 date rules these settings describe.
+    public var reminderDatePolicy: ReminderDatePolicy {
+        ReminderDatePolicy(mode: reminderDateMode, planHour: reminderPlanHour, planMinute: reminderPlanMinute)
     }
 
     /// The Reminders list name, or the default when blank.

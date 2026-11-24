@@ -30,7 +30,7 @@ Mail Digest is a native macOS menu bar app. Every morning it reads new mail from
 
 ## Architecture
 
-The `DigestPipeline` in `MailDigestCore` runs every step through protocols. The app supplies real adapters; tests supply fakes. Nothing is written to Reminders until the user approves it in the panel.
+The `DigestPipeline` in `MailDigestCore` runs every step through protocols. The app supplies real adapters; tests supply fakes. Nothing is written to Reminders until the user approves it in the panel, except preselected suggestions from a Daily job when the user turns on "Add Suggested Reminders Automatically" (Q101, default off).
 
 ```text
 Scheduler / user ──> JobRunner (core actor: queue, pause, resume, stop)
@@ -762,6 +762,7 @@ public protocol ReminderWriter: Sendable {
 - **The app's list:** on first approval (or first run), `ensureList` looks up the stored `calendarIdentifier`; if it's missing, it creates an `EKCalendar(for: .reminder, eventStore:)` named from settings (default "Mail Digest"), with `source` = the source of `defaultCalendarForNewReminders()` so it lives in iCloud and syncs to iPhone. The identifier is saved; renaming in Settings renames the same list. If the user deletes the list in Reminders, the next approval recreates it
 - `title` = suggestion title; `calendar` = the app's list
 - `dueDateComponents` = date only, or date plus hour and minute when `dueHasTime`; add an `EKAlarm` at 9:00 on the day for date-only, or 1 hour before for timed items
+- **Reminder date mode (Q101):** by default (`planToday`) the reminder is due at the plan time (default 20:00) on the day it is written, or the next day if that time has passed, never later than the real deadline; the real deadline is kept as a title suffix ` (due Mon 1 Dec)`. In `emailDeadline` mode the rule above applies and undated items fall back to the plan time. Every written reminder has a date
 - `priority` = high 1, medium 5, low 9
 - `notes` = `From <sender> · <subject>` (prefilled when Notes is empty and editable before adding, or the user's own text), then one `• <step>` line per step, then `"<evidence>"`, then `#<category>` (Q83, Q88). EventKit has no subtask API
 - **Tags:** EventKit has no public API for Reminders tags. v1 writes the category as a `#category` hashtag at the end of `notes` (searchable in Reminders). The agent must note this in `MAC_TODO.md` so Justin can check how it shows on macOS 26 and iOS; if Reminders doesn't treat it as a real tag, it stays as searchable text. No private APIs

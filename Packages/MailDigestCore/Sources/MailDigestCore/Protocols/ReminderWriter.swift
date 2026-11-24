@@ -8,8 +8,10 @@ public protocol ReminderWriter: Sendable {
     /// Whether a list with this id still exists and accepts new reminders.
     func listExists(id: String) async -> Bool
     /// Writes one approved suggestion to the list and returns the reminder id. `email` supplies the sender and
-    /// subject for the notes; it is nil only when the job's email rows are unavailable.
-    func write(_ suggestion: Suggestion, category: Category, email: EmailContext?, toList listID: String) async throws -> String
+    /// subject for the notes; it is nil only when the job's email rows are unavailable. `datePolicy` and `now` pick
+    /// the written due date and alarm (Q101).
+    func write(_ suggestion: Suggestion, category: Category, email: EmailContext?, toList listID: String,
+               datePolicy: ReminderDatePolicy, now: Date) async throws -> String
 }
 
 extension ReminderWriter {

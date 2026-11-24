@@ -817,3 +817,13 @@ Nothing here has been run: development is on an Intel Mac. Run the MLX and bench
   - Measure memory with Kev MLX bf16 plus the digest model loaded.
 - Only after these pass: decide whether Apple silicon defaults change. Q100 keeps defaults unchanged by chip until then.
 - The app launches on a macOS 15 machine. FoundationModels is weak-linked; `LC_LOAD_WEAK_DYLIB` is confirmed in the binary, but the launch itself is unverified.
+
+## Reminder dates and automatic adding (Q101)
+
+- With "Add Suggested Reminders Automatically" on and Reminders access granted, finish a Daily run (Run Now): the preselected suggestions appear in the Mail Digest list without opening the review panel and show as approved. Unselected items and `money-new-sender` items stay pending. A Backlog run adds nothing.
+- Reminders access missing or a write failing: the suggestion shows as failed inline and can be retried from the review panel.
+- Plan Ahead mode before 20:00: an approved reminder with a later deadline is due today at 20:00, alerts at 20:00, and the title ends with ` (due Mon 1 Dec)` (with the time when the deadline is timed). Check how the title and the date read in Reminders on the Mac and on iPhone.
+- Approving after 20:00 lands the reminder tomorrow at 20:00.
+- A deadline earlier than that moment (for example today 15:00) is written as the deadline with no suffix.
+- Deadline from Email mode: a dated suggestion keeps its date and alarm; an undated one gets a due date at the chosen time and alerts.
+- Settings > Reminders: changing the mode switches the time picker label between "Remind At" and "Undated Reminders At", and the setting survives a relaunch.

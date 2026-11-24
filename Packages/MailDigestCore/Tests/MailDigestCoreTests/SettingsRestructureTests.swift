@@ -61,6 +61,7 @@ import Testing
             "quietHoursStartMinute", "quietHoursEndMinute", "cloudDigestEnabled", "geminiModel", "triageModel", "cloudProvider", "claudeCodeModel",
             "privacyThreshold", "cloudPrivacyAcknowledgedRevision", "triageModelDefaultRevision", "showSenderLogos",
             "privacyThresholdDefaultRevision", "autoFileHandledDestination", "autoFileDismissedDestination",
+            "reminderDateMode", "reminderPlanHour", "reminderPlanMinute", "autoAddSuggestedReminders",
         ])
     }
 

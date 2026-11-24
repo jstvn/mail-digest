@@ -116,6 +116,7 @@ private struct RemindersListSection: View {
     }
 
     var body: some View {
+        @Bindable var store = run.settings
         Section {
             if reminders.status == .granted {
                 Picker("Add Reminders To", selection: Binding(get: { selectedID }, set: { choose($0) })) {
@@ -127,12 +128,48 @@ private struct RemindersListSection: View {
                 LabeledContent("Add Reminders To", value: name)
                 accessRow
             }
+            Toggle(isOn: $store.settings.autoAddSuggestedReminders) {
+                Text("Add Suggested Reminders Automatically")
+            }
+            Picker("Reminder Date", selection: $store.settings.reminderDateMode) {
+                Text("Plan Ahead on the Day It Arrives").tag(ReminderDateMode.planToday)
+                Text("Deadline from Email").tag(ReminderDateMode.emailDeadline)
+            }
+            DatePicker(planTimeTitle, selection: planTime, displayedComponents: .hourAndMinute)
+                .accessibilityLabel(planTimeTitle)
         } header: {
             Text("Reminders")
         } footer: {
-            Text("Nothing is added until you press Add to Reminders.")
+            VStack(alignment: .leading, spacing: 4) {
+                Text(store.settings.autoAddSuggestedReminders
+                     ? "Only preselected suggestions from the daily digest. Payment requests from new senders always wait for your review."
+                     : "Nothing is added until you press Add to Reminders, unless you turn on automatic adding.")
+                Text(store.settings.reminderDateMode == .planToday
+                     ? "Reminders are due at this time on the day they\u{2019}re added, or the next day if it has passed. The email\u{2019}s deadline stays in the title. Times use Brisbane time."
+                     : "Reminders use the deadline from the email. Reminders without a deadline are due at this time, on the day they\u{2019}re added or the next day. Times use Brisbane time.")
+            }
         }
         .onAppear { reminders.refresh() }
+    }
+
+    private var store: SettingsStore { run.settings }
+
+    private var planTimeTitle: String {
+        store.settings.reminderDateMode == .planToday ? "Remind At" : "Undated Reminders At"
+    }
+
+    /// The plan time as a time-of-day picker value over the stored hour and minute.
+    private var planTime: Binding<Date> {
+        Binding(
+            get: {
+                Calendar.current.date(bySettingHour: store.settings.reminderPlanHour,
+                                      minute: store.settings.reminderPlanMinute, second: 0, of: .now) ?? .now
+            },
+            set: { date in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                store.settings.reminderPlanHour = parts.hour ?? ReminderDatePolicy.defaultPlanHour
+                store.settings.reminderPlanMinute = parts.minute ?? ReminderDatePolicy.defaultPlanMinute
+            })
     }
 
     private func choose(_ id: String?) {

@@ -12,6 +12,8 @@ public struct WrittenReminder: Sendable, Equatable {
     public var category: Category
     public var email: EmailContext?
     public var listID: String
+    public var datePolicy: ReminderDatePolicy = ReminderDatePolicy()
+    public var now: Date = Date(timeIntervalSince1970: 0)
 }
 
 /// `ReminderWriter` fake that records lists, renames and writes.
@@ -51,10 +53,12 @@ public actor RecordingReminderWriter: ReminderWriter {
         renames.append((id: id, name: name))
     }
 
-    public func write(_ suggestion: Suggestion, category: Category, email: EmailContext?, toList listID: String) async throws -> String {
+    public func write(_ suggestion: Suggestion, category: Category, email: EmailContext?, toList listID: String,
+                      datePolicy: ReminderDatePolicy, now: Date) async throws -> String {
         if failingSuggestionIDs.contains(suggestion.id) { throw RecordingReminderError.writeFailed }
         reminderCounter += 1
-        written.append(WrittenReminder(suggestion: suggestion, category: category, email: email, listID: listID))
+        written.append(WrittenReminder(suggestion: suggestion, category: category, email: email, listID: listID,
+                                      datePolicy: datePolicy, now: now))
         return "rem-\(reminderCounter)"
     }
 }

@@ -238,7 +238,8 @@ private let emails: [String: EmailContext] = [
         struct BadWriter: ReminderWriter {
             func ensureList(named name: String, storedID: String?) async throws -> String { throw Boom() }
             func renameList(id: String, to name: String) async throws {}
-            func write(_ suggestion: Suggestion, category: Category, email: EmailContext?, toList listID: String) async throws -> String { "x" }
+            func write(_ suggestion: Suggestion, category: Category, email: EmailContext?, toList listID: String,
+                       datePolicy: ReminderDatePolicy, now: Date) async throws -> String { "x" }
         }
         let a = sug("Pay fees")
         let state = ReviewState(digest: digest([a]))
@@ -369,5 +370,27 @@ private let emails: [String: EmailContext] = [
         let written = await writer.written
         #expect(written[0].listID == "uni")
         #expect(written[1].listID == out.listID) // the default list
+    }
+}
+
+@Suite struct ReviewActionsDatePolicyTests {
+    @Test func approvePassesPolicyAndOneClockTimeToTheWriter() async throws {
+        let s = Suggestion(id: UUID(), emailID: "e", title: "T", due: nil, dueHasTime: false, priority: .low,
+                           evidence: "x", confidence: 0.8, preselected: true, flags: [], status: .pending, reminderID: nil)
+        let d = Digest(id: UUID(), createdAt: Date(timeIntervalSince1970: 0), headline: "", emailCount: 1,
+                       suggestions: [s], info: [], skipped: [])
+        let store = InMemoryDigestStore()
+        try await store.save(d)
+        let writer = RecordingReminderWriter()
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let policy = ReminderDatePolicy(mode: .emailDeadline, planHour: 7, planMinute: 30)
+        let rec = SuggestionRecord(suggestion: s, digestID: d.id, digestCreatedAt: d.createdAt, kind: .daily,
+                                   category: .other, email: nil)
+        _ = await ReviewActions.approve([rec], writer: writer, store: store, listName: "L", storedListID: nil,
+                                        clock: FixedClock(now), datePolicy: policy)
+        let written = await writer.written
+        #expect(written.count == 1)
+        #expect(written[0].datePolicy == policy)
+        #expect(written[0].now == now)
     }
 }
