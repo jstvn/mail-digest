@@ -141,6 +141,28 @@ extension StubNetworkTests {
         #expect(StubURLProtocol.requests.count == 2)
     }
 
+    @Test func lengthStopFailsWithoutRetry() async throws {
+        StubURLProtocol.install { _ in
+            let body: [String: JSONValue] = [
+                "message": .object(["role": .string("assistant"), "content": .string(validContent)]),
+                "done_reason": .string("length"),
+            ]
+            return StubResponse(body: try! JSONValue.object(body).stableData())
+        }
+        let email = try assessmentEmail()
+        await #expect(throws: LLMError.malformedResponse("the answer was too long")) {
+            try await client().extract(email, tier: .full, today: today, timeZone: tz)
+        }
+        #expect(StubURLProtocol.requests.count == 1)
+    }
+
+    @Test func tokenCapsInRequests() throws {
+        let extraction = try client().makeExtractionRequest(assessmentEmail(), tier: .full, today: today, timeZone: tz)
+        #expect(String(decoding: extraction.httpBody!, as: UTF8.self).contains("\"num_predict\":1024"))
+        let headline = try client().makeHeadlineRequest(info: [], suggestionCount: 0)
+        #expect(String(decoding: headline.httpBody!, as: UTF8.self).contains("\"num_predict\":256"))
+    }
+
     @Test func malformedThenValidSucceeds() async throws {
         let counter = Counter()
         StubURLProtocol.install { _ in

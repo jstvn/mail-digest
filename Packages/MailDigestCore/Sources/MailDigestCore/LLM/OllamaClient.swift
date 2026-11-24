@@ -43,6 +43,10 @@ public struct OllamaClient: LLMClient {
     public let healthCheckTimeout: TimeInterval
     private let session: URLSession
 
+    /// Answer-length caps (Q100): a runaway generation can't hold the serial runner for minutes.
+    public static let extractionMaxTokens = 1024
+    public static let headlineMaxTokens = 256
+
     public init(baseURL: URL = URL(string: "http://localhost:11434")!, model: String = "qwen3:4b",
                 session: URLSession = .shared, extractTimeout: TimeInterval = 1000,
                 headlineTimeout: TimeInterval = 180, healthCheckTimeout: TimeInterval = 10) {
@@ -62,17 +66,19 @@ public struct OllamaClient: LLMClient {
         let p = Prompts.extraction(email, tier: tier, trustedNewsletter: trustedNewsletter,
                                    today: today, timeZone: timeZone)
         return try chatRequest(system: p.system, user: p.user,
-                        format: ExtractionSchema.json, timeout: extractTimeout)
+                        format: ExtractionSchema.json, timeout: extractTimeout,
+                               maxTokens: Self.extractionMaxTokens)
     }
 
     /// Builds the `/api/chat` request for the headline call (no `format`).
     public func makeHeadlineRequest(info: [InfoItem], suggestionCount: Int) throws -> URLRequest {
         let p = Prompts.headline(info: info, suggestionCount: suggestionCount)
         return try chatRequest(system: p.system, user: p.user,
-                        format: nil, timeout: headlineTimeout)
+                        format: nil, timeout: headlineTimeout, maxTokens: Self.headlineMaxTokens)
     }
 
-    private func chatRequest(system: String, user: String, format: JSONValue?, timeout: TimeInterval) throws -> URLRequest {
+    private func chatRequest(system: String, user: String, format: JSONValue?, timeout: TimeInterval,
+                              maxTokens: Int) throws -> URLRequest {
         var body: [String: JSONValue] = [
             "model": .string(model),
             "messages": .array([
@@ -82,7 +88,8 @@ public struct OllamaClient: LLMClient {
             "think": .bool(false),
             "stream": .bool(false),
             "keep_alive": .string("10m"),
-            "options": .object(["temperature": .number(0), "num_ctx": .number(8192)]),
+            "options": .object(["temperature": .number(0), "num_ctx": .number(8192),
+                                "num_predict": .number(Double(maxTokens))]),
         ]
         if let format { body["format"] = format }
         var request = URLRequest(url: baseURL.appendingPathComponent("api/chat"))
@@ -119,7 +126,13 @@ public struct OllamaClient: LLMClient {
                         today: Date, timeZone: TimeZone) async throws -> ExtractionResult {
         let request = try makeExtractionRequest(email, tier: tier, trustedNewsletter: trustedNewsletter,
                                                 today: today, timeZone: timeZone)
-        let result = try await withRetry { try Self.decodeExtraction(try await send(request)) }
+        let result: ExtractionResult
+        do {
+            result = try await withRetry { try Self.decodeExtraction(try await send(request)) }
+        } catch is TruncatedAnswer {
+            // Not retried: a second run would hit the same cap and cost the same minutes.
+            throw LLMError.malformedResponse("the answer was too long")
+        }
         return result.applyingTierRules(tier: tier)
     }
 
@@ -136,7 +149,14 @@ public struct OllamaClient: LLMClient {
         do { return try await body() } catch LLMError.malformedResponse { return try await body() }
     }
 
-    private struct Envelope: Decodable { struct Message: Decodable { var content: String }; var message: Message }
+    /// The model stopped at `num_predict`; `withRetry` lets it through so `extract` can map it.
+    private struct TruncatedAnswer: Error {}
+
+    private struct Envelope: Decodable {
+        struct Message: Decodable { var content: String }
+        var message: Message
+        var done_reason: String?
+    }
 
     static func decodeContent(_ data: Data) throws -> String {
         do { return try JSONDecoder().decode(Envelope.self, from: data).message.content }
@@ -144,7 +164,11 @@ public struct OllamaClient: LLMClient {
     }
 
     static func decodeExtraction(_ data: Data) throws -> ExtractionResult {
-        let content = try decodeContent(data)
+        let envelope: Envelope
+        do { envelope = try JSONDecoder().decode(Envelope.self, from: data) }
+        catch { throw LLMError.malformedResponse("response envelope not readable") }
+        if envelope.done_reason == "length" { throw TruncatedAnswer() }
+        let content = envelope.message.content
         guard let result = ExtractionResult.decode(jsonText: content) else {
             throw LLMError.malformedResponse("content is not valid extraction JSON")
         }

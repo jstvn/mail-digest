@@ -43,7 +43,13 @@ struct FoundationModelsClient: LLMClient {
     var budget = FoundationModelsBudget()
 
     // Greedy sampling for repeatable extraction, the counterpart of Ollama's temperature 0.
-    private static var greedy: GenerationOptions { GenerationOptions(sampling: .greedy) }
+    // Token caps match the Ollama client (Q100).
+    private static var extractionOptions: GenerationOptions {
+        GenerationOptions(sampling: .greedy, maximumResponseTokens: OllamaClient.extractionMaxTokens)
+    }
+    private static var headlineOptions: GenerationOptions {
+        GenerationOptions(sampling: .greedy, maximumResponseTokens: OllamaClient.headlineMaxTokens)
+    }
 
     func healthCheck() async throws {
         if case .unavailable = availability() {
@@ -81,7 +87,7 @@ struct FoundationModelsClient: LLMClient {
                                          today: today, timeZone: timeZone)
         let session = LanguageModelSession(instructions: prompts.system)
         let response = try await session.respond(to: prompts.user, generating: GeneratedExtraction.self,
-                                                 options: Self.greedy)
+                                                 options: Self.extractionOptions)
         return response.content.result.applyingTierRules(tier: tier)
     }
 
@@ -90,7 +96,7 @@ struct FoundationModelsClient: LLMClient {
         let prompts = Prompts.headline(info: info, suggestionCount: suggestionCount)
         do {
             let session = LanguageModelSession(instructions: prompts.system)
-            let response = try await session.respond(to: prompts.user, options: Self.greedy)
+            let response = try await session.respond(to: prompts.user, options: Self.headlineOptions)
             return response.content.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch let error as LanguageModelSession.GenerationError {
             throw Self.map(error)

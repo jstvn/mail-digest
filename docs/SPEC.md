@@ -430,8 +430,8 @@ Apply sender and newsletter rules in this precedence order: **Blocked â†’ VIP â†
 **Ollama client (`OllamaClient: LLMClient`)**
 
 - `POST {baseURL}/api/chat`, default base URL `http://localhost:11434`
-- Body: `model: "qwen3:4b"`, `think: false`, `stream: false`, `format: <JSON schema>`, `keep_alive: "10m"`, `options: { temperature: 0, num_ctx: 8192 }`
-- Decode `message.content` as JSON into `ExtractionResult`; on decode failure retry once, then mark the email as failed (it shows under Skipped with reason)
+- Body: `model: "qwen3:4b"`, `think: false`, `stream: false`, `format: <JSON schema>`, `keep_alive: "10m"`, `options: { temperature: 0, num_ctx: 8192, num_predict: 1024 }` (headline: `num_predict: 256`, Q100)
+- Decode `message.content` as JSON into `ExtractionResult`; on decode failure retry once, then mark the email as failed (it shows under Skipped with reason). An answer cut off by `num_predict` (`done_reason: "length"`) is failed without a retry, because temperature 0 would repeat it (Q100)
 - Request timeouts (Q35): `extract()` 1,000 seconds, because prompt evaluation of a long email on an Intel CPU can take many minutes; `headline()` 180 seconds; `healthCheck()` 10 seconds. `healthCheck()` calls `GET /api/tags` and confirms the model is present. Bodies keep the 24,000-character cleaning limit; there is no further truncation, chunking or multi-stage extraction. A timed-out extraction is reported as `LLMError.timedOut` and is not retried automatically; the user can retry it from the job's failed items.
 - Requests run one at a time (CPU-bound machine)
 
