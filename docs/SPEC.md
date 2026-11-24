@@ -497,7 +497,7 @@ confidence: 0 to 1, how sure you are the user must act.
 
 `{info_only_rule}` = `tasks must be an empty array.` for the `infoOnly` tier, otherwise empty. The prompt also receives whether the sender is explicitly configured as a Trusted Newsletter. The schema permits up to 8 items so trusted newsletters can be represented; deterministic validation enforces a maximum of 3 for ordinary mail and 8 for trusted newsletters. The user message is: `Subject: ...`, `From: ...`, `Received: ...`, then `<email>` + cleaned body + `</email>`.
 
-**Headline call**: send the list of `{category, importance, summary}` (no bodies) and ask for 1 to 2 sentences naming the most important items, never referring to the reader or recipient. Plain text, `format` omitted.
+**Headline call**: send the list of `{category, importance, summary}` (no bodies) and ask for 1 to 2 sentences naming the most important items, never referring to the reader or recipient. Ollama requests use a JSON-schema `format` (one required string property `headline`), so the model cannot write reasoning into the answer; a reply cut off by `num_predict` (`done_reason: "length"`) is a failure and is not retried. For every provider the pipeline accepts a headline only when, after trimming, it is non-empty, a single line and at most 280 characters; otherwise the count fallback ("N emails, M suggestions.") is used (Q102).
 
 Unit-test the request body builder and the response decoder with fixtures in `Fixtures/llm/`; never call a real server in tests.
 

@@ -119,8 +119,7 @@ public struct DigestPipeline: Sendable {
         let pending = digest.suggestions.filter { $0.status == .pending }.count
         if digest.info.isEmpty && digest.suggestions.isEmpty { return Self.fallbackHeadline(emails: digest.emailCount, suggestions: pending) }
         if let text = try? await llm.headline(for: digest.info, suggestionCount: pending) {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty { return trimmed }
+            if let valid = HeadlineValidator.validated(text) { return valid }
         }
         return Self.fallbackHeadline(emails: digest.emailCount, suggestions: pending)
     }

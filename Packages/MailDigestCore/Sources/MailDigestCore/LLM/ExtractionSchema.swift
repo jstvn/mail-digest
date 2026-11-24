@@ -40,3 +40,13 @@ public enum ExtractionSchema {
         "required": strings(["summary", "category", "importance", "key_facts", "tasks"]),
     ])
 }
+
+/// The JSON schema for the headline call (Q102). Constrained decoding keeps qwen3 from writing
+/// its reasoning into the answer, which free-text replies did.
+public enum HeadlineSchema {
+    public static let json: JSONValue = .object([
+        "type": .string("object"),
+        "properties": .object(["headline": .object(["type": .string("string")])]),
+        "required": .array([.string("headline")]),
+    ])
+}

@@ -79,9 +79,9 @@ public enum Prompts {
     public static let headlineSystem = """
         You write the headline of a morning email digest. \
         You get a JSON array of emails, each with category, importance (1 to 5) and summary. \
-        Reply with 1 to 2 plain sentences naming the most important items. \
+        Reply with a JSON object whose "headline" field holds 1 to 2 plain sentences naming the most important items. \
         Never refer to the reader or recipient: no "user", "you" or "recipient". \
-        No lists, no markdown, no preamble.
+        No lists, no markdown, no preamble in the headline.
         """
 
     /// User message for the headline call; sends summaries only, never bodies.

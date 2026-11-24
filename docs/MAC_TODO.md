@@ -827,3 +827,4 @@ Nothing here has been run: development is on an Intel Mac. Run the MLX and bench
 - A deadline earlier than that moment (for example today 15:00) is written as the deadline with no suffix.
 - Deadline from Email mode: a dated suggestion keeps its date and alarm; an undated one gets a due date at the chosen time and alerts.
 - Settings > Reminders: changing the mode switches the time picker label between "Remind At" and "Undated Reminders At", and the setting survives a relaunch.
+- After a Daily run on the Intel Mac, the Today headline is one or two plain sentences (or the "N emails, M suggestions." count fallback), never reasoning text (Q102).

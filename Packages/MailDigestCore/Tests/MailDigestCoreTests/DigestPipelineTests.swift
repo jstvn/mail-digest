@@ -133,6 +133,14 @@ private func fixture(_ prefix: String) throws -> EmailMessage {
         #expect(await p.headline(for: digest) == "23 emails, 1 suggestion.")
     }
 
+    @Test func headlineFallsBackOnReasoningText() async {
+        let llm = StubLLMClient(headlineText: "We are given a JSON array of emails.\nHowever, the")
+        let p = pipeline(llm)
+        let info = InfoItem(id: "a", emailID: "a", category: .other, importance: 1, summary: "s", keyFacts: [], pinned: false)
+        let digest = Digest(id: UUID(), createdAt: today, headline: "", emailCount: 2, suggestions: [], info: [info], skipped: [])
+        #expect(await p.headline(for: digest) == "2 emails, 0 suggestions.")
+    }
+
     @Test func headlineFallsBackWhenModelThrows() async {
         struct Failing: LLMClient {
             func healthCheck() async throws {}

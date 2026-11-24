@@ -160,7 +160,12 @@ extension StubNetworkTests {
         let extraction = try client().makeExtractionRequest(assessmentEmail(), tier: .full, today: today, timeZone: tz)
         #expect(String(decoding: extraction.httpBody!, as: UTF8.self).contains("\"num_predict\":1024"))
         let headline = try client().makeHeadlineRequest(info: [], suggestionCount: 0)
-        #expect(String(decoding: headline.httpBody!, as: UTF8.self).contains("\"num_predict\":256"))
+        let text = String(decoding: headline.httpBody!, as: UTF8.self)
+        #expect(text.contains("\"num_predict\":256"))
+        #expect(text.contains("\"think\":false"))
+        let body = try JSONDecoder().decode(JSONValue.self, from: #require(headline.httpBody))
+        guard case .object(let fields) = body else { Issue.record("not an object"); return }
+        #expect(fields["format"] == HeadlineSchema.json)
     }
 
     @Test func malformedThenValidSucceeds() async throws {
@@ -253,15 +258,38 @@ extension StubNetworkTests {
         let request = try client().makeHeadlineRequest(info: info, suggestionCount: 2)
         let body = try JSONDecoder().decode(JSONValue.self, from: #require(request.httpBody))
         guard case .object(let fields) = body else { Issue.record("not an object"); return }
-        #expect(fields["format"] == nil)
+        #expect(fields["format"] == HeadlineSchema.json)
         #expect(fields["think"] == .bool(false))
         let text = String(decoding: request.httpBody!, as: UTF8.self)
         #expect(text.contains("Assessment due."))
         #expect(!text.contains("secret fact"))
 
-        StubURLProtocol.install { _ in StubResponse(body: chatReply("  Assessment due Monday.\n")) }
+        StubURLProtocol.install { _ in StubResponse(body: chatReply(#"{"headline":"  Assessment due Monday.\n"}"#)) }
         let headline = try await client().headline(for: info, suggestionCount: 2)
         #expect(headline == "Assessment due Monday.")
+    }
+
+    @Test func headlineLengthStopFailsWithoutRetry() async throws {
+        StubURLProtocol.install { _ in
+            let body: [String: JSONValue] = [
+                "message": .object(["role": .string("assistant"), "content": .string(#"{"headline":"We are given"#)]),
+                "done_reason": .string("length"),
+            ]
+            return StubResponse(body: try! JSONValue.object(body).stableData())
+        }
+        await #expect(throws: LLMError.malformedResponse("the answer was too long")) {
+            try await client().headline(for: [], suggestionCount: 0)
+        }
+        #expect(StubURLProtocol.requests.count == 1)
+    }
+
+    @Test func headlineMalformedContentThrows() async throws {
+        for content in ["We are given a JSON array.", #"{"summary":"x"}"#] {
+            StubURLProtocol.install { _ in StubResponse(body: chatReply(content)) }
+            await #expect(throws: LLMError.malformedResponse("content is not valid headline JSON")) {
+                try await client().headline(for: [], suggestionCount: 0)
+            }
+        }
     }
 
     @Test func schemaMatchesSpecKeys() throws {

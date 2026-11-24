@@ -70,11 +70,11 @@ public struct OllamaClient: LLMClient {
                                maxTokens: Self.extractionMaxTokens)
     }
 
-    /// Builds the `/api/chat` request for the headline call (no `format`).
+    /// Builds the `/api/chat` request for the headline call (schema-constrained, Q102).
     public func makeHeadlineRequest(info: [InfoItem], suggestionCount: Int) throws -> URLRequest {
         let p = Prompts.headline(info: info, suggestionCount: suggestionCount)
         return try chatRequest(system: p.system, user: p.user,
-                        format: nil, timeout: headlineTimeout, maxTokens: Self.headlineMaxTokens)
+                        format: HeadlineSchema.json, timeout: headlineTimeout, maxTokens: Self.headlineMaxTokens)
     }
 
     private func chatRequest(system: String, user: String, format: JSONValue?, timeout: TimeInterval,
@@ -138,8 +138,13 @@ public struct OllamaClient: LLMClient {
 
     public func headline(for info: [InfoItem], suggestionCount: Int) async throws -> String {
         let request = try makeHeadlineRequest(info: info, suggestionCount: suggestionCount)
-        let content = try await withRetry { try Self.decodeContent(try await send(request)) }
-        return content.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            let text = try await withRetry { try Self.decodeHeadline(try await send(request)) }
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch is TruncatedAnswer {
+            // Not retried, same as extraction: a second run would hit the same cap.
+            throw LLMError.malformedResponse("the answer was too long")
+        }
     }
 
     // MARK: Helpers
@@ -158,9 +163,17 @@ public struct OllamaClient: LLMClient {
         var done_reason: String?
     }
 
-    static func decodeContent(_ data: Data) throws -> String {
-        do { return try JSONDecoder().decode(Envelope.self, from: data).message.content }
+    /// Reads `{"headline": "..."}` from the reply; a cut-off answer is `TruncatedAnswer`.
+    static func decodeHeadline(_ data: Data) throws -> String {
+        let envelope: Envelope
+        do { envelope = try JSONDecoder().decode(Envelope.self, from: data) }
         catch { throw LLMError.malformedResponse("response envelope not readable") }
+        if envelope.done_reason == "length" { throw TruncatedAnswer() }
+        struct Payload: Decodable { var headline: String }
+        guard let payload = try? JSONDecoder().decode(Payload.self, from: Data(envelope.message.content.utf8)) else {
+            throw LLMError.malformedResponse("content is not valid headline JSON")
+        }
+        return payload.headline
     }
 
     static func decodeExtraction(_ data: Data) throws -> ExtractionResult {
